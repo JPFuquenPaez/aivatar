@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Phase B plug-in port (§13): UI events translated to avatar events.
 enum AvatarEvent: Sendable {
@@ -37,4 +38,15 @@ nonisolated protocol TelemetrySink: Sendable {
 
 nonisolated struct NullTelemetrySink: TelemetrySink {
     func record(counter: String, value: Float) {}
+}
+
+/// os_log-backed telemetry sink (§3 ports): event counters visible in
+/// Console.app and Instruments for the on-device validation pass (§11).
+/// Records are fire-and-forget logs; nothing is buffered or shipped.
+nonisolated struct OsLogTelemetrySink: TelemetrySink {
+    private let logger = Logger(subsystem: "com.aivatar.telemetry", category: "counters")
+
+    func record(counter: String, value: Float) {
+        logger.log("\(counter, privacy: .public) = \(value, privacy: .public)")
+    }
 }

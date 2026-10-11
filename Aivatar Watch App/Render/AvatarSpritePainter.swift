@@ -137,7 +137,8 @@ nonisolated final class AvatarSpritePainter {
             }
         case "appendageA", "appendageA2", "appendageB", "appendageB2":
             switch style {
-            case .roundSparks, .crystalMix, .droopingLeaf: return "triangle"
+            case .roundSparks, .crystalMix: return "triangle"
+            case .droopingLeaf: return "leaf"
             case .softCloud: return "circle"
             case .angularClean: return "rect"
             }
@@ -193,10 +194,10 @@ nonisolated final class AvatarSpritePainter {
     private static func buildShape(_ shape: RigDocument.Shape, kind: String) -> PaintedShape {
         let w = CGFloat(shape.width)
         let h = CGFloat(shape.height)
-        // Triangles taper to a point: bending slices would break the apex,
-        // so flame/leaf/crystal appendages stay rigid (§6 flat parts stay
-        // rigid for fill rate).
-        let segments = kind == "triangle" ? 1 : max(1, shape.bendSegments ?? 1)
+        // Triangles and leaves taper to a point: bending slices would break
+        // the apex, so flame/crystal/leaf appendages stay rigid (§6 flat
+        // parts stay rigid for fill rate).
+        let segments = (kind == "triangle" || kind == "leaf") ? 1 : max(1, shape.bendSegments ?? 1)
         var paths: [CGPath] = []
         var offsetsY: [Float] = []
         var bendFractions: [Float] = []
@@ -226,6 +227,22 @@ nonisolated final class AvatarSpritePainter {
                 path.move(to: CGPoint(x: -w / 2, y: rect.maxY))
                 path.addLine(to: CGPoint(x: w / 2, y: rect.maxY))
                 path.addLine(to: CGPoint(x: 0, y: rect.minY))
+                path.closeSubpath()
+            case "leaf":
+                // Willow's accent (§5 "drooping leaf curves"): a curved,
+                // asymmetric teardrop — same attach/tip convention as the
+                // triangle accents (base low, tip up), but both edges sweep
+                // so the silhouette separates from the straight-edged
+                // flame/crystal triangles of the other round archetypes.
+                path.move(to: CGPoint(x: -w * 0.5, y: rect.maxY))
+                path.addQuadCurve(
+                    to: CGPoint(x: 0, y: rect.minY),
+                    control: CGPoint(x: -w * 0.62, y: rect.minY + h * 0.15)
+                )
+                path.addQuadCurve(
+                    to: CGPoint(x: -w * 0.5, y: rect.maxY),
+                    control: CGPoint(x: w * 0.10, y: rect.minY + h * 0.55)
+                )
                 path.closeSubpath()
             case "square":
                 // Compass head: softly rounded square — dependable, not

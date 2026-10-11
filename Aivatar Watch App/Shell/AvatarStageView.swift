@@ -53,7 +53,10 @@ struct AvatarStageView: View {
             profile: try! PersonalityProfile.load(archetype),
             // Stable per-archetype seed (String.hashValue is
             // randomized per launch and must never be used here).
-            seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0)
+            seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0),
+            // Event counters go to os_log for the on-device validation
+            // pass (§3 telemetry port, §11 budgets).
+            telemetry: OsLogTelemetrySink()
         )
         let renderContext = AvatarRenderContext(engine: engine)
         context = renderContext

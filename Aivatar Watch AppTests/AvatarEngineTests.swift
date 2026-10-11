@@ -836,12 +836,43 @@ private func makeGoldenEngine(_ archetype: Archetype, seed: UInt64 = 42) throws 
     )
 }
 
+/// A CPU-rasterized frame's pixels (RGBA8, 205x251), copied out of the
+/// raster context so it outlives the context.
+private struct RasterBytes {
+    let width = 205
+    let height = 251
+    let bytes: [UInt8]
+
+    /// Binary silhouette mask: any channel above the background threshold
+    /// (matches the smoke test's lit-pixel definition).
+    func silhouetteMask(threshold: UInt8 = 8) -> [Bool] {
+        var mask = [Bool](repeating: false, count: width * height)
+        for i in 0..<(width * height) {
+            let o = i * 4
+            mask[i] = max(bytes[o], max(bytes[o + 1], bytes[o + 2])) > threshold
+        }
+        return mask
+    }
+
+    /// Intersection-over-union of two binary masks (1 = identical).
+    static func iou(_ a: [Bool], _ b: [Bool]) -> Double {
+        var inter = 0, union = 0
+        for i in 0..<a.count {
+            if a[i] { union += 1 }
+            if b[i] { union += b[i] && !a[i] ? 1 : 0 }
+            if a[i] && b[i] { inter += 1 }
+        }
+        guard union > 0 else { return 1 }
+        return Double(inter) / Double(union)
+    }
+}
+
 /// Golden-frame rasterizer (§10): renders the painter's command buffer
 /// offscreen with CoreGraphics (CPU rasterization, deterministic) and hashes
 /// the pixels with FNV-1a. Same seed + frame -> same hash, so any visual
 /// change (geometry, palette, mixer, engine) shows up as a hash change.
 private enum GoldenFrameRasterizer {
-    static func hash(archetype: Archetype, seed: UInt64 = 42, frame: Int = 300) throws -> UInt64 {
+    static func render(archetype: Archetype, seed: UInt64 = 42, frame: Int = 300) throws -> RasterBytes {
         let engine = try makeGoldenEngine(archetype, seed: seed)
         engine.update(toFrame: frame)
         let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
@@ -892,10 +923,16 @@ private enum GoldenFrameRasterizer {
         }
 
         guard let data = ctx.data else { throw NSError(domain: "GoldenFrameRasterizer", code: 2) }
-        let bytes = data.assumingMemoryBound(to: UInt8.self)
+        let raw = data.assumingMemoryBound(to: UInt8.self)
+        let bytes = [UInt8](UnsafeBufferPointer(start: raw, count: width * height * 4))
+        return RasterBytes(bytes: bytes)
+    }
+
+    static func hash(archetype: Archetype, seed: UInt64 = 42, frame: Int = 300) throws -> UInt64 {
+        let raster = try render(archetype: archetype, seed: seed, frame: frame)
         var hash: UInt64 = 0xcbf29ce484222325 // FNV-1a offset basis
-        for i in 0..<(width * height * 4) {
-            hash ^= UInt64(bytes[i])
+        for byte in raster.bytes {
+            hash ^= UInt64(byte)
             hash = hash &* 0x100000001b3 // FNV-1a prime
         }
         return hash
@@ -917,7 +954,7 @@ final class GoldenFrameTests: XCTestCase {
         // logo's lavender family (#9C86DB).
         let expected: [Archetype: UInt64] = [
             .ember: 12_016_137_667_541_340_369,
-            .willow: 11_247_534_850_468_798_195,
+            .willow: 18_097_399_317_908_289_734,
             .compass: 13_126_774_808_885_116_185,
             .prism: 9_954_699_415_628_735_132,
             .nimbus: 5_352_135_130_477_461_359,
@@ -956,6 +993,80 @@ final class GoldenFrameTests: XCTestCase {
             let hash = try GoldenFrameRasterizer.hash(archetype: archetype)
             XCTAssertFalse(seen.contains(hash), "\(archetype.rawValue) golden frame collides with an earlier archetype — visual sets must separate")
             seen.append(hash)
+        }
+    }
+}
+
+/// Machine proxy for the §11 silhouette-readability criterion (the A1
+/// silhouette gate): binarizes the golden rasters (lit pixels = silhouette,
+/// palette-free) and measures pairwise IoU. High overlap means two
+/// archetypes read as the same shape at a glance — the §12 "personalities
+/// don't separate" risk, quantified. The n>=12 human study remains the
+/// acceptance authority; this test guards regressions between studies.
+final class SilhouetteSeparationTests: XCTestCase {
+    /// Pairwise IoU ceilings: measured + 0.02 margin, so any silhouette
+    /// regression fails CI and any deliberate improvement requires (and
+    /// gets) a fresh measurement. Empty table = RECORD MODE (prints the
+    /// measured matrix).
+    ///
+    /// Measured v1 (frame 300, seed 42, after Willow's §5 leaf accents):
+    /// ember-willow 0.939, ember-compass 0.823, ember-prism 0.957,
+    /// ember-nimbus 0.818, willow-compass 0.821, willow-prism 0.939,
+    /// willow-nimbus 0.815, compass-prism 0.816, compass-nimbus 0.792,
+    /// prism-nimbus 0.834.
+    ///
+    /// FINDING: the round trio (ember/willow/prism) overlaps at ~0.94-0.96
+    /// because §5 assigns all three a circle head; compass (square) and
+    /// nimbus (cloud) separate from everything. The ember/prism overlap is
+    /// inherent to the plan's §5 shape tokens, so the §11 "identify pairs
+    /// from silhouette alone" bar is at risk for that pair — flagged, with
+    /// a minimal amendment proposed (a faceted head for Prism), NOT applied.
+    /// The n>=12 human study remains the acceptance authority.
+    private static let ceilings: [String: Double] = [
+        "ember-willow": 0.959,
+        "ember-compass": 0.843,
+        "ember-prism": 0.977,
+        "ember-nimbus": 0.838,
+        "willow-compass": 0.841,
+        "willow-prism": 0.959,
+        "willow-nimbus": 0.835,
+        "compass-prism": 0.836,
+        "compass-nimbus": 0.812,
+        "prism-nimbus": 0.854,
+    ]
+
+    func testPairwiseSilhouetteSeparation() throws {
+        var masks: [Archetype: [Bool]] = [:]
+        var litCounts: [Archetype: Int] = [:]
+        for archetype in Archetype.allCases {
+            let raster = try GoldenFrameRasterizer.render(archetype: archetype)
+            let mask = raster.silhouetteMask()
+            masks[archetype] = mask
+            litCounts[archetype] = mask.filter { $0 }.count
+        }
+
+        let sorted = Archetype.allCases
+        var overlaps: [(Archetype, Archetype, Double)] = []
+        for i in 0..<sorted.count {
+            for j in (i + 1)..<sorted.count {
+                let a = sorted[i], b = sorted[j]
+                let overlap = RasterBytes.iou(masks[a]!, masks[b]!)
+                overlaps.append((a, b, overlap))
+                if let ceiling = Self.ceilings["\(a.rawValue)-\(b.rawValue)"] {
+                    XCTAssertLessThanOrEqual(
+                        overlap, ceiling,
+                        "\(a.rawValue)/\(b.rawValue) silhouettes regressed (IoU \(overlap) > ceiling \(ceiling)) — §11 separation risk"
+                    )
+                }
+            }
+        }
+
+        let lit = sorted.map { "\($0.rawValue)=\(litCounts[$0]!)" }.joined(separator: " ")
+        let matrix = overlaps
+            .map { String(format: "%@-%@=%.3f", $0.0.rawValue, $0.1.rawValue, $0.2) }
+            .joined(separator: ", ")
+        if Self.ceilings.isEmpty {
+            XCTFail("RECORD MODE — lit: \(lit); \(matrix)")
         }
     }
 }
