@@ -235,10 +235,14 @@ struct CanvasAvatarRenderer: View {
             tell: engine.tell,
             tellPhase: engine.tellPhase
         )
-        // Vector stage (v4 reference direction: smooth-gradient low-poly).
-        // The hi-bit pixel rasterizer (§11.3) remains available as an
-        // alternate LOD — rasterize(painter:) + draw(into:size:).
-        paintCommands(ctx: ctx, size: size)
+        // Hi-bit pixel stage (§11.3, v5 DEFAULT): the command buffer is
+        // rasterized to the sprite grid and snapped to the archetype's
+        // vivid LUT — fat crisp pixels, the v4 art direction. The vector
+        // stage (paintCommands) remains the fallback LOD (debugImage and
+        // any future low-cost path).
+        let rasterizer = context.pixelRasterizer
+        rasterizer.rasterize(painter: context.painter, rest: false)
+        rasterizer.draw(into: ctx, size: size)
         #if DEBUG
         context.debugDrawCount += 1
         if context.debugDrawCount % 60 == 1 {
@@ -256,7 +260,11 @@ struct CanvasAvatarRenderer: View {
     private func drawStaticRest(ctx: GraphicsContext, size: CGSize) {
         context.solveRestIfNeeded()
         context.painter.paint(world: context.restWorld, pose: context.restPose!, rest: true)
-        paintCommands(ctx: ctx, size: size)
+        // Pixel rest frame: full-LUT snap so the dimmed rest tones stay
+        // exact (see PixelStageRasterizer.snapToLUT).
+        let rasterizer = context.pixelRasterizer
+        rasterizer.rasterize(painter: context.painter, rest: true)
+        rasterizer.draw(into: ctx, size: size)
     }
 
     /// Fit the rig content into the view (§9 composition via

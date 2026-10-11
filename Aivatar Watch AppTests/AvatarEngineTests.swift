@@ -1328,12 +1328,14 @@ final class GoldenFrameTests: XCTestCase {
         // v10 (A6.2): per-archetype body plans — flame/gem/pyramid heads,
         // chamfered/sag masses, reference decorations.
         // v11 (A6.3): posture wander (alive pass) + facet contrast polish.
+        // v12 (v5): radical body plans (flame/bush/gem/pyramid/cloud) +
+        // pixel-stage default + nimbus indigo palette.
         let expected: [Archetype: UInt64] = [
-            .ember: 14_331_582_820_154_286_129,
-            .willow: 3_607_243_858_067_788_876,
-            .compass: 11_268_772_857_050_976_646,
-            .prism: 9_649_437_648_944_361_884,
-            .nimbus: 3_908_147_332_231_348_452,
+            .ember: 6_003_811_012_249_022_199,
+            .willow: 12_556_598_134_123_831_722,
+            .compass: 1_736_151_592_779_275_816,
+            .prism: 12_918_640_192_026_002_639,
+            .nimbus: 6_483_730_128_731_939_307,
         ]
 
         var actual: [Archetype: UInt64] = [:]
@@ -1408,8 +1410,8 @@ final class SpeciesInvariantsTests: XCTestCase {
                 let a = sorted[i], b = sorted[j]
                 let overlap = RasterBytes.iou(masks[a]!, masks[b]!)
                 XCTAssertLessThan(
-                    overlap, 0.92,
-                    "\(a.rawValue)/\(b.rawValue) silhouettes too similar (IoU \(String(format: "%.3f", overlap)) >= 0.92) — v4 body plans must diverge (shadow test)"
+                    overlap, 0.60,
+                    "\(a.rawValue)/\(b.rawValue) silhouettes too similar (IoU \(String(format: "%.3f", overlap)) >= 0.60) — v5 body plans must diverge radically (shadow test; the v4 0.92 bar let all five pass at ~0.75-0.83, which read as recolors of one body)"
                 )
             }
         }
@@ -1461,8 +1463,12 @@ extension SpeciesInvariantsTests {
             let raster = try GoldenFrameRasterizer.render(archetype: archetype)
             let headWorld = engine.currentWorld[engine.bones.head]
             let centerY = Double(raster.height) / 2
-            let puffTop = Int(centerY + Double(headWorld.ty) - 21.5)
-            let puffBottom = Int(centerY + Double(headWorld.ty) + 21.5)
+            // v5: head slot heights are per-archetype now — the puff extent
+            // comes from the v5 scale table, not the old fixed ±21.5.
+            let headScale = AvatarSpritePainter.speciesSlotScale(archetype: archetype, slotName: "head") ?? (w: 1, h: 1)
+            let puffHalf = 46.0 * Double(headScale.h) * 0.934 / 2
+            let puffTop = Int(centerY + Double(headWorld.ty) - puffHalf)
+            let puffBottom = Int(centerY + Double(headWorld.ty) + puffHalf)
 
             func meanLum(_ y0: Int, _ y1: Int) -> (Double, Int) {
                 let lo = max(0, y0)
@@ -1600,12 +1606,13 @@ final class PixelStageTests: XCTestCase {
         // (face-mud fix).
         // v3 (A6.2): per-archetype body plans.
         // v4 (A6.3): posture wander + facet contrast polish.
+        // v5 (v5): radical body plans + 64x78 grid + pixel-stage default.
         let expected: [Archetype: UInt64] = [
-            .ember: 17_418_118_748_497_994_838,
-            .willow: 17_179_089_577_491_295_665,
-            .compass: 1_454_164_303_986_258_873,
-            .prism: 5_031_569_973_221_757_597,
-            .nimbus: 8_913_389_609_442_486_168,
+            .ember: 15_992_830_819_844_983_735,
+            .willow: 7_800_850_261_981_265_915,
+            .compass: 16_216_657_902_760_658_041,
+            .prism: 15_407_548_065_465_615_412,
+            .nimbus: 28_976_292_975_949_446,
         ]
         var actual: [Archetype: UInt64] = [:]
         for archetype in Archetype.allCases {

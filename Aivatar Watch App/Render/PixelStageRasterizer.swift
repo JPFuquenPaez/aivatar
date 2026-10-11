@@ -1,26 +1,29 @@
 import SwiftUI
 import CoreGraphics
 
-/// Hi-bit pixel rasterizer (§11.3, v4 direction): renders the painter's
-/// command buffer into a 51x63 logical-pixel grid — one sprite pixel
-/// covers ~3.4 rig units (~4 screen points, no smoothing) — and snaps
-/// every pixel to the archetype's vivid LUT. The stage draws the grid as
-/// flat rects: nearest-neighbor by construction, no image upload, no
-/// resampling. The engine, poses and tells are unchanged — this changes
-/// only the presentation layer ("pixel style changes the renderer, not
-/// the character").
+/// Hi-bit pixel rasterizer (§11.3, v4 direction — v5 DEFAULT stage):
+/// renders the painter's command buffer into a 64x78 logical-pixel grid —
+/// one sprite pixel covers ~2.7 rig units (~3.2 screen points, no
+/// smoothing) — and snaps every pixel to the archetype's vivid LUT. The
+/// stage draws the grid as flat rects: nearest-neighbor by construction,
+/// no image upload, no resampling. The engine, poses and tells are
+/// unchanged — this changes only the presentation layer ("pixel style
+/// changes the renderer, not the character").
 ///
 /// Grid window: the rig region visible on a canonical 184x224 pt screen
 /// under the vector stage composition (StageComposition zoom 1.18):
 /// rig x in [-87, +87], content centered 35.5 rig units above the rig
 /// origin at grid center — the pixel stage shows the same framing as the
-/// vector stage did, so composition tests carry over.
+/// vector stage did, so composition tests carry over. The v5 bump from
+/// 51x63 to 64x78 keeps the same window (~174 x 214 rig units) and
+/// raises the detail class a step (§11.3: "more detail" than simple
+/// pixel mascots; 3-4 tone ramps and 4x3 px eyes stay legible).
 nonisolated final class PixelStageRasterizer {
-    static let gridWidth = 51
-    static let gridHeight = 63
+    static let gridWidth = 64
+    static let gridHeight = 78
 
-    /// Rig units per sprite pixel (grid covers ~174 x 214 rig units).
-    private static let rigUnitsPerPixel: CGFloat = 3.4
+    /// Rig units per sprite pixel (grid covers ~174 x 212 rig units).
+    private static let rigUnitsPerPixel: CGFloat = 2.72
     /// Content center (rig y, relative to the rig origin) placed at the
     /// grid center — matches StageComposition.contentCenterY.
     private static let contentCenterY: CGFloat = -35.5
