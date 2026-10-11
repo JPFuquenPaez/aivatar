@@ -220,23 +220,35 @@ final class AvatarEngineTests: XCTestCase {
 
     // MARK: Phase B — L3 reactions
 
-    func testTapTriggersSparkleReactionAndFades() throws {
+    func testTapTriggersPooledReactionAndFades() throws {
         let engine = try makeEngine(.ember, seed: 11)
         let reference = try makeEngine(.ember, seed: 11)
         engine.handleEvent(.tap)
-        for frame in 1...20 { // mid-reaction (sparkle lasts ~25 + fade)
+        for frame in 1...20 { // mid-reaction (shortest ember clip: ~30 + fade)
             engine.update(toFrame: frame)
             reference.update(toFrame: frame)
         }
         XCTAssertEqual(engine.reactionCountForTesting, 1, "tap must trigger a reaction")
+        XCTAssertNotNil(engine.currentReactionClip, "a pooled clip must be active mid-reaction")
         XCTAssertNotEqual(engine.currentPose, reference.currentPose, "the reaction must alter the pose")
         // Reactions are transient: the engine re-converges with a
-        // reference that never saw the event (no RNG consumed).
-        for frame in 21...120 {
+        // reference that never saw the event (the pick RNG is a separate
+        // stream and is never consumed by the pose path).
+        for frame in 21...140 {
             engine.update(toFrame: frame)
             reference.update(toFrame: frame)
         }
         XCTAssertEqual(engine.currentPose, reference.currentPose, "the reaction must fully fade")
+    }
+
+    func testNamedGestureEventPlaysThatClip() throws {
+        // Phase B reaction scripting: an explicit gesture event bypasses
+        // the weighted pool and plays exactly the requested clip.
+        let engine = try makeEngine(.willow, seed: 17)
+        engine.update(toFrame: 50)
+        engine.handleEvent(.gesture(name: "nod"))
+        engine.update(toFrame: 51)
+        XCTAssertEqual(engine.currentReactionClip, .nod, "named gesture events play the named clip")
     }
 
     func testReactionCooldown() throws {
@@ -303,17 +315,25 @@ final class AvatarEngineTests: XCTestCase {
 
     func testL1ReactionsStayOn() throws {
         // L1 disables *idle* motion; reactions are user-initiated and stay.
+        // Whichever pooled clip the tap picks, it must move the avatar.
         let engine = try makeEngine(.ember, seed: 3)
         engine.accessibilityMode = .reduceMotionL1
         engine.update(toFrame: 100)
+        let reference = try makeEngine(.ember, seed: 3)
+        reference.accessibilityMode = .reduceMotionL1
+        reference.update(toFrame: 100)
         engine.handleEvent(.tap)
         engine.update(toFrame: 105)
+        reference.update(toFrame: 105)
         XCTAssertEqual(engine.reactionCountForTesting, 1)
-        XCTAssertGreaterThan(engine.currentPose.expressionWeights[ExpressionChannel.joy.rawValue], 0)
+        XCTAssertNotNil(engine.currentReactionClip, "a pooled clip must be active in L1")
+        XCTAssertNotEqual(engine.currentPose, reference.currentPose,
+                          "the reaction must move the avatar in L1")
     }
 
     func testL2ReactionsAreFaceOnly() throws {
-        // L2: the body stays static; the reaction reads on the face.
+        // L2: the body stays static; the tap pool is filtered to clips
+        // that write an expression channel, so the reaction reads on the face.
         let engine = try makeEngine(.ember, seed: 3)
         engine.accessibilityMode = .reduceMotionL2
         engine.update(toFrame: 100)
@@ -322,16 +342,122 @@ final class AvatarEngineTests: XCTestCase {
         engine.update(toFrame: 105)
         let after = engine.currentPose
         XCTAssertEqual(engine.reactionCountForTesting, 1, "user-initiated reactions stay on in L2")
+        guard let clip = engine.currentReactionClip else {
+            return XCTFail("a reaction clip must be active in L2")
+        }
+        XCTAssertTrue(clip.writesExpression, "the L2 tap pool must be filtered to face-readable clips")
         for i in 0..<baseline.rotations.count where i != engine.bones.lidL && i != engine.bones.lidR {
             XCTAssertEqual(after.rotations[i], baseline.rotations[i], "L2 must stay static outside blinks")
             XCTAssertEqual(after.offsetsX[i], baseline.offsetsX[i])
             XCTAssertEqual(after.offsetsY[i], baseline.offsetsY[i])
         }
-        XCTAssertGreaterThan(
-            after.expressionWeights[ExpressionChannel.joy.rawValue],
-            baseline.expressionWeights[ExpressionChannel.joy.rawValue],
-            "the sparkle joy must read on the face"
-        )
+        if let channel = TestFacialChannels.channel(for: clip) {
+            XCTAssertGreaterThan(
+                after.expressionWeights[channel.rawValue],
+                baseline.expressionWeights[channel.rawValue],
+                "the \(clip.rawValue) reaction must read on the face"
+            )
+        }
+    }
+
+    // MARK: Phase B — per-archetype tap pool (B2a)
+
+    /// Taps the engine repeatedly and records which pooled clip answered.
+    /// Dropped taps (idle-gesture suppression) are retried at the next
+    /// frame; the schedule is deterministic for a given seed.
+    private func collectTapPicks(
+        _ archetype: Archetype, seed: UInt64,
+        mode: MotionAccessibilityMode = .full, count: Int
+    ) throws -> [GestureClip] {
+        let engine = try makeEngine(archetype, seed: seed)
+        engine.accessibilityMode = mode
+        let profile = try PersonalityProfile.load(archetype)
+        let fade = max(9, min(21, Int(profile.motionProfile.transitionDurationRange.lowerBound * 30)))
+        var frame = 30
+        engine.update(toFrame: frame)
+        var picks: [GestureClip] = []
+        var attempts = 0
+        while picks.count < count && attempts < count * 30 {
+            attempts += 1
+            engine.handleEvent(.tap)
+            engine.update(toFrame: frame + 1)
+            if let clip = engine.currentReactionClip {
+                picks.append(clip)
+                // Jump past the clip end + cooldown (15) + margin.
+                let total = GestureClipLibrary.durationFrames(clip, profile: profile) + fade
+                frame += total + 16
+                engine.update(toFrame: frame)
+            } else {
+                frame += 1 // suppressed during an idle gesture — retry
+            }
+        }
+        return picks
+    }
+
+    /// Mirrors GestureClipLibrary's clip -> expression channel mapping so
+    /// face-readability assertions can name the channel they expect.
+    private enum TestFacialChannels {
+        static func channel(for clip: GestureClip) -> ExpressionChannel? {
+            switch clip {
+            case .wave: return .warm
+            case .stretch, .sparkle: return .joy
+            case .spin: return .wry
+            case .lookAround: return .focus
+            case .shiver: return .startle
+            case .doubleTake: return .surprise
+            case .puff: return .alert
+            default: return nil
+            }
+        }
+    }
+
+    func testTapPicksOnlyFromProfilePool() throws {
+        // Every archetype answers taps in character: only clips with a
+        // nonzero profile weight are drawn (§5 gesturePoolWeights).
+        for archetype in Archetype.allCases {
+            let profile = try PersonalityProfile.load(archetype)
+            let pool = Set(profile.gesturePoolWeights.filter { $0.value > 0 }.keys)
+            XCTAssertFalse(pool.isEmpty, "\(archetype.rawValue): pool must not be empty")
+            let picks = try collectTapPicks(archetype, seed: 99, count: 20)
+            XCTAssertGreaterThanOrEqual(picks.count, 10,
+                                        "\(archetype.rawValue): expected tap reactions")
+            for clip in picks {
+                XCTAssertTrue(pool.contains(clip.rawValue),
+                              "\(archetype.rawValue) must not react with \(clip.rawValue) (weight 0)")
+            }
+        }
+    }
+
+    func testTapPickSequenceIsDeterministic() throws {
+        // Same seed + same event schedule -> same reaction picks (CI
+        // replayability, §7 deterministic clock & seeded randomness).
+        let a = try collectTapPicks(.ember, seed: 4242, count: 20)
+        let b = try collectTapPicks(.ember, seed: 4242, count: 20)
+        XCTAssertEqual(a, b, "reaction pick sequences must match for the same seed")
+        XCTAssertFalse(a.allSatisfy { $0 == a.first }, "a 4-clip pool should vary across 20 picks")
+    }
+
+    func testL2TapPoolIsFaceOnly() throws {
+        // In Reduce Motion L2 every tap answer must be a face-readable clip.
+        let picks = try collectTapPicks(.ember, seed: 7, mode: .reduceMotionL2, count: 15)
+        XCTAssertGreaterThanOrEqual(picks.count, 8)
+        for clip in picks {
+            XCTAssertTrue(clip.writesExpression, "L2 tap pool must exclude body-only clips (got \(clip.rawValue))")
+        }
+    }
+
+    func testPoolDistributionRoughlyMatchesWeights() throws {
+        // Statistical check on a fixed seed (no flakiness): the empirical
+        // pick frequency tracks the profile weights.
+        let profile = try PersonalityProfile.load(.ember)
+        let picks = try collectTapPicks(.ember, seed: 1234, count: 150)
+        var counts: [String: Int] = [:]
+        for clip in picks { counts[clip.rawValue, default: 0] += 1 }
+        for (name, weight) in profile.gesturePoolWeights where weight > 0 {
+            let empirical = Double(counts[name] ?? 0) / Double(picks.count)
+            XCTAssertEqual(empirical, Double(weight), accuracy: 0.12,
+                           "tap pick frequency for \(name) should track its pool weight")
+        }
     }
 
     // MARK: Painter (§8)

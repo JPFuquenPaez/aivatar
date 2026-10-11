@@ -40,6 +40,18 @@ nonisolated enum GestureClip: String, Sendable, CaseIterable, Codable {
             return false
         }
     }
+
+    /// Clips that write at least one expression channel. Reduce Motion L2
+    /// keeps the body static, so tap reactions must be able to read on the
+    /// face alone; the reaction pool is filtered to these clips in L2 (§8).
+    var writesExpression: Bool {
+        switch self {
+        case .wave, .stretch, .spin, .lookAround, .shiver, .doubleTake, .sparkle, .puff:
+            return true
+        case .bounce, .nod, .tilt, .shiftWeight:
+            return false
+        }
+    }
 }
 
 /// Per-archetype shape language (§4.2, §5): derived from the frozen

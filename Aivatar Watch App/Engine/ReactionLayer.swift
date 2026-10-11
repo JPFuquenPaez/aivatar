@@ -2,17 +2,23 @@ import Foundation
 
 /// L3 — Reactions (Phase B, §7).
 ///
-/// Maps avatar events to short reaction clips: tap → sparkle (joy pulse),
+/// Maps avatar events to short reaction clips: tap → a weighted pick from
+/// the profile's `gesturePoolWeights` (each archetype reacts in character),
 /// named gestures → that clip, crown ticks → a decaying gaze dart (pupils
 /// only). Reactions are user-initiated, so they stay on in Reduce Motion L1
-/// (which disables *idle* motion); in L2 the body stays static and reactions
-/// read on the face only (expression channels + lid openness).
+/// (which disables *idle* motion); in L2 the body stays static and the tap
+/// pool is filtered to clips that write an expression channel, so every
+/// reaction still reads on the face.
 ///
-/// Deterministic: no randomness — a reaction is a pure function of the
-/// event and frame. Cooldown (>= 0.5 s) between reactions; reactions are
-/// suppressed while an idle gesture is active (§7 gesture suppression).
+/// Deterministic: the tap pick draws from a private seeded RNG stream that
+/// is consumed only when a reaction actually starts — the engine's other
+/// layers never see it, so an engine that reacted still re-converges with
+/// an event-free reference (same seed, same frame -> same pose). Cooldown
+/// (>= 0.5 s) between reactions; reactions are suppressed while an idle
+/// gesture is active (§7 gesture suppression).
 nonisolated final class ReactionLayer {
     private let profile: PersonalityProfile
+    private var pickRNG: SeededRandom
 
     // Active reaction playback state.
     private var activeClip: GestureClip?
@@ -34,8 +40,11 @@ nonisolated final class ReactionLayer {
 
     var currentClip: GestureClip? { activeClip }
 
-    init(profile: PersonalityProfile) {
+    init(profile: PersonalityProfile, seed: UInt64) {
         self.profile = profile
+        // Separate stream (offset from the engine seed) so reaction picks
+        // never disturb the deterministic clock/idle schedules.
+        pickRNG = SeededRandom(seed &+ 0x5EAC_7100_0000_0001)
         let seconds = profile.motionProfile.transitionDurationRange.lowerBound
         fadeFrames = max(9, min(21, Int(seconds * 30)))
     }
@@ -43,8 +52,10 @@ nonisolated final class ReactionLayer {
     /// Offers an event; returns true if a reaction clip started. Crown
     /// ticks never start a clip (they drive the gaze dart). `idleActive`
     /// suppresses reactions while an L2 idle gesture is playing (§7).
+    /// `faceOnly` (Reduce Motion L2) restricts the tap pool to clips that
+    /// write an expression channel so the reaction reads on the face.
     @discardableResult
-    func offer(_ event: AvatarEvent, frame: Int, idleActive: Bool) -> Bool {
+    func offer(_ event: AvatarEvent, frame: Int, idleActive: Bool, faceOnly: Bool = false) -> Bool {
         switch event {
         case .crownTick(let delta):
             crownGazeX = min(max(crownGazeX + delta * 0.35, -3), 3)
@@ -61,8 +72,9 @@ nonisolated final class ReactionLayer {
         let clip: GestureClip?
         switch event {
         case .tap:
-            clip = .sparkle
+            clip = pickFromPool(faceOnly: faceOnly)
         case .gesture(let name):
+            // Phase B reaction scripting: explicit clips are honored as-is.
             clip = GestureClip(rawValue: name)
         default:
             clip = nil
@@ -75,6 +87,40 @@ nonisolated final class ReactionLayer {
         activeElapsed = 0
         reactionCount += 1
         return true
+    }
+
+    /// Weighted pick from the profile's gesture pool (§5 `gesturePoolWeights`,
+    /// weights sum to 1 — validated at build time). Clips with weight 0 are
+    /// never drawn; in L2 only clips with a facial channel remain eligible.
+    /// Event-time only (not per frame); allocates nothing.
+    private func pickFromPool(faceOnly: Bool) -> GestureClip? {
+        var total: Float = 0
+        for clip in GestureClip.allCases {
+            let w = profile.gesturePoolWeights[clip.rawValue] ?? 0
+            if w > 0, !(faceOnly && !clip.writesExpression) {
+                total += w
+            }
+        }
+        guard total > 0 else { return nil }
+        var draw = pickRNG.nextFloat() * total
+        for clip in GestureClip.allCases {
+            var w = profile.gesturePoolWeights[clip.rawValue] ?? 0
+            if w > 0, faceOnly && !clip.writesExpression {
+                w = 0
+            }
+            if w > 0 {
+                if draw < w { return clip }
+                draw -= w
+            }
+        }
+        // Float rounding can leave draw == total; fall back to the last
+        // eligible clip rather than dropping the reaction.
+        var last: GestureClip?
+        for clip in GestureClip.allCases {
+            let w = profile.gesturePoolWeights[clip.rawValue] ?? 0
+            if w > 0, !(faceOnly && !clip.writesExpression) { last = clip }
+        }
+        return last
     }
 
     /// Applies the active reaction (additive) and advances the gaze dart.

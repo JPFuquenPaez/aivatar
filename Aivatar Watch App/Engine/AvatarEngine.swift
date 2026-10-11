@@ -33,7 +33,8 @@ nonisolated final class AvatarEngine {
     private var affectInput: (any AffectInput)?
     private var affectEMA: AffectState?
     private let affectEMAAlpha: Float = 0.3
-    /// L3 (Phase B): queued interaction events (no-op reactions until B).
+    /// L3 (Phase B): queued interaction events, drained into the reaction
+    /// layer on the next step.
     private var pendingEvents: [AvatarEvent] = []
     /// Telemetry (§3 ports).
     private(set) var telemetry: any TelemetrySink
@@ -70,7 +71,7 @@ nonisolated final class AvatarEngine {
         posture = PostureLayer(profile: profile)
         life = LifeLoopLayer(profile: profile, seed: seed)
         idle = IdleGestureLayer(profile: profile, seed: seed)
-        reactions = ReactionLayer(profile: profile)
+        reactions = ReactionLayer(profile: profile, seed: seed)
         self.telemetry = telemetry ?? NullTelemetrySink()
 
         pose = AvatarPose(boneCount: skeleton.boneCount)
@@ -107,6 +108,8 @@ nonisolated final class AvatarEngine {
     var blinkCountForTesting: Int { life.blinkCount }
     /// Reaction telemetry (Phase B tests).
     var reactionCountForTesting: Int { reactions.reactionCount }
+    /// The clip the active reaction is playing (tap pool picks; Phase B).
+    var currentReactionClip: GestureClip? { reactions.currentClip }
 
     var activeGestureClip: GestureClip? { idle.currentClip }
     var activeGesturePhase: Float { idle.bigClipPhase }
@@ -153,9 +156,9 @@ nonisolated final class AvatarEngine {
         affectInput = input
     }
 
-    /// Phase B: the interaction bus delivers avatar events here. Reactions are
-    /// a port stub: events are accepted (and counted for telemetry) but have
-    /// no visual behavior until Phase B.
+    /// Phase B: the interaction bus delivers avatar events here; the
+    /// reaction layer answers taps with a weighted pick from the profile's
+    /// gesture pool (per-archetype reaction variety, §5/§7).
     func handleEvent(_ event: AvatarEvent) {
         pendingEvents.append(event)
         telemetry.record(counter: "avatar.event.\(event)", value: 1)
@@ -244,12 +247,14 @@ nonisolated final class AvatarEngine {
 
     private func drainReactionEvents() {
         // L3 (Phase B): each queued event is offered to the reaction layer.
-        // Reactions are suppressed while an idle gesture is active (§7).
+        // Reactions are suppressed while an idle gesture is active (§7). In
+        // Reduce Motion L2 the tap pool is filtered to face-readable clips.
         guard !pendingEvents.isEmpty else { return }
         let frame = clock.frame
         let idleActive = idle.currentClip != nil
+        let faceOnly = accessibilityMode == .reduceMotionL2
         for event in pendingEvents {
-            reactions.offer(event, frame: frame, idleActive: idleActive)
+            reactions.offer(event, frame: frame, idleActive: idleActive, faceOnly: faceOnly)
         }
         pendingEvents.removeAll()
     }

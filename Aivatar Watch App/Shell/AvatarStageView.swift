@@ -54,14 +54,15 @@ struct AvatarStageView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         // Phase B: tap and the VoiceOver default action send a .tap event;
-        // the engine answers with a sparkle reaction + haptic (§9).
+        // the engine answers with a pooled, in-character reaction clip and
+        // the archetype's haptic flavor (§9).
         .onTapGesture {
             context?.engine.handleEvent(.tap)
-            HapticsChannel.shared.react()
+            HapticsChannel.shared.react(to: archetype)
         }
         .accessibilityAction {
             context?.engine.handleEvent(.tap)
-            HapticsChannel.shared.react()
+            HapticsChannel.shared.react(to: archetype)
         }
         .onChange(of: isLuminanceReduced) { reduced in
             isResting = reduced
