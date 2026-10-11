@@ -18,6 +18,13 @@
 			remoteGlobalIDString = 85E29358307AC6A3002CF04C;
 			remoteInfo = "Aivatar Watch App";
 		};
+		A1A0000000000000000000X7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 85E2934D307AC6A2002CF04C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 85E29358307AC6A3002CF04C;
+			remoteInfo = "Aivatar Watch App";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -35,6 +42,7 @@
 /* Begin PBXFileReference section */
 		85E29353307AC6A3002CF04C /* Aivatar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aivatar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		85E29359307AC6A3002CF04C /* Aivatar Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aivatar Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1A0000000000000000000X1 /* Aivatar Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Aivatar Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -43,10 +51,20 @@
 			path = "Aivatar Watch App";
 			sourceTree = "<group>";
 		};
+		A1A0000000000000000000X2 /* Aivatar Watch AppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Aivatar Watch AppTests";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		85E29356307AC6A3002CF04C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		A1A0000000000000000000X3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -58,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				85E2935D307AC6A3002CF04C /* Aivatar Watch App */,
+				A1A0000000000000000000X2 /* Aivatar Watch AppTests */,
 				85E29354307AC6A3002CF04C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -67,6 +86,7 @@
 			children = (
 				85E29353307AC6A3002CF04C /* Aivatar.app */,
 				85E29359307AC6A3002CF04C /* Aivatar Watch App.app */,
+				A1A0000000000000000000X1 /* Aivatar Watch AppTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -97,6 +117,7 @@
 			buildPhases = (
 				85E29355307AC6A3002CF04C /* Sources */,
 				85E29356307AC6A3002CF04C /* Frameworks */,
+				A1A0000000000000000000XC /* Validate Avatar Assets */,
 				85E29357307AC6A3002CF04C /* Resources */,
 			);
 			buildRules = (
@@ -108,6 +129,27 @@
 			productName = "Aivatar Watch App";
 			productReference = 85E29359307AC6A3002CF04C /* Aivatar Watch App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A1A0000000000000000000X6 /* Aivatar Watch AppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1A0000000000000000000X9 /* Build configuration list for PBXNativeTarget "Aivatar Watch AppTests" */;
+			buildPhases = (
+				A1A0000000000000000000X5 /* Sources */,
+				A1A0000000000000000000X3 /* Frameworks */,
+				A1A0000000000000000000X4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A1A0000000000000000000X8 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A1A0000000000000000000X2 /* Aivatar Watch AppTests */,
+			);
+			name = "Aivatar Watch AppTests";
+			productName = "Aivatar Watch AppTests";
+			productReference = A1A0000000000000000000X1 /* Aivatar Watch AppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -143,6 +185,7 @@
 			targets = (
 				85E29352307AC6A3002CF04C /* Aivatar */,
 				85E29358307AC6A3002CF04C /* Aivatar Watch App */,
+				A1A0000000000000000000X6 /* Aivatar Watch AppTests */,
 			);
 		};
 /* End PBXProject section */
@@ -158,10 +201,34 @@
 			files = (
 			);
 		};
+		A1A0000000000000000000X4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A1A0000000000000000000XC /* Validate Avatar Assets */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			name = "Validate Avatar Assets";
+			shellPath = /bin/sh;
+			shellScript = (
+				"cd \"$SRCROOT\"",
+				"env -u SDKROOT xcrun --sdk macosx swift Tools/asset_validator.swift \"Aivatar Watch App/AvatarAssets\"",
+				"",
+			);
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		85E29355307AC6A3002CF04C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		A1A0000000000000000000X5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
 			);
@@ -173,6 +240,11 @@
 			isa = PBXTargetDependency;
 			target = 85E29358307AC6A3002CF04C /* Aivatar Watch App */;
 			targetProxy = 85E2935B307AC6A3002CF04C /* PBXContainerItemProxy */;
+		};
+		A1A0000000000000000000X8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 85E29358307AC6A3002CF04C /* Aivatar Watch App */;
+			targetProxy = A1A0000000000000000000X7 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -214,7 +286,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -275,7 +347,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -317,9 +389,9 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+				WATCHOS_DEPLOYMENT_TARGET = 9.0;
 			};
 			name = Debug;
 		};
@@ -349,10 +421,10 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				VALIDATE_PRODUCT = YES;
-				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+				WATCHOS_DEPLOYMENT_TARGET = 9.0;
 			};
 			name = Release;
 		};
@@ -362,14 +434,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_KEY_CFBundleDisplayName = Aivatar;
-				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = aivatarapp.Aivatar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
@@ -379,15 +451,57 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_KEY_CFBundleDisplayName = Aivatar;
-				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = aivatarapp.Aivatar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A1A0000000000000000000XA /* Debug configuration for PBXNativeTarget "Aivatar Watch AppTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = aivatarapp.Aivatar.watchkitapp.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = Nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aivatar Watch App.app/Aivatar Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 9.0;
+			};
+			name = Debug;
+		};
+		A1A0000000000000000000XB /* Release configuration for PBXNativeTarget "Aivatar Watch AppTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = aivatarapp.Aivatar.watchkitapp.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = Nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aivatar Watch App.app/Aivatar Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 9.0;
 			};
 			name = Release;
 		};
@@ -415,6 +529,14 @@
 			buildConfigurations = (
 				85E2936B307AC6A3002CF04C /* Debug configuration for PBXNativeTarget "Aivatar" */,
 				85E2936C307AC6A3002CF04C /* Release configuration for PBXNativeTarget "Aivatar" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		A1A0000000000000000000X9 /* Build configuration list for PBXNativeTarget "Aivatar Watch AppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1A0000000000000000000XA /* Debug configuration for PBXNativeTarget "Aivatar Watch AppTests" */,
+				A1A0000000000000000000XB /* Release configuration for PBXNativeTarget "Aivatar Watch AppTests" */,
 			);
 			defaultConfigurationName = Release;
 		};

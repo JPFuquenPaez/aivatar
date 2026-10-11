@@ -1,0 +1,26 @@
+{
+  "id": "prism",
+  "traitVector": { "extraversion": 0.55, "agreeableness": 0.5, "conscientiousness": 0.35, "openness": 0.95, "neuroticism": 0.35 },
+  "motionProfile": {
+    "gestureRatePerMin": 4.5,
+    "amplitudeScale": 1.1,
+    "tempoScale": 1.4,
+    "transitionDurationSec": [0.3, 0.8],
+    "overshoot": 0.2
+  },
+  "gazeProfile": {
+    "blinkRatePerMin": 18,
+    "saccadeRatePerMin": 12,
+    "headPropensity": 0.5,
+    "idleGazeTargets": ["away", "user", "up", "down"]
+  },
+  "visualTokens": {
+    "dominantShape": "circle",
+    "accentShape": "triangle",
+    "palette": ["#C74BCE", "#5EE7E4", "#160A18"],
+    "silhouetteWeights": { "roundness": 0.6, "angularity": 0.4 }
+  },
+  "gesturePoolWeights": { "wave": 0.1, "bounce": 0.0, "stretch": 0.2, "spin": 0.2, "nod": 0.0, "tilt": 0.1, "lookAround": 0.0, "shiftWeight": 0.0, "shiver": 0.0, "doubleTake": 0.2, "sparkle": 0.2, "puff": 0.0 },
+  "quirks": ["double-take gaze", "unpredictable tempo"],
+  "assetVersion": "1.0.0"
+}

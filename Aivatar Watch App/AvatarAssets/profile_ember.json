@@ -1,0 +1,26 @@
+{
+  "id": "ember",
+  "traitVector": { "extraversion": 0.9, "agreeableness": 0.6, "conscientiousness": 0.5, "openness": 0.6, "neuroticism": 0.3 },
+  "motionProfile": {
+    "gestureRatePerMin": 6.0,
+    "amplitudeScale": 1.3,
+    "tempoScale": 1.2,
+    "transitionDurationSec": [0.4, 0.7],
+    "overshoot": 0.15
+  },
+  "gazeProfile": {
+    "blinkRatePerMin": 22,
+    "saccadeRatePerMin": 9,
+    "headPropensity": 0.35,
+    "idleGazeTargets": ["away", "user", "up"]
+  },
+  "visualTokens": {
+    "dominantShape": "circle",
+    "accentShape": "triangle",
+    "palette": ["#FF8A3D", "#FFC24B", "#1A0E08"],
+    "silhouetteWeights": { "roundness": 0.8, "angularity": 0.2 }
+  },
+  "gesturePoolWeights": { "wave": 0.25, "bounce": 0.3, "stretch": 0.25, "spin": 0.2, "nod": 0.0, "tilt": 0.0, "lookAround": 0.0, "shiftWeight": 0.0, "shiver": 0.0, "doubleTake": 0.0, "sparkle": 0.0, "puff": 0.0 },
+  "quirks": ["spark-trail on big gestures"],
+  "assetVersion": "1.0.0"
+}
