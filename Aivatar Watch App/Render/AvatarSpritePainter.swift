@@ -261,7 +261,7 @@ nonisolated final class AvatarSpritePainter {
             // (glow budget, v3 10.4). The flame tip is the appendageA2 slot
             // kind; the glow is decoration.
             append(RigDocument.Shape(kind: "circle", width: 13, height: 8, bendSegments: nil),
-                   kind: "circle", bone: "chest", role: .glow, x: 0, y: -3, alpha: 0.55)
+                   kind: "circle", bone: "chest", role: .glow, x: 0, y: -3, alpha: 0.7)
             append(RigDocument.Shape(kind: "circle", width: 9, height: 6, bendSegments: nil),
                    kind: "circle", bone: "chest", role: .glow, x: 4, y: 8, alpha: 0.35)
             // v4 reference: voluminous smoke plume at the base — three
@@ -599,8 +599,8 @@ nonisolated final class AvatarSpritePainter {
             let left = poly([(0, -hh), (-hw, 0), (0, hh)])
             let right = poly([(0, -hh), (hw, 0), (0, hh)])
             let center = poly([(0, -hh), (hw * 0.62, 0), (0, hh), (-hw * 0.62, 0)])
-            append(left, centerY: 0, height: Float(h), shade: 0.88)
-            append(right, centerY: 0, height: Float(h), shade: 0.88)
+            append(left, centerY: 0, height: Float(h), shade: 0.80)
+            append(right, centerY: 0, height: Float(h), shade: 0.80)
             append(center, centerY: 0, height: Float(h), shade: 1.0)
             bendFractions = [0, 0, 0]
             return PaintedShape(paths: paths, offsetsY: offsetsY, bendFractions: bendFractions,
@@ -625,8 +625,8 @@ nonisolated final class AvatarSpritePainter {
             let base = poly([(-hw * 0.84, hh), (hw * 0.84, hh), (hw * 0.60, hh * 0.2), (-hw * 0.60, hh * 0.2)])
             let mid = poly([(-hw * 0.64, hh * 0.24), (hw * 0.64, hh * 0.24), (hw * 0.34, -hh * 0.44), (-hw * 0.34, -hh * 0.44)])
             let apex = poly([(-hw * 0.36, -hh * 0.40), (hw * 0.36, -hh * 0.40), (0, -hh)])
-            append(base, centerY: 0, height: Float(h), shade: 0.88)
-            append(mid, centerY: 0, height: Float(h), shade: 0.94)
+            append(base, centerY: 0, height: Float(h), shade: 0.82)
+            append(mid, centerY: 0, height: Float(h), shade: 0.91)
             append(apex, centerY: 0, height: Float(h), shade: 1.0)
             bendFractions = [0, 0, 0]
             return PaintedShape(paths: paths, offsetsY: offsetsY, bendFractions: bendFractions,

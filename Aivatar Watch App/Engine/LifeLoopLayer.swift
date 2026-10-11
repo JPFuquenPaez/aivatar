@@ -9,6 +9,10 @@ import Foundation
 nonisolated final class LifeLoopLayer {
     private let profile: PersonalityProfile
     private var rng: SeededRandom
+    /// Posture-wander stream (v4 "alive" pass): a SEPARATE seeded stream so
+    /// the blink/saccade Bernoulli schedules — pinned by the rate-budget
+    /// tests — are untouched by the wander draws.
+    private var wanderRng: SeededRandom
 
     // Rates as per-frame probabilities (lambda * dt, §7 Poisson model).
     private let blinkP: Float
@@ -49,6 +53,27 @@ nonisolated final class LifeLoopLayer {
     // Nimbus quirk: higher blink variance via a slow-modulated rate.
     private let blinkVariance: Float
 
+    // Posture wander (v4 "alive" pass, avatarro-inspired): every few
+    // seconds the body eases toward a NEW random posture target — lean,
+    // tilt, bob depth — so the avatar never settles into a visible loop
+    // and never reads static between idle gestures. Per-archetype grammar
+    // rides the gaze policy (the personality carrier): Ember shifts often
+    // and quick, Willow drifts slow and deep, Compass resets on a
+    // metronome (small, exact), Prism's intervals are irregular by
+    // design, Nimbus floats the most.
+    private var wanderFramesLeft = 0
+    private var wanderTargetLeanRot: Float = 0
+    private var wanderTargetLeanX: Float = 0
+    private var wanderTargetTilt: Float = 0
+    private var wanderTargetBobScale: Float = 1
+    private var wanderLeanRot: Float = 0
+    private var wanderLeanX: Float = 0
+    private var wanderTilt: Float = 0
+    private var wanderBobScale: Float = 1
+    private var wanderEase: Float = 0.05
+    private var wanderAmp: Float = 1
+    private var wanderInterval: Int = 120
+
     /// v3 grammar: gaze policy + blink shape + idle drift (schema v2; the
     /// v1 traits remain the fallback so a v1 profile still behaves).
     private let gazePolicy: GazePolicy
@@ -58,6 +83,7 @@ nonisolated final class LifeLoopLayer {
     init(profile: PersonalityProfile, seed: UInt64) {
         self.profile = profile
         rng = SeededRandom(seed ^ 0x1_1F_E0_00)
+        wanderRng = SeededRandom(seed ^ 0x4A_11_00_2E)
         blinkP = profile.gazeProfile.blinkRatePerMin / 1800.0
         saccadeP = profile.gazeProfile.saccadeRatePerMin / 1800.0
         blinkVariance = profile.blink?.variance ?? profile.traitVector.neuroticism
@@ -66,6 +92,34 @@ nonisolated final class LifeLoopLayer {
         driftScale = profile.motionGrammar.map { 0.6 + 0.8 * $0.drift }
             ?? 1.0
         gazeTargets = Self.resolveTargets(profile.gazeProfile.idleGazeTargets)
+        // Wander grammar per archetype (gaze policy = the carrier).
+        switch gazePolicy {
+        case .lock:
+            // Ember: frequent, quick, springy shifts.
+            wanderInterval = 75
+            wanderEase = 0.10
+            wanderAmp = 1.25
+        case .soft:
+            // Willow: slow, deep, continuous drift.
+            wanderInterval = 165
+            wanderEase = 0.012
+            wanderAmp = 1.1
+        case .metricSweep:
+            // Compass: exact metronome resets, small and tidy.
+            wanderInterval = 120
+            wanderEase = 0.09
+            wanderAmp = 0.7
+        case .wander:
+            // Prism: irregular by design — intervals redrawn per cycle.
+            wanderInterval = 100
+            wanderEase = 0.05
+            wanderAmp = 1.35
+        case .detectThenSettle:
+            // Nimbus: the floater — biggest gentle wander.
+            wanderInterval = 100
+            wanderEase = 0.035
+            wanderAmp = 1.6
+        }
     }
 
     private static func resolveTargets(_ names: [String]) -> [(x: Float, y: Float)] {
@@ -106,10 +160,40 @@ nonisolated final class LifeLoopLayer {
         pose.rotations[bones.hips] += sin(t * 0.55) * 0.035 * profile.motionProfile.amplitudeScale * driftScale
         pose.offsetsY[bones.hips] += sin(t * 1.1) * 1.6 * driftScale
 
-        // --- Heartbeat shimmer: 60 bpm pulse on the head (~0.6-unit bob).
+        // --- Heartbeat shimmer: 60 bpm pulse on the head (~0.6-unit bob),
+        //     depth modulated by the posture wander (the bob "breathes"
+        //     too — a constant-depth pulse reads mechanical).
         let beat = t * Float.pi * 2.0 * 1.0
         let pulse = pow(max(0, sin(beat)), 12)
-        pose.offsetsY[bones.head] -= pulse * 0.6
+        pose.offsetsY[bones.head] -= pulse * 0.6 * wanderBobScale
+
+        // --- Posture wander (v4 "alive" pass): draw a new random posture
+        //     target when the current one expires, then ease toward it.
+        //     Independent seeded stream -> the blink/saccade schedules are
+        //     untouched. Written AFTER the sway/heartbeat contributions
+        //     so it composes with them (additive, L1 never replaces).
+        if wanderFramesLeft <= 0 {
+            wanderFramesLeft = wanderInterval
+            if gazePolicy == .wander {
+                // Prism: irregular by design — redraw the interval itself
+                // (1.5-7 s), never a fixed loop.
+                wanderFramesLeft = 45 + Int(wanderRng.nextFloat() * 165)
+            }
+            let amp = wanderAmp * driftScale
+            wanderTargetLeanRot = wanderRng.nextSignedFloat() * 0.030 * amp
+            wanderTargetLeanX = wanderRng.nextSignedFloat() * 1.4 * amp
+            wanderTargetTilt = wanderRng.nextSignedFloat() * 0.045 * amp
+            wanderTargetBobScale = 0.8 + wanderRng.nextFloat() * 0.5
+        }
+        wanderFramesLeft -= 1
+        let ease = wanderEase
+        wanderLeanRot += (wanderTargetLeanRot - wanderLeanRot) * ease
+        wanderLeanX += (wanderTargetLeanX - wanderLeanX) * ease
+        wanderTilt += (wanderTargetTilt - wanderTilt) * ease
+        wanderBobScale += (wanderTargetBobScale - wanderBobScale) * ease
+        pose.rotations[bones.hips] += wanderLeanRot
+        pose.offsetsX[bones.hips] += wanderLeanX
+        pose.rotations[bones.spineLower] += wanderTilt
 
         // --- Saccades: policy-driven (v3 grammar). Every policy lands a
         //     fixation hold after a shift — look -> hold 400-900 ms ->

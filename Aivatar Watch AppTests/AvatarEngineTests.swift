@@ -34,6 +34,40 @@ final class AvatarEngineTests: XCTestCase {
         XCTAssertNotEqual(a.currentPose, b.currentPose)
     }
 
+    /// v4 "alive" pass: the posture wander must keep every archetype
+    /// visibly, randomly moving between idle gestures — the hips lean
+    /// wanders across a measurable range and the posture at distant
+    /// windows is never a repeating loop. Determinism is covered by
+    /// testSameSeedSamePoseSequence (the wander rides a seeded stream).
+    func testPostureWanderKeepsBodyAlive() throws {
+        for archetype in Archetype.allCases {
+            let engine = try makeEngine(archetype, seed: 4242)
+
+            var leanMin: Float = 0
+            var leanMax: Float = 0
+            var leanAt600: Float = 0
+            var leanAt900: Float = 0
+            for frame in 1...900 {
+                engine.update(toFrame: frame)
+                let lean = engine.currentPose.rotations[engine.bones.hips]
+
+                leanMin = min(leanMin, lean)
+                leanMax = max(leanMax, lean)
+                if frame == 600 { leanAt600 = lean }
+                if frame == 900 { leanAt900 = lean }
+            }
+            XCTAssertGreaterThan(
+                leanMax - leanMin, 0.02,
+                "\(archetype.rawValue): hips lean must wander visibly (range \(leanMax - leanMin))"
+            )
+            // Not a loop: the posture 10 s apart differs (wander targets
+            // are redrawn every few seconds).
+            XCTAssertNotEqual(
+                leanAt600, leanAt900, "\(archetype.rawValue): posture must not repeat between windows"
+            )
+        }
+    }
+
     func testSteppingThroughFramesEqualsJumping() throws {
         // update(toFrame:) steps through every frame so stochastic state stays
         // identical to a ticked run.
@@ -1293,12 +1327,13 @@ final class GoldenFrameTests: XCTestCase {
         // saturated hue-separated bodies.
         // v10 (A6.2): per-archetype body plans — flame/gem/pyramid heads,
         // chamfered/sag masses, reference decorations.
+        // v11 (A6.3): posture wander (alive pass) + facet contrast polish.
         let expected: [Archetype: UInt64] = [
-            .ember: 6_519_094_879_658_272_589,
-            .willow: 16_901_840_358_411_959_065,
-            .compass: 12_173_337_096_608_833_484,
-            .prism: 14_839_059_435_747_660_864,
-            .nimbus: 13_040_412_923_109_962_975,
+            .ember: 14_331_582_820_154_286_129,
+            .willow: 3_607_243_858_067_788_876,
+            .compass: 11_268_772_857_050_976_646,
+            .prism: 9_649_437_648_944_361_884,
+            .nimbus: 3_908_147_332_231_348_452,
         ]
 
         var actual: [Archetype: UInt64] = [:]
@@ -1564,12 +1599,13 @@ final class PixelStageTests: XCTestCase {
         // v2 (bugfix): restDim removed from the active snap candidates
         // (face-mud fix).
         // v3 (A6.2): per-archetype body plans.
+        // v4 (A6.3): posture wander + facet contrast polish.
         let expected: [Archetype: UInt64] = [
-            .ember: 7_035_407_340_944_801_084,
-            .willow: 570_065_832_684_050_166,
-            .compass: 3_886_939_997_016_539_922,
-            .prism: 3_838_181_931_980_126_332,
-            .nimbus: 6_639_547_717_414_181_186,
+            .ember: 17_418_118_748_497_994_838,
+            .willow: 17_179_089_577_491_295_665,
+            .compass: 1_454_164_303_986_258_873,
+            .prism: 5_031_569_973_221_757_597,
+            .nimbus: 8_913_389_609_442_486_168,
         ]
         var actual: [Archetype: UInt64] = [:]
         for archetype in Archetype.allCases {
