@@ -292,10 +292,24 @@ final class AvatarEngineTests: XCTestCase {
         engine.handleEvent(.tap) // inside the active reaction + cooldown
         engine.update(toFrame: 10)
         XCTAssertEqual(engine.reactionCountForTesting, 1, "reactions inside the cooldown are dropped")
-        engine.update(toFrame: 60) // past the reaction end + cooldown
+        // Decouple from the schedules (v5b quirk clips shifted them): the
+        // first tap may now pick a longer clip (preen), so advance until
+        // neither a reaction nor an idle gesture is active — plus the
+        // 9-frame post-reaction cooldown — then the assertion measures
+        // cooldown behavior, not timing luck.
+        var frame = 60
+        while frame < 600 && (engine.currentReactionClip != nil || engine.activeGestureClip != nil) {
+            frame += 3
+            engine.update(toFrame: frame)
+        }
+        frame += 15
+        engine.update(toFrame: frame)
         engine.handleEvent(.tap)
-        engine.update(toFrame: 65)
-        XCTAssertEqual(engine.reactionCountForTesting, 2, "a tap after the cooldown reacts")
+        engine.update(toFrame: frame + 5)
+        XCTAssertEqual(
+            engine.reactionCountForTesting, 2,
+            "a tap after the cooldown reacts (diag: frame=\(frame) reaction=\(String(describing: engine.currentReactionClip)) idle=\(String(describing: engine.activeGestureClip)) count=\(engine.reactionCountForTesting))"
+        )
     }
 
     func testDroppedTapIsAcknowledgedWithEyeContact() throws {
@@ -470,6 +484,11 @@ final class AvatarEngineTests: XCTestCase {
             case .shiver: return .startle
             case .doubleTake: return .surprise
             case .puff: return .alert
+            case .preen: return .joy
+            case .swayCatch: return .warm
+            case .tick: return .focus
+            case .mirror: return .surprise
+            case .driftFloat: return .warm
             default: return nil
             }
         }
@@ -1330,6 +1349,9 @@ final class GoldenFrameTests: XCTestCase {
         // v11 (A6.3): posture wander (alive pass) + facet contrast polish.
         // v12 (v5): radical body plans (flame/bush/gem/pyramid/cloud) +
         // pixel-stage default + nimbus indigo palette.
+        // v13 (v5b): quirk clips — pool weights changed the seeded idle
+        // schedule, but the pinned frames carry no active gesture, so the
+        // v12 hashes carry over unchanged.
         let expected: [Archetype: UInt64] = [
             .ember: 6_003_811_012_249_022_199,
             .willow: 12_556_598_134_123_831_722,
@@ -1607,6 +1629,9 @@ final class PixelStageTests: XCTestCase {
         // v3 (A6.2): per-archetype body plans.
         // v4 (A6.3): posture wander + facet contrast polish.
         // v5 (v5): radical body plans + 64x78 grid + pixel-stage default.
+        // v6 (v5b): quirk clips — pool weights changed the seeded idle
+        // schedule, but the pinned frames carry no active gesture, so the
+        // v5 hashes carry over unchanged.
         let expected: [Archetype: UInt64] = [
             .ember: 15_992_830_819_844_983_735,
             .willow: 7_800_850_261_981_265_915,
@@ -1761,5 +1786,104 @@ final class PixelStageTests: XCTestCase {
                 "\(archetype.rawValue): rest grid must render dimmer than the active grid (restDim is 0.22x bodyLight; the active mean runs below full bodyLight, so the designed ratio is ~0.35-0.4 — a rest pose at active brightness fails this)"
             )
         }
+    }
+}
+
+// MARK: - v5b quirk clips (one per archetype — the "act the same" fix)
+
+/// Each archetype owns exactly one quirk clip no other archetype performs:
+/// Ember preens, Willow catches a leaf, Compass ticks, Prism mirror-flips,
+/// Nimbus float-wanders. The clips' motion signatures must be pairwise
+/// distinct — five behaviors, not five parameterizations of one bob.
+final class QuirkClipTests: XCTestCase {
+    private let owners: [GestureClip: Archetype] = [
+        .preen: .ember,
+        .swayCatch: .willow,
+        .tick: .compass,
+        .mirror: .prism,
+        .driftFloat: .nimbus,
+    ]
+
+    func testQuirkClipsAreOwnerExclusive() throws {
+        for (clip, owner) in owners {
+            for archetype in Archetype.allCases {
+                let profile = try PersonalityProfile.load(archetype)
+                let weight = profile.gesturePoolWeights["\(clip)"] ?? 0
+                if archetype == owner {
+                    XCTAssertGreaterThan(
+                        weight, 0,
+                        "\(clip.rawValue) must be in \(archetype.rawValue)'s pool"
+                    )
+                } else {
+                    XCTAssertEqual(
+                        weight, 0,
+                        "\(clip.rawValue) belongs to \(owner.rawValue) only — \(archetype.rawValue) must not perform it"
+                    )
+                }
+            }
+        }
+    }
+
+    func testQuirkClipsHaveDistinctMotionSignatures() throws {
+        // Sampled at multiple phases (a clip's mid-point can be a zero
+        // crossing — swayCatch's sway passes through neutral at u = 0.5).
+        let engine = try makeGoldenEngine(.nimbus)
+        var signatures: [GestureClip: [Float]] = [:]
+        for clip in owners.keys {
+            var signature: [Float] = []
+            for u: Float in [0.1, 0.25, 0.5, 0.75, 0.9] {
+                var pose = AvatarPose(boneCount: engine.skeleton.boneCount)
+                var expressions = [Float](repeating: 0, count: ExpressionChannel.count)
+                GestureClipLibrary.apply(
+                    clip, u: u, anticipation: 0, weight: 1,
+                    profile: engine.profile, bones: engine.bones,
+                    pose: &pose, expressions: &expressions
+                )
+                let b = engine.bones
+                signature.append(contentsOf: [
+                    pose.rotations[b.head],
+                    pose.rotations[b.spineUpper],
+                    pose.offsetsY[b.hips],
+                    pose.offsetsX[b.hips],
+                    pose.scalesY[b.head] - 1,
+                    pose.scalesX[b.chest] - 1,
+                ])
+            }
+            signatures[clip] = signature
+        }
+        let clips = Array(owners.keys)
+        for i in 0..<clips.count {
+            for j in (i + 1)..<clips.count {
+                let a = signatures[clips[i]]!
+                let c = signatures[clips[j]]!
+                var d: Float = 0
+                for k in 0..<a.count {
+                    let diff = a[k] - c[k]
+                    d += diff * diff
+                }
+                XCTAssertGreaterThan(
+                    d, 0.001,
+                    "\(clips[i].rawValue) and \(clips[j].rawValue) must have distinct motion signatures (squared distance \(d))"
+                )
+            }
+        }
+    }
+
+    func testTickSettlesExactlyToNeutral() throws {
+        // Compass's tell is ONE exact metronome bob: zero overshoot, and
+        // the pose returns to exactly neutral by u = 1 — one pixel of
+        // imprecision destroys it (§1 Compass).
+        let engine = try makeGoldenEngine(.compass)
+        var pose = AvatarPose(boneCount: engine.skeleton.boneCount)
+        var expressions = [Float](repeating: 0, count: ExpressionChannel.count)
+        GestureClipLibrary.apply(
+            .tick, u: 1, anticipation: 0, weight: 1,
+            profile: engine.profile, bones: engine.bones,
+            pose: &pose, expressions: &expressions
+        )
+        XCTAssertEqual(
+            pose, AvatarPose(boneCount: engine.skeleton.boneCount),
+            "tick must settle exactly to neutral at u = 1"
+        )
     }
 }

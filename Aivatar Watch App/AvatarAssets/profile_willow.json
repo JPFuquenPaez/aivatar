@@ -35,7 +35,7 @@
   "tell": "leaf",
   "quirkLoop": "phototropism",
   "voiceStyle": "understated, present progressive, no exclamation marks",
-  "gesturePoolWeights": { "wave": 0.2, "bounce": 0.0, "stretch": 0.3, "spin": 0.0, "nod": 0.35, "tilt": 0.15, "lookAround": 0.0, "shiftWeight": 0.0, "shiver": 0.0, "doubleTake": 0.0, "sparkle": 0.0, "puff": 0.0 },
+  "gesturePoolWeights": { "wave": 0.15, "bounce": 0.0, "stretch": 0.25, "spin": 0.0, "nod": 0.3, "tilt": 0.1, "lookAround": 0.0, "shiftWeight": 0.0, "shiver": 0.0, "doubleTake": 0.0, "sparkle": 0.0, "puff": 0.0, "preen": 0.0, "swayCatch": 0.2, "tick": 0.0, "mirror": 0.0, "driftFloat": 0.0 },
   "quirks": ["long soft blinks", "leaf sway on weight shift"],
   "assetVersion": "2.0.0"
 }

@@ -19,6 +19,12 @@ nonisolated enum GestureClipLibrary {
         case .doubleTake: return 1.5
         case .sparkle: return 1.0
         case .puff: return 1.4
+        // v5b quirk clips — the unique per-archetype signatures.
+        case .preen: return 1.8
+        case .swayCatch: return 2.8
+        case .tick: return 0.9
+        case .mirror: return 2.4
+        case .driftFloat: return 3.4
         }
     }
 
@@ -185,6 +191,82 @@ nonisolated enum GestureClipLibrary {
             pose.scalesX[bones.chest] += 0.22 * swell * w
             pose.scalesY[bones.chest] += 0.18 * swell * w
             expressions[ExpressionChannel.alert.rawValue] = max(expressions[ExpressionChannel.alert.rawValue], arc * 0.4 * w)
+
+        // MARK: - v5b quirk clips (one per archetype, owner-only weights)
+
+        case .preen:
+            // EMBER — the preen: dips its head and gives itself two quick
+            // pat pulses (head scale), then a springy hop. "Checking its
+            // hair" before the curtain rises; anticipation is the stance.
+            let dip = easeInOut(min(u / 0.25, 1)) * (1 - easeInOut(min(max((u - 0.35) / 0.25, 0), 1)))
+            pose.rotations[bones.head] += 0.16 * dip * w * amp
+            let patWindow = u > 0.10 && u < 0.70
+            if patWindow {
+                let pat = pow(abs(sin(u * Float.pi * 4)), 2)
+                pose.scalesY[bones.head] += 0.05 * pat * w
+                pose.scalesX[bones.head] += 0.03 * pat * w
+            }
+            if u > 0.78 {
+                pose.offsetsY[bones.hips] += 3.0 * sin((u - 0.78) / 0.22 * Float.pi) * w * amp
+            }
+            expressions[ExpressionChannel.joy.rawValue] = max(expressions[ExpressionChannel.joy.rawValue], arc * 0.5 * w)
+
+        case .swayCatch:
+            // WILLOW — the leaf-catch: one slow full-body sway with the
+            // head LAGGING the spine (vegetation, not clockwork), then a
+            // quick small dip — catching a falling leaf — and a settle
+            // that never fully settles (residual sway by design).
+            pose.rotations[bones.spineUpper] += 0.09 * sin(u * Float.pi * 2) * w
+            pose.rotations[bones.head] += 0.07 * sin(u * Float.pi * 2 - 0.9) * w
+            pose.rotations[bones.appendageB] += 0.12 * sin(u * Float.pi * 2 - 1.4) * w
+            if u > 0.55 && u < 0.80 {
+                let catchPulse = sin((u - 0.55) / 0.25 * Float.pi)
+                pose.offsetsY[bones.head] -= 1.4 * catchPulse * w
+                pose.rotations[bones.neck] += 0.08 * catchPulse * w
+            }
+            expressions[ExpressionChannel.warm.rawValue] = max(expressions[ExpressionChannel.warm.rawValue], 0.4 * w)
+
+        case .tick:
+            // COMPASS — the tick: ONE exact metronome bob. Single hump,
+            // zero overshoot, posture stays level, returns to EXACTLY
+            // neutral by u = 1 (sin(pi) leaves a float residue — clamp it;
+            // one pixel of imprecision destroys the tell, §1 Compass).
+            let hump: Float = u >= 1 ? 0 : sin(u * Float.pi)
+            pose.offsetsY[bones.hips] += 2.0 * hump * w
+            pose.rotations[bones.spineUpper] -= 0.03 * hump * w
+            expressions[ExpressionChannel.focus.rawValue] = max(expressions[ExpressionChannel.focus.rawValue], hump * 0.35 * w)
+
+        case .mirror:
+            // PRISM — the mirror moment: freezes, tilts slowly left to
+            // study itself, holds, then a quick flip tilt right with a
+            // small head-scale study pulse — it just changed a color.
+            if u < 0.3 {
+                pose.rotations[bones.head] -= 0.20 * easeInOut(u / 0.3) * w
+            } else if u < 0.55 {
+                pose.rotations[bones.head] -= 0.20 * w
+            } else if u < 0.68 {
+                pose.rotations[bones.head] += (-0.20 + 0.45 * easeInOut((u - 0.55) / 0.13)) * w
+                pose.scalesX[bones.head] += 0.03 * sin((u - 0.55) / 0.13 * Float.pi) * w
+            } else {
+                pose.rotations[bones.head] += 0.25 * (1 - easeInOut((u - 0.68) / 0.32)) * w
+            }
+            expressions[ExpressionChannel.wry.rawValue] = max(expressions[ExpressionChannel.wry.rawValue], 0.3 * w)
+            if u > 0.55 {
+                expressions[ExpressionChannel.surprise.rawValue] = max(
+                    expressions[ExpressionChannel.surprise.rawValue],
+                    sin((u - 0.55) / 0.45 * Float.pi) * 0.5 * w
+                )
+            }
+
+        case .driftFloat:
+            // NIMBUS — the float wander: two-frequency drift (lateral
+            // sway + faster small vertical bob) with a gentle chest
+            // breathing swell. Calm weather made visible.
+            pose.offsetsX[bones.hips] += 3.0 * sin(u * Float.pi * 2) * w
+            pose.offsetsY[bones.hips] += 1.5 * sin(u * Float.pi * 4 + 0.7) * w
+            pose.scalesX[bones.chest] += 0.03 * sin(u * Float.pi * 2) * w
+            pose.rotations[bones.appendageB] += 0.10 * sin(u * Float.pi * 2 - 0.5) * w
+            expressions[ExpressionChannel.warm.rawValue] = max(expressions[ExpressionChannel.warm.rawValue], 0.3 * w)
         }
     }
 }

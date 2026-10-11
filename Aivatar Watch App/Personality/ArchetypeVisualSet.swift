@@ -1,8 +1,10 @@
 import Foundation
 
-/// The gesture clip list (§10 A1 deliverable: ~12 shared clips). Every clip is
-/// available to every archetype; the profile's `gesturePoolWeights` sets how
-/// likely it is (weight 0 allowed) — CI parity tests enforce this (§10).
+/// The gesture clip list (§10 A1 deliverable: shared clip vocabulary; v5b
+/// adds one UNIQUE QUIRK CLIP per archetype — the involuntary signature
+/// behavior no other archetype performs). Every clip is available to every
+/// archetype; the profile's `gesturePoolWeights` sets how likely it is
+/// (weight 0 allowed) — CI parity tests enforce this (§10).
 nonisolated enum GestureClip: String, Sendable, CaseIterable, Codable {
     case wave
     case bounce
@@ -16,12 +18,18 @@ nonisolated enum GestureClip: String, Sendable, CaseIterable, Codable {
     case doubleTake
     case sparkle
     case puff
+    // v5b quirk clips — one per archetype, weighted ONLY for its owner.
+    case preen       // Ember: head-pat warm-up before the show
+    case swayCatch   // Willow: slow sway, catches a falling leaf
+    case tick        // Compass: one exact metronome bob
+    case mirror      // Prism: freezes, studies itself, flips a color
+    case driftFloat  // Nimbus: two-frequency floating wander
 
     /// Clips the engine treats as "big" (anticipation frames >= 120 ms,
     /// squash & stretch, §7).
     var isBig: Bool {
         switch self {
-        case .bounce, .spin, .stretch, .puff, .sparkle:
+        case .bounce, .spin, .stretch, .puff, .sparkle, .preen:
             return true
         default:
             return false
@@ -46,7 +54,8 @@ nonisolated enum GestureClip: String, Sendable, CaseIterable, Codable {
     /// face alone; the reaction pool is filtered to these clips in L2 (§8).
     var writesExpression: Bool {
         switch self {
-        case .wave, .stretch, .spin, .lookAround, .shiver, .doubleTake, .sparkle, .puff:
+        case .wave, .stretch, .spin, .lookAround, .shiver, .doubleTake, .sparkle, .puff,
+             .preen, .swayCatch, .tick, .mirror, .driftFloat:
             return true
         case .bounce, .nod, .tilt, .shiftWeight:
             return false

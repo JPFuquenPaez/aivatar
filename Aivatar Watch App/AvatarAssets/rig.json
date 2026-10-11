@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "expressionChannels": ["joy", "sad", "surprise", "alert", "sleepy", "focus", "warm", "wry", "startle", "rest"],
-  "gestures": ["wave", "bounce", "stretch", "spin", "nod", "tilt", "lookAround", "shiftWeight", "shiver", "doubleTake", "sparkle", "puff"],
+  "gestures": ["wave", "bounce", "stretch", "spin", "nod", "tilt", "lookAround", "shiftWeight", "shiver", "doubleTake", "sparkle", "puff", "preen", "swayCatch", "tick", "mirror", "driftFloat"],
   "width": 205.0,
   "height": 251.0,
   "bones": [
