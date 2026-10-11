@@ -460,6 +460,49 @@ final class AvatarEngineTests: XCTestCase {
         }
     }
 
+    // MARK: Phase B — notification bridge (B2b)
+
+    func testNotificationDefaultsAreFaceReadablePerArchetype() throws {
+        // Notification reactions must read in Reduce Motion L2 too: every
+        // default attention gesture writes an expression channel (explicit
+        // gesture events bypass the L2 pool filter, so the defaults must
+        // be face-readable by construction).
+        for archetype in Archetype.allCases {
+            let clip = NotificationAvatarBridge.defaultAttentionGesture(for: archetype)
+            XCTAssertTrue(clip.writesExpression,
+                          "\(archetype.rawValue) default attention gesture must be face-readable")
+        }
+    }
+
+    func testNotificationPayloadOverridesDefaultGesture() throws {
+        let defaults: [Archetype: GestureClip] = [
+            .ember: .wave, .willow: .wave, .compass: .lookAround,
+            .prism: .doubleTake, .nimbus: .puff,
+        ]
+        for (archetype, clip) in defaults {
+            XCTAssertEqual(NotificationAvatarBridge.attentionGesture(userInfo: [:], archetype: archetype), clip)
+        }
+        // An explicit, valid payload wins for every archetype.
+        for archetype in Archetype.allCases {
+            let userInfo: [AnyHashable: Any] = [NotificationAvatarBridge.gestureUserInfoKey: "shiver"]
+            XCTAssertEqual(NotificationAvatarBridge.attentionGesture(userInfo: userInfo, archetype: archetype), .shiver)
+            // Unknown clip names fall back to the default (never dropped).
+            let bad: [AnyHashable: Any] = [NotificationAvatarBridge.gestureUserInfoKey: "backflip"]
+            XCTAssertEqual(NotificationAvatarBridge.attentionGesture(userInfo: bad, archetype: archetype),
+                           NotificationAvatarBridge.defaultAttentionGesture(for: archetype))
+        }
+    }
+
+    func testNotificationGestureEventReachesEngine() throws {
+        // End-to-end port check: the bridge's gesture event triggers an L3
+        // reaction on the engine — the same port the stage's taps use (§13).
+        let engine = try makeEngine(.nimbus, seed: 8)
+        engine.update(toFrame: 40)
+        engine.handleEvent(.gesture(name: NotificationAvatarBridge.defaultAttentionGesture(for: .nimbus).rawValue))
+        engine.update(toFrame: 41)
+        XCTAssertEqual(engine.currentReactionClip, .puff, "the notification gesture must play on the engine")
+    }
+
     // MARK: Painter (§8)
 
     func testPainterProducesCommandsForEverySlotWithinCapacity() throws {

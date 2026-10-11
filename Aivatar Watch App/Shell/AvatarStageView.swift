@@ -30,6 +30,14 @@ struct AvatarStageView: View {
                 )
                 let renderContext = AvatarRenderContext(engine: engine)
                 context = renderContext
+                // Phase B: notification events reach this engine via the
+                // session registry (§13 port).
+                AvatarSession.shared.register(context: renderContext, archetype: archetype)
+            }
+        }
+        .onDisappear {
+            if let context {
+                AvatarSession.shared.unregister(context: context)
             }
         }
     }
