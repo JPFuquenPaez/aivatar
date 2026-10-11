@@ -21,9 +21,18 @@
 // Blend model: the source's overlap regions mix both lobes' colors roughly
 // 50/50 even deep inside both ellipses, which no opaque-stack of three
 // gradients can reproduce exactly (the source reads as a mesh-gradient
-// render). We approximate with feathered ellipses drawn at 0.9 alpha and
-// gradient stops pre-compensated so each lobe's interior matches the
-// measured source colors exactly; seams gain a 10% blend of the lobe below.
+// render). We approximate with feathered ellipses; seams get a soft blend
+// from the Gaussian feather alone.
+//
+// Background: the source logo sits on near-black (#100F18), but the watchOS
+// home screen is also near-black with circular-masked icons — a near-black
+// icon is effectively invisible there (the post-launch assessment found
+// exactly that: the app was on the honeycomb but read as an empty gap).
+// Per the watchOS HIG (colorful, opaque, readable-on-black), the icon now
+// uses a full-bleed brand-violet vertical gradient (#4B3A8F top ->
+// #2B1F58 bottom, Nimbus family) with the cloud drawn OPAQUE on top
+// (lobeAlpha 1.0: over a light background the 0.9-alpha under-blend is
+// unnecessary and interior colors stay exact).
 //
 // Icon geometry: cloud scaled 1.5034x (439 -> 660 px, ~64% of canvas),
 // recentered at (512,512) to read inside the system's circular mask.
@@ -39,8 +48,12 @@ let size = 1024
 let rect = CGRect(x: 0, y: 0, width: size, height: size)
 let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
 
-let bgHex: UInt32 = 0x100F18
-let lobeAlpha: CGFloat = 0.9
+/// Full-bleed background gradient (brand violet; NOT the logo's near-black —
+/// see header). Top is lighter so the icon's edge ring reads on the black
+/// watchOS home screen.
+let bgTopHex: UInt32 = 0x4B3A8F
+let bgBottomHex: UInt32 = 0x2B1F58
+let lobeAlpha: CGFloat = 1.0
 let featherSigma: CGFloat = 9.0
 
 func rgb(_ hex: UInt32) -> (CGFloat, CGFloat, CGFloat) {
@@ -51,9 +64,11 @@ func color(_ hex: UInt32) -> CGColor {
     return CGColor(colorSpace: srgb, components: [c.0 / 255, c.1 / 255, c.2 / 255, 1])!
 }
 // Pre-compensate a stop so that drawing at lobeAlpha over the bg reproduces
-// the measured color: C_paint = (C_measured - (1-a)*bg) / a.
+// the measured color: C_paint = (C_measured - (1-a)*bg) / a. With a = 1.0
+// (opaque lobes over the violet gradient) this is the identity.
+let compBG = rgb(bgBottomHex)
 func compensated(_ hex: UInt32) -> CGColor {
-    let m = rgb(hex), b = rgb(bgHex)
+    let m = rgb(hex), b = compBG
     let a = lobeAlpha
     func f(_ v: CGFloat, _ bv: CGFloat) -> CGFloat { min(255, (v - (1 - a) * bv) / a) }
     return CGColor(colorSpace: srgb, components: [f(m.0, b.0) / 255, f(m.1, b.1) / 255, f(m.2, b.2) / 255, 1])!
@@ -130,8 +145,19 @@ func featheredLobe(_ lobe: Lobe) -> CGImage? {
 // MARK: - Compose
 
 let out = makeContext()
-out.setFillColor(color(bgHex))
-out.fill(rect)
+// Full-bleed brand-violet vertical gradient (see header: near-black would
+// be invisible in the watchOS home screen's circular mask on black).
+let bgGradient = CGGradient(
+    colorsSpace: srgb,
+    colors: [color(bgTopHex), color(bgBottomHex)] as CFArray,
+    locations: [0, 1]
+)!
+out.drawLinearGradient(
+    bgGradient,
+    start: CGPoint(x: 512, y: 0),
+    end: CGPoint(x: 512, y: CGFloat(size)),
+    options: []
+)
 
 for lobe in lobes {
     guard let img = featheredLobe(lobe) else { fatalError("lobe render failed") }
@@ -161,8 +187,6 @@ guard let composed = out.makeImage() else { fatalError("composition failed") }
 let finalCtx = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8,
                          bytesPerRow: size * 4, space: srgb,
                          bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
-finalCtx.setFillColor(color(bgHex))
-finalCtx.fill(CGRect(x: 0, y: 0, width: size, height: size))
 finalCtx.draw(composed, in: CGRect(x: 0, y: 0, width: size, height: size))
 guard let finalImage = finalCtx.makeImage() else { fatalError("final flatten failed") }
 
@@ -212,16 +236,40 @@ for (label, src, expected) in probes {
                  px.0, px.1, px.2, expected, drift))
 }
 
-// Silhouette: expect ~660x404 centered on (512,512).
+// Silhouette: expect ~660x404 centered on (512,512). On the violet gradient
+// the cloud is detected by luminance (darkest cloud lobe ~95, brightest
+// background ~73), not by a per-channel floor.
 var minX = size, maxX = 0, minY = size, maxY = 0
 for y in stride(from: 0, to: size, by: 2) {
     for x in stride(from: 0, to: size, by: 2) {
         let c = pixel(x, y)
-        if max(c.0, max(c.1, c.2)) > 60 {
+        let lum = 0.299 * Double(c.0) + 0.587 * Double(c.1) + 0.114 * Double(c.2)
+        if lum > 85 {
             minX = min(minX, x); maxX = max(maxX, x)
             minY = min(minY, y); maxY = max(maxY, y)
         }
     }
 }
-print("cloud bbox: x[\(minX),\(maxX)] y[\(minY),\(maxY)] -> \(maxX-minX+1)x\(maxY-minY+1), center=((\(minX+maxX)/2),\(minY+maxY)/2)")
+print("cloud bbox: x[\(minX),\(maxX)] y[\(minY),\(maxY)] -> \(maxX-minX+1)x\(maxY-minY+1), center=(\((minX+maxX)/2),\((minY+maxY)/2))")
 print("max interior drift vs source samples: \(maxDrift)")
+
+// Home-screen visibility probe — the check this background exists for:
+// sample just inside the circular mask edge (r=490) at 8 angles; every
+// sample must be clearly brighter than the black watchOS home screen
+// (luminance > 25/255) or the icon reads as an empty gap in the honeycomb.
+// (The v1 icon — cloud on the logo's #100F18 near-black — measured ~16/255
+// here and was the "app icon missing on the watch" bug report.)
+var minEdgeLum = 255
+for i in 0..<8 {
+    let a = Double(i) / 8.0 * 2.0 * Double.pi
+    let x = 512 + Int(490 * cos(a)), y = 512 + Int(490 * sin(a))
+    let p = pixel(x, y)
+    let lum = 0.299 * Double(p.0) + 0.587 * Double(p.1) + 0.114 * Double(p.2)
+    minEdgeLum = min(minEdgeLum, Int(lum))
+    print(String(format: "edge %d (%4d,%4d) #%02X%02X%02X  lum=%d", i, x, y, p.0, p.1, p.2, Int(lum)))
+}
+print("edge ring min luminance: \(minEdgeLum)  (must be > 25 to read on the black home screen)")
+if minEdgeLum <= 25 {
+    print("FAIL: icon edge is invisible on the black watchOS home screen")
+    exit(1)
+}

@@ -67,21 +67,27 @@ nonisolated final class LifeLoopLayer {
         let t = Float(frame) / 30.0
 
         // --- Breathing: chest scale, ~20 cycles/min baseline, tempo-scaled.
+        // Amplitude floor 0.07: at screen fit ~1.78 pt/rig-unit a 10% chest
+        // scale moves the rib silhouette ~10 pt (~20 px) per breath cycle —
+        // the "is it alive?" signal. Verified against the §11 continuity
+        // budget with ~2 orders of magnitude of headroom (slow sinusoid).
         let breatheRate = Float.pi * 2.0 * 0.33 * profile.motionProfile.tempoScale
         let breath = (sin(t * breatheRate) + 1) * 0.5
-        let amp = 0.03 + 0.015 * profile.motionProfile.amplitudeScale
+        let amp = 0.07 + 0.035 * profile.motionProfile.amplitudeScale
         pose.scalesX[bones.chest] = 1 + breath * amp
         pose.scalesY[bones.chest] = 1 - breath * amp * 0.4
-        pose.rotations[bones.chest] += sin(t * breatheRate + 0.4) * 0.01
+        pose.rotations[bones.chest] += sin(t * breatheRate + 0.4) * 0.02
 
-        // --- Micro-sway: slow full-body rotation around the hips.
-        pose.rotations[bones.hips] += sin(t * 0.55) * 0.012 * profile.motionProfile.amplitudeScale
-        pose.offsetsY[bones.hips] += sin(t * 1.1) * 0.8
+        // --- Micro-sway: slow full-body rotation around the hips. 0.035 rad
+        // swings the head (~100 units above the hips) ~3.5 units lateral per
+        // half-cycle — a visible drift, still under 0.03 rad/frame.
+        pose.rotations[bones.hips] += sin(t * 0.55) * 0.035 * profile.motionProfile.amplitudeScale
+        pose.offsetsY[bones.hips] += sin(t * 1.1) * 1.6
 
-        // --- Heartbeat shimmer: 60 bpm sub-pixel pulse on the head.
+        // --- Heartbeat shimmer: 60 bpm pulse on the head (~0.6-unit bob).
         let beat = t * Float.pi * 2.0 * 1.0
         let pulse = pow(max(0, sin(beat)), 12)
-        pose.offsetsY[bones.head] -= pulse * 0.25
+        pose.offsetsY[bones.head] -= pulse * 0.6
 
         // --- Saccades: retarget gaze stochastically among the profile's idle
         //     gaze targets; head follows with probability `headPropensity`

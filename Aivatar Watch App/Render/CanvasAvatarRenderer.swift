@@ -5,6 +5,43 @@ import CoreGraphics
 import os
 #endif
 
+/// Stage composition (§9): the avatar occupies the center ~70% of the screen
+/// with its face in the upper third. The rig canvas (205x251) is larger than
+/// the drawn content — the rest pose spans rig y ~20...160, centered ~35.5
+/// units above the canvas center — so fitting the full canvas shrinks the
+/// avatar to ~52% of screen height with dead space below it. These constants
+/// zoom past the canvas padding and center on the *content* instead.
+fileprivate enum StageComposition {
+    /// Zoom over the base canvas fit. 1.18 puts the ~140-unit content at
+    /// ~66% of screen height on 44-46 mm devices, leaving headroom above
+    /// for gesture peaks (raised wave arm ~+10 units) and the clock.
+    static let zoom: CGFloat = 1.18
+    /// Rest-pose content center in rig coordinates, relative to the canvas
+    /// center (origin): 35.5 units above it (measured from the golden
+    /// rasterizer bbox; negative y = up).
+    static let contentCenterY: CGFloat = -35.5
+    /// Screen height fraction where the content center lands. 0.50 keeps
+    /// the face in the upper third (§9 glance zone) while leaving margin
+    /// for the extremes across archetypes: Nimbus's raised middle puff
+    /// (content top ~7 units above the canvas center) stays ~19 px below
+    /// the screen top, and Ember's tail keeps ~20 px clearance above the
+    /// name text (measured live on SE 3 44mm, Tools/avatar_bbox.swift).
+    static let contentCenterYFraction: CGFloat = 0.50
+
+    /// Maps rig space (origin at the canvas center) to screen space.
+    /// Returns the fit scale and the screen position of the rig origin.
+    static func solve(size: CGSize, rigWidth: CGFloat, rigHeight: CGFloat)
+        -> (fit: CGFloat, originX: CGFloat, originY: CGFloat)
+    {
+        let fit = min(size.width / rigWidth, size.height / rigHeight) * zoom
+        return (
+            fit: fit,
+            originX: size.width / 2,
+            originY: size.height * contentCenterYFraction - contentCenterY * fit
+        )
+    }
+}
+
 /// Owns everything the render loop touches: the engine, the sprite painter,
 /// the cached rest-pose world transforms and the TimelineView epoch. Built
 /// once per stage appearance; the Canvas closures only mutate in place.
@@ -59,9 +96,12 @@ final class AvatarRenderContext {
         ctx.translateBy(x: 0, y: CGFloat(height))
         ctx.scaleBy(x: 1, y: -1)
         let size = CGSize(width: width, height: height)
-        let fit = min(size.width / 205.0, size.height / 251.0)
-        let centerX = 205.0 / 2 * fit
-        let centerY = 251.0 / 2 * fit
+        let mapping = StageComposition.solve(
+            size: size, rigWidth: 205.0, rigHeight: 251.0
+        )
+        let fit = mapping.fit
+        let centerX = mapping.originX
+        let centerY = mapping.originY
         for i in 0..<painter.commandCount {
             let command = painter.commands[i]
             ctx.saveGState()
@@ -154,21 +194,18 @@ struct CanvasAvatarRenderer: View {
         paintCommands(ctx: ctx, size: size)
     }
 
-    /// Fit the 205x251 rig canvas into the view, clear to pure black, draw
-    /// commands back-to-front (§8 renderer design).
+    /// Fit the rig content into the view (§9 composition via
+    /// StageComposition), clear to pure black, draw commands back-to-front
+    /// (§8 renderer design).
     private func paintCommands(ctx: GraphicsContext, size: CGSize) {
         let painter = context.painter
         let rig = context.engine.skeleton.document
-        let rigWidth = CGFloat(rig.width)
-        let rigHeight = CGFloat(rig.height)
-        let fit = min(size.width / rigWidth, size.height / rigHeight)
-        let originX = (size.width - rigWidth * fit) / 2
-        let originY = (size.height - rigHeight * fit) / 2
-        // The rig origin (0,0) is the CENTER of the rig canvas — bone
-        // positions span roughly -half...+half of the canvas (head chain up,
-        // tail down). Without this offset the avatar draws off-screen.
-        let centerX = originX + rigWidth / 2 * fit
-        let centerY = originY + rigHeight / 2 * fit
+        let mapping = StageComposition.solve(
+            size: size, rigWidth: CGFloat(rig.width), rigHeight: CGFloat(rig.height)
+        )
+        let fit = mapping.fit
+        let centerX = mapping.originX
+        let centerY = mapping.originY
 
         ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black))
 

@@ -14,8 +14,11 @@ import Foundation
 /// is consumed only when a reaction actually starts — the engine's other
 /// layers never see it, so an engine that reacted still re-converges with
 /// an event-free reference (same seed, same frame -> same pose). Cooldown
-/// (>= 0.5 s) between reactions; reactions are suppressed while an idle
-/// gesture is active (§7 gesture suppression).
+/// (>= 0.3 s) between reactions; reactions are suppressed while an idle
+/// gesture is active (§7 gesture suppression). A tap that cannot start a
+/// clip (cooldown, active clip, idle suppression) is never silent: the
+/// avatar acknowledges it with a brief eye-contact + focus pulse that
+/// interrupts nothing — every touch gets an immediate, visible answer.
 nonisolated final class ReactionLayer {
     private let profile: PersonalityProfile
     private var pickRNG: SeededRandom
@@ -27,9 +30,16 @@ nonisolated final class ReactionLayer {
     private var fadeFrames = 9
     private var activeElapsed = 0
 
-    /// Frames of silence required between reactions (15 = 0.5 s).
-    private let cooldownFrames = 15
+    /// Frames of silence required between reactions (9 = 0.3 s — long
+    /// enough that two clips never overlap, short enough that the avatar
+    /// never feels dead to a second tap).
+    private let cooldownFrames = 9
     private var lastReactionEndFrame = -1000
+
+    /// Dropped-tap acknowledgment (§9 responsiveness): frames left in the
+    /// eye-contact + focus pulse; 12 frames = 0.4 s, sine in-out envelope.
+    private var ackFramesLeft = 0
+    private let ackTotal = 12
 
     /// Crown-driven gaze dart: an impulse that decays. Pupil offset only —
     /// the digital crown drives page navigation on watchOS, so a crown
@@ -76,6 +86,9 @@ nonisolated final class ReactionLayer {
         }
 
         guard activeClip == nil, frame - lastReactionEndFrame >= cooldownFrames, !idleActive else {
+            // The tap cannot start a clip, but it is never dropped
+            // silently: acknowledge with eye contact (§9 responsiveness).
+            ackFramesLeft = ackTotal
             return false
         }
         var clip: GestureClip?
@@ -147,32 +160,54 @@ nonisolated final class ReactionLayer {
             crownGazeX *= 0.82
         }
 
-        guard let clip = activeClip else { return }
-        activeElapsed = frame - startFrame
-        let total = actionFrames + fadeFrames
-        var w: Float = 1
-        if activeElapsed < fadeFrames {
-            w = GestureClipLibrary.easeInOut(Float(activeElapsed) / Float(fadeFrames))
-        } else if !clip.endsWrapped, activeElapsed >= total - fadeFrames {
-            // Wrapped clips (spin) hold weight 1 to the end; their 2*pi end
-            // pose is the neutral pose (§11 continuity).
-            let tail = Float(activeElapsed - (total - fadeFrames)) / Float(fadeFrames)
-            w = GestureClipLibrary.easeInOut(1 - min(tail, 1))
+        if let clip = activeClip {
+            activeElapsed = frame - startFrame
+            let total = actionFrames + fadeFrames
+            var w: Float = 1
+            if activeElapsed < fadeFrames {
+                w = GestureClipLibrary.easeInOut(Float(activeElapsed) / Float(fadeFrames))
+            } else if !clip.endsWrapped, activeElapsed >= total - fadeFrames {
+                // Wrapped clips (spin) hold weight 1 to the end; their 2*pi end
+                // pose is the neutral pose (§11 continuity).
+                let tail = Float(activeElapsed - (total - fadeFrames)) / Float(fadeFrames)
+                w = GestureClipLibrary.easeInOut(1 - min(tail, 1))
+            }
+            let u = min(max(Float(activeElapsed) / Float(max(actionFrames, 1)), 0), 1)
+            GestureClipLibrary.apply(
+                clip,
+                u: u,
+                anticipation: 0,
+                weight: w,
+                profile: profile,
+                bones: bones,
+                pose: &pose,
+                expressions: &expressions
+            )
+            if activeElapsed >= total {
+                activeClip = nil
+                lastReactionEndFrame = frame
+            }
         }
-        let u = min(max(Float(activeElapsed) / Float(max(actionFrames, 1)), 0), 1)
-        GestureClipLibrary.apply(
-            clip,
-            u: u,
-            anticipation: 0,
-            weight: w,
-            profile: profile,
-            bones: bones,
-            pose: &pose,
-            expressions: &expressions
-        )
-        if activeElapsed >= total {
-            activeClip = nil
-            lastReactionEndFrame = frame
+
+        // Dropped-tap acknowledgment: the eyes answer — lids lift (an
+        // "I see you" widening that reads even when the gaze is centered),
+        // accumulated pupil deltas (L1 gaze, clip offsets) pull toward the
+        // rest direction, and the focus channel pulses. Additive and
+        // interrupting nothing; survives L2 (expressions/lids are kept).
+        if ackFramesLeft > 0 {
+            ackFramesLeft -= 1
+            let p = 1 - Float(ackFramesLeft) / Float(ackTotal)
+            let envelope = sin(p * .pi)
+            let lift = envelope * 1.2
+            pose.offsetsY[bones.lidL] -= lift
+            pose.offsetsY[bones.lidR] -= lift
+            let pull = envelope * 0.4
+            for pupil in [bones.pupilL, bones.pupilR] {
+                pose.offsetsX[pupil] -= pose.offsetsX[pupil] * pull
+                pose.offsetsY[pupil] -= pose.offsetsY[pupil] * pull
+            }
+            let focus = ExpressionChannel.focus.rawValue
+            expressions[focus] = max(expressions[focus], envelope * 0.7)
         }
     }
 }

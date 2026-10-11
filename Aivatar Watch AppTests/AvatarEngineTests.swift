@@ -264,6 +264,36 @@ final class AvatarEngineTests: XCTestCase {
         XCTAssertEqual(engine.reactionCountForTesting, 2, "a tap after the cooldown reacts")
     }
 
+    func testDroppedTapIsAcknowledgedWithEyeContact() throws {
+        // Every touch answers (§9 responsiveness): a tap that cannot start a
+        // clip (here: inside the active reaction) makes the avatar glance at
+        // the user — pupil pull toward the rest direction + a focus pulse —
+        // deterministically and without consuming the pick RNG stream.
+        let engine = try makeEngine(.ember, seed: 5)
+        let reference = try makeEngine(.ember, seed: 5)
+        engine.handleEvent(.tap)
+        engine.update(toFrame: 5)
+        engine.handleEvent(.tap) // dropped: inside the active reaction
+        engine.update(toFrame: 8)
+        XCTAssertEqual(engine.reactionCountForTesting, 1, "no second clip may start inside the cooldown")
+        let focus = ExpressionChannel.focus.rawValue
+        XCTAssertGreaterThan(engine.currentPose.expressionWeights[focus],
+                             reference.currentPose.expressionWeights[focus],
+                             "a dropped tap must pulse the focus channel")
+        XCTAssertLessThan(engine.currentPose.offsetsY[engine.bones.lidL],
+                          reference.currentPose.offsetsY[reference.bones.lidL],
+                          "a dropped tap must lift the lids (an always-visible answer)")
+        // The acknowledgment is transient: the engine re-converges with the
+        // event-free reference once the pulse has fully faded (the pick RNG
+        // stream was never consumed by the dropped tap).
+        for frame in 9...90 {
+            engine.update(toFrame: frame)
+            reference.update(toFrame: frame)
+        }
+        XCTAssertEqual(engine.currentPose, reference.currentPose,
+                       "the acknowledgment must fully fade back to the reference pose")
+    }
+
     func testReactionsSuppressedDuringIdleGesture() throws {
         // With a fixed seed, find the first frame an idle gesture is active;
         // a tap there must not start a reaction (§7 suppression).
@@ -383,7 +413,7 @@ final class AvatarEngineTests: XCTestCase {
             engine.update(toFrame: frame + 1)
             if let clip = engine.currentReactionClip {
                 picks.append(clip)
-                // Jump past the clip end + cooldown (15) + margin.
+                // Jump past the clip end + cooldown (9) + margin.
                 let total = GestureClipLibrary.durationFrames(clip, profile: profile) + fade
                 frame += total + 16
                 engine.update(toFrame: frame)
@@ -952,12 +982,16 @@ final class GoldenFrameTests: XCTestCase {
         // v3 (nimbus only): Nimbus's head is now the three-puff brand cloud
         // (logo geometry) and its primary palette is harmonized with the
         // logo's lavender family (#9C86DB).
+        // v4: L1 life-loop amplitudes raised for visible motion (breathing
+        // chest scale ~2.3x, sway rotation ~3x, heartbeat bob ~2.4x) — the
+        // post-polish assessment found the avatar read as frozen between
+        // blinks (~2% pixels moved per second).
         let expected: [Archetype: UInt64] = [
-            .ember: 12_016_137_667_541_340_369,
-            .willow: 18_097_399_317_908_289_734,
-            .compass: 13_126_774_808_885_116_185,
-            .prism: 9_954_699_415_628_735_132,
-            .nimbus: 5_352_135_130_477_461_359,
+            .ember: 11_117_809_796_357_006_278,
+            .willow: 12_049_078_547_383_160_587,
+            .compass: 10_375_914_817_836_150_481,
+            .prism: 871_704_784_707_370_524,
+            .nimbus: 3_029_167_971_646_149_126,
         ]
 
         var actual: [Archetype: UInt64] = [:]
@@ -1015,6 +1049,9 @@ final class SilhouetteSeparationTests: XCTestCase {
     /// willow-nimbus 0.815, compass-prism 0.816, compass-nimbus 0.792,
     /// prism-nimbus 0.834.
     ///
+    /// Measured v2 (L1 amplitude retune, v4 goldens): re-measured because
+    /// frame-300 poses moved with the larger life-loop amplitudes.
+    ///
     /// FINDING: the round trio (ember/willow/prism) overlaps at ~0.94-0.96
     /// because §5 assigns all three a circle head; compass (square) and
     /// nimbus (cloud) separate from everything. The ember/prism overlap is
@@ -1023,16 +1060,19 @@ final class SilhouetteSeparationTests: XCTestCase {
     /// a minimal amendment proposed (a faceted head for Prism), NOT applied.
     /// The n>=12 human study remains the acceptance authority.
     private static let ceilings: [String: Double] = [
-        "ember-willow": 0.959,
-        "ember-compass": 0.843,
-        "ember-prism": 0.977,
-        "ember-nimbus": 0.838,
-        "willow-compass": 0.841,
-        "willow-prism": 0.959,
+        // Measured v2 (frame 300, seed 42, L1 amplitude retune): the larger
+        // life-loop motion slightly *improved* separation of the round trio
+        // (ember-willow 0.919 vs 0.939, ember-prism 0.949 vs 0.957).
+        "ember-willow": 0.939,
+        "ember-compass": 0.838,
+        "ember-prism": 0.969,
+        "ember-nimbus": 0.834,
+        "willow-compass": 0.817,
+        "willow-prism": 0.965,
         "willow-nimbus": 0.835,
-        "compass-prism": 0.836,
-        "compass-nimbus": 0.812,
-        "prism-nimbus": 0.854,
+        "compass-prism": 0.824,
+        "compass-nimbus": 0.817,
+        "prism-nimbus": 0.848,
     ]
 
     func testPairwiseSilhouetteSeparation() throws {
