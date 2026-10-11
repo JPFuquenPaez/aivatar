@@ -203,10 +203,7 @@ struct CanvasAvatarRenderer: View {
                     drawStaticRest(ctx: ctx, size: size)
                 }
             } else {
-                // Hi-bit cadence (§11.3): idle loops at ~15 fps read as
-                // deliberately steppy retro animation and halve the tick
-                // cost of the 30 fps vector stage.
-                TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
                     Canvas { ctx, size in
                         draw(ctx: ctx, size: size, date: timeline.date)
                     }
@@ -238,8 +235,10 @@ struct CanvasAvatarRenderer: View {
             tell: engine.tell,
             tellPhase: engine.tellPhase
         )
-        context.pixelRasterizer.rasterize(painter: context.painter)
-        context.pixelRasterizer.draw(into: ctx, size: size)
+        // Vector stage (v4 reference direction: smooth-gradient low-poly).
+        // The hi-bit pixel rasterizer (§11.3) remains available as an
+        // alternate LOD — rasterize(painter:) + draw(into:size:).
+        paintCommands(ctx: ctx, size: size)
         #if DEBUG
         context.debugDrawCount += 1
         if context.debugDrawCount % 60 == 1 {
@@ -257,8 +256,7 @@ struct CanvasAvatarRenderer: View {
     private func drawStaticRest(ctx: GraphicsContext, size: CGSize) {
         context.solveRestIfNeeded()
         context.painter.paint(world: context.restWorld, pose: context.restPose!, rest: true)
-        context.pixelRasterizer.rasterize(painter: context.painter)
-        context.pixelRasterizer.draw(into: ctx, size: size)
+        paintCommands(ctx: ctx, size: size)
     }
 
     /// Fit the rig content into the view (§9 composition via

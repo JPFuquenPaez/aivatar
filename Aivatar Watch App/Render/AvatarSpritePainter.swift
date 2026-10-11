@@ -264,6 +264,14 @@ nonisolated final class AvatarSpritePainter {
                    kind: "circle", bone: "chest", role: .glow, x: 0, y: -3, alpha: 0.55)
             append(RigDocument.Shape(kind: "circle", width: 9, height: 6, bendSegments: nil),
                    kind: "circle", bone: "chest", role: .glow, x: 4, y: 8, alpha: 0.35)
+            // v4 reference: voluminous smoke plume at the base — three
+            // soft shadow-tone puffs under the body.
+            append(RigDocument.Shape(kind: "circle", width: 15, height: 10, bendSegments: nil),
+                   kind: "circle", bone: "hips", role: .deep, x: 0, y: 13, alpha: 0.6)
+            append(RigDocument.Shape(kind: "circle", width: 10, height: 7, bendSegments: nil),
+                   kind: "circle", bone: "hips", role: .deep, x: -10, y: 11, alpha: 0.5)
+            append(RigDocument.Shape(kind: "circle", width: 11, height: 8, bendSegments: nil),
+                   kind: "circle", bone: "hips", role: .deep, x: 10, y: 12, alpha: 0.5)
         case .willow:
             // The tended sprout floats beside it in a small soil-pod
             // (interiority made discoverable; the plant itself grows in a
@@ -273,6 +281,33 @@ nonisolated final class AvatarSpritePainter {
             append(RigDocument.Shape(kind: "triangle", width: 4, height: 7, bendSegments: nil),
                    kind: "leaf", bone: "hips", role: .accentA, x: 17, y: 3, rotation: 0.2,
                    id: "sproutLeaf")
+            // v4 reference: the weeping bush — hanging teardrop leaves
+            // under the body (leaf kind rotated tip-down), yellow-lit.
+            for (lx, ly, rot) in [(-8.0, 14.0, 0.12), (0.0, 17.0, 0.0), (8.0, 13.0, -0.12)] {
+                append(RigDocument.Shape(kind: "triangle", width: 4.5, height: 9, bendSegments: nil),
+                       kind: "leaf", bone: "hips", role: .accentA,
+                       x: Float(lx), y: Float(ly), rotation: Float(rot + .pi))
+            }
+        case .compass:
+            // The interior progress grid (order token): thin cyan lines on
+            // the chest, inside the "translucency". U3: precision lives in
+            // the grid and the timing, never in hard edges.
+            for (gx, gy) in [(-4.0, 0.0), (0.0, 0.0), (4.0, 0.0)] {
+                append(RigDocument.Shape(kind: "rect", width: 1.2, height: 13, bendSegments: nil),
+                       kind: "rect", bone: "chest", role: .accentA, x: Float(gx), y: Float(gy), alpha: 0.55,
+                       id: "grid")
+            }
+            for gy in [-5.0, 0.0, 5.0] {
+                append(RigDocument.Shape(kind: "rect", width: 11, height: 1.2, bendSegments: nil),
+                       kind: "rect", bone: "chest", role: .accentA, x: 0, y: Float(gy), alpha: 0.55,
+                       id: "grid")
+            }
+            // v4 reference: the dangling diamond crystals below the body
+            // (rounded squares rotated 45°, cyan glow).
+            append(RigDocument.Shape(kind: "rect", width: 5.5, height: 5.5, bendSegments: nil),
+                   kind: "patch", bone: "hips", role: .accentA, x: -6, y: 16, rotation: Float.pi / 4, alpha: 0.9)
+            append(RigDocument.Shape(kind: "rect", width: 4, height: 4, bendSegments: nil),
+                   kind: "patch", bone: "hips", role: .accentA, x: 6, y: 14, rotation: Float.pi / 4, alpha: 0.85)
         case .compass:
             // The interior progress grid (order token): thin cyan lines on
             // the chest, inside the "translucency". U3: precision lives in
@@ -297,6 +332,10 @@ nonisolated final class AvatarSpritePainter {
             // Mismatched wisp tips: triangle (slot) + round (decoration).
             append(RigDocument.Shape(kind: "circle", width: 3.5, height: 3.5, bendSegments: nil),
                    kind: "circle", bone: "appendageA2", role: .accentB, x: 3, y: -4)
+            // v4 reference: the small pointing arrow above the pyramid,
+            // glowing violet (accentA).
+            append(RigDocument.Shape(kind: "triangle", width: 5, height: 9, bendSegments: nil),
+                   kind: "triangle", bone: "head", role: .accentA, x: 0, y: -32, alpha: 0.9)
         case .nimbus:
             // Reference specimen: no extra token — identity is the lavender
             // tint and the tell (the post-event pulse, engine-side A5b).
@@ -334,13 +373,26 @@ nonisolated final class AvatarSpritePainter {
         // v3 shared species anatomy.
         switch slotName {
         case "head":
-            return "blob"                        // 3-puff brand cloud, all five
+            // v4 (§11.2, reference icons): distinct body plans per
+            // archetype — the head carries the strongest silhouette cue.
+            // Ember = flame (tip up), Compass = faceted gem, Prism =
+            // layered pyramid, Willow/Nimbus keep the round cloud head
+            // (cuteness floor U2 — the wide face mass stays round).
+            switch species {
+            case .ember: return "flame"
+            case .compass: return "gemHead"
+            case .prism: return "pyramidHead"
+            default: return "blob"
+            }
         case "torsoLower", "torsoUpper", "torsoChest":
-            return species == .compass && slotName == "torsoLower"
-                ? "chamferPuff"                  // soft rounded chamfer (>=15% radius)
-                : (species == .willow && slotName == "torsoLower"
-                    ? "sagPuff"                  // the only cloud whose base droops
-                    : "puff")
+            // Mass orientation diverges per plan (§11.2): Compass stacks
+            // chamfered squares, Willow droops wide, the rest stay puffs.
+            switch species {
+            case .compass: return "chamferPuff"
+            case .willow: return "sagPuff"
+            case .prism: return "chamferPuff"
+            default: return "puff"
+            }
         case "jaw":
             return "puff"                        // chin puff
         case "appendageA":
@@ -527,6 +579,60 @@ nonisolated final class AvatarSpritePainter {
             offsetsY.append(centerY)
             pathHeights.append(height)
             pathShades.append(shade)
+        }
+
+        if kind == "gemHead" {
+            // Compass (v4, reference: faceted turquoise gem): a diamond
+            // head built from THREE facets back-to-front (side triangles
+            // shade 0.88, center rhombus on top shade 1.0) — the same
+            // occlusion depth cue as the cloud blob. Paths are built
+            // SLICE-RELATIVE (centered at their own slice centers — the
+            // command-origin convention; see the rim comment in "blob").
+            func poly(_ points: [(CGFloat, CGFloat)]) -> CGMutablePath {
+                let path = CGMutablePath()
+                path.move(to: CGPoint(x: points[0].0, y: points[0].1))
+                for p in points.dropFirst() { path.addLine(to: CGPoint(x: p.0, y: p.1)) }
+                path.closeSubpath()
+                return path
+            }
+            let hw = w / 2, hh = h / 2
+            let left = poly([(0, -hh), (-hw, 0), (0, hh)])
+            let right = poly([(0, -hh), (hw, 0), (0, hh)])
+            let center = poly([(0, -hh), (hw * 0.62, 0), (0, hh), (-hw * 0.62, 0)])
+            append(left, centerY: 0, height: Float(h), shade: 0.88)
+            append(right, centerY: 0, height: Float(h), shade: 0.88)
+            append(center, centerY: 0, height: Float(h), shade: 1.0)
+            bendFractions = [0, 0, 0]
+            return PaintedShape(paths: paths, offsetsY: offsetsY, bendFractions: bendFractions,
+                                pathHeights: pathHeights, pathShades: pathShades,
+                                perPathGradient: true,
+                                width: shape.width, height: shape.height)
+        }
+
+        if kind == "pyramidHead" {
+            // Prism (v4, reference: layered purple pyramid): three stacked
+            // layers, shades 0.88 / 0.94 / 1.0 bottom-to-top — the layers
+            // ARE the silhouette (no two characters share a dominant mass
+            // orientation; Prism's is the layered vertical). Slice-relative.
+            func poly(_ points: [(CGFloat, CGFloat)]) -> CGMutablePath {
+                let path = CGMutablePath()
+                path.move(to: CGPoint(x: points[0].0, y: points[0].1))
+                for p in points.dropFirst() { path.addLine(to: CGPoint(x: p.0, y: p.1)) }
+                path.closeSubpath()
+                return path
+            }
+            let hw = w / 2, hh = h / 2
+            let base = poly([(-hw * 0.84, hh), (hw * 0.84, hh), (hw * 0.60, hh * 0.2), (-hw * 0.60, hh * 0.2)])
+            let mid = poly([(-hw * 0.64, hh * 0.24), (hw * 0.64, hh * 0.24), (hw * 0.34, -hh * 0.44), (-hw * 0.34, -hh * 0.44)])
+            let apex = poly([(-hw * 0.36, -hh * 0.40), (hw * 0.36, -hh * 0.40), (0, -hh)])
+            append(base, centerY: 0, height: Float(h), shade: 0.88)
+            append(mid, centerY: 0, height: Float(h), shade: 0.94)
+            append(apex, centerY: 0, height: Float(h), shade: 1.0)
+            bendFractions = [0, 0, 0]
+            return PaintedShape(paths: paths, offsetsY: offsetsY, bendFractions: bendFractions,
+                                pathHeights: pathHeights, pathShades: pathShades,
+                                perPathGradient: true,
+                                width: shape.width, height: shape.height)
         }
 
         if kind == "blob" {

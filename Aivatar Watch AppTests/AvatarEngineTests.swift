@@ -1291,11 +1291,13 @@ final class GoldenFrameTests: XCTestCase {
         // rim-light crescent on the head (species spec silver rim).
         // v9 (A6.1): vivid v4 palettes (§11.2) — muted tints replaced with
         // saturated hue-separated bodies.
+        // v10 (A6.2): per-archetype body plans — flame/gem/pyramid heads,
+        // chamfered/sag masses, reference decorations.
         let expected: [Archetype: UInt64] = [
-            .ember: 2_163_605_488_693_583_837,
-            .willow: 16_395_695_612_764_117_208,
-            .compass: 12_881_850_497_902_596_937,
-            .prism: 6_259_452_286_938_053_347,
+            .ember: 6_519_094_879_658_272_589,
+            .willow: 16_901_840_358_411_959_065,
+            .compass: 12_173_337_096_608_833_484,
+            .prism: 14_839_059_435_747_660_864,
             .nimbus: 13_040_412_923_109_962_975,
         ]
 
@@ -1353,7 +1355,13 @@ final class SpeciesInvariantsTests: XCTestCase {
     /// 0.85 leaves room for the sanctioned trait tokens — Willow's drooping
     /// base + leaf wisps + sprout measure 0.881-0.888 vs the others — while
     /// failing hard if anatomy ever diverges (a square head lands ~0.6-0.7).
-    func testSilhouetteIsConstantAcrossArchetypes() throws {
+    /// v4 shadow test (§11.1, §11.2 — SUPERSEDES the v3 constancy
+    /// invariant): distinctness moved to the SILHOUETTE level; every pair
+    /// must be identifiable from its black silhouette alone. Machine
+    /// proxy: pairwise silhouette IoU must stay low enough that the body
+    /// plans are pairwise distinguishable (flame / weeping bush / gem /
+    /// pyramid / cloud).
+    func testSilhouettesSeparateAcrossArchetypes() throws {
         var masks: [Archetype: [Bool]] = [:]
         for archetype in Archetype.allCases {
             let raster = try GoldenFrameRasterizer.render(archetype: archetype)
@@ -1364,9 +1372,9 @@ final class SpeciesInvariantsTests: XCTestCase {
             for j in (i + 1)..<sorted.count {
                 let a = sorted[i], b = sorted[j]
                 let overlap = RasterBytes.iou(masks[a]!, masks[b]!)
-                XCTAssertGreaterThanOrEqual(
-                    overlap, 0.85,
-                    "\(a.rawValue)/\(b.rawValue) silhouettes diverged (IoU \(String(format: "%.3f", overlap)) < 0.85) — the species must stay constant (v3)"
+                XCTAssertLessThan(
+                    overlap, 0.92,
+                    "\(a.rawValue)/\(b.rawValue) silhouettes too similar (IoU \(String(format: "%.3f", overlap)) >= 0.92) — v4 body plans must diverge (shadow test)"
                 )
             }
         }
@@ -1408,7 +1416,11 @@ extension SpeciesInvariantsTests {
     /// upper/lower split is NOT the invariant: Willow's drooping base and
     /// Prism's patches legitimately brighten the lower region.)
     func testHeadMassShadesTopToBottom() throws {
-        for archetype in Archetype.allCases {
+        // v4: only the blob-head archetypes (willow, nimbus) have the
+        // three-puff head geometry this test measures (±21.5 around the
+        // head bone); the flame/gem/pyramid heads shade via the same
+        // gradient machinery but have different extents.
+        for archetype in blobHeads {
             let engine = try makeGoldenEngine(archetype)
             engine.update(toFrame: 300)
             let raster = try GoldenFrameRasterizer.render(archetype: archetype)
@@ -1454,10 +1466,15 @@ extension SpeciesInvariantsTests {
         }
     }
 
-    /// A5b.2 rim light: every archetype's head emits a flat, translucent,
+    /// A5b.2 rim light: the blob-head archetypes (willow, nimbus — v4
+    /// keeps the round cloud head for them) each emit a flat, translucent,
     /// near-silver crescent command (species spec §6 v2 "faint silver rim
     /// light") — and the rest LOD must NOT emit it (wrist-down is the
-    /// designed sleep pose; no highlights on a sleeping body).
+    /// designed sleep pose; no highlights on a sleeping body). The v4
+    /// non-blob heads (flame, gem, pyramid) carry their silhouette
+    /// identity instead — no rim.
+    private var blobHeads: [Archetype] { [.willow, .nimbus] }
+
     func testHeadRimLightCommand() throws {
         for archetype in Archetype.allCases {
             let engine = try makeGoldenEngine(archetype)
@@ -1484,7 +1501,8 @@ extension SpeciesInvariantsTests {
                 XCTAssertEqual(command.g, AvatarSpritePainter.rimLight.1, accuracy: 0.001)
                 XCTAssertEqual(command.b, AvatarSpritePainter.rimLight.2, accuracy: 0.001)
             }
-            XCTAssertEqual(rimCommands, 1, "\(archetype.rawValue): exactly one rim-light crescent (on the head blob)")
+            XCTAssertEqual(rimCommands, blobHeads.contains(archetype) ? 1 : 0,
+                           "\(archetype.rawValue): rim-light crescent exists only on blob-head archetypes")
 
             // Rest LOD: the rim path must blend in (full alpha) so the
             // sleep pose carries no highlight.
@@ -1543,12 +1561,15 @@ final class PixelStageTests: XCTestCase {
     func testPixelFramesMatchRecordedHashes() throws {
         // v1 (A6.1): first pixel-stage pins — vivid v4 palettes, 51x63
         // grid, LUT snap. Update deliberately — and say why.
+        // v2 (bugfix): restDim removed from the active snap candidates
+        // (face-mud fix).
+        // v3 (A6.2): per-archetype body plans.
         let expected: [Archetype: UInt64] = [
-            .ember: 12_093_100_890_318_142_509,
-            .willow: 15_220_900_056_946_158_264,
-            .compass: 16_637_641_543_945_049_322,
-            .prism: 11_443_566_159_302_803_918,
-            .nimbus: 8_719_967_813_410_397_485,
+            .ember: 7_035_407_340_944_801_084,
+            .willow: 570_065_832_684_050_166,
+            .compass: 3_886_939_997_016_539_922,
+            .prism: 3_838_181_931_980_126_332,
+            .nimbus: 6_639_547_717_414_181_186,
         ]
         var actual: [Archetype: UInt64] = [:]
         for archetype in Archetype.allCases {
@@ -1630,6 +1651,39 @@ final class PixelStageTests: XCTestCase {
         }
     }
 
+    /// The face-muddiness regression (A6.1 bug): antialiased blends
+    /// between bright body tones and the dark face color used to snap to
+    /// restDim and smear dark bands across the face. restDim must never
+    /// appear in an ACTIVE frame.
+    func testActivePixelFramesContainNoRestDim() throws {
+        for archetype in Archetype.allCases {
+            let engine = try makeGoldenEngine(archetype)
+            engine.update(toFrame: 300)
+            let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+            painter.paint(
+                world: engine.currentWorld,
+                pose: engine.currentPose,
+                rest: false,
+                accentPhase: engine.activeGesturePhase,
+                tell: engine.tell,
+                tellPhase: engine.tellPhase
+            )
+            let rasterizer = PixelStageRasterizer(painter: painter)
+            rasterizer.rasterize(painter: painter)
+            let bytes = rasterizer.snapshotBytes()
+            guard let restDim = painter.roleColors[.restDim] else { continue }
+            let rr = Int(restDim.0 * 255), rg = Int(restDim.1 * 255), rb = Int(restDim.2 * 255)
+            var offenders = 0
+            for i in 0..<(PixelStageRasterizer.gridWidth * PixelStageRasterizer.gridHeight) {
+                let o = i * 4
+                if bytes[o] == rr && bytes[o + 1] == rg && bytes[o + 2] == rb {
+                    offenders += 1
+                }
+            }
+            XCTAssertEqual(offenders, 0, "\(archetype.rawValue): active frames must not contain restDim pixels (the A6.1 face-mud bug)")
+        }
+    }
+
     /// Wrist-down rest (§8): the rest grid must render far dimmer than the
     /// active grid — the sleep pose carries no glow.
     func testPixelRestFrameIsDim() throws {
@@ -1648,7 +1702,7 @@ final class PixelStageTests: XCTestCase {
 
             painter.paint(world: engine.currentWorld, pose: engine.currentPose, rest: true)
             let rest = PixelStageRasterizer(painter: painter)
-            rest.rasterize(painter: painter)
+            rest.rasterize(painter: painter, rest: true)
             let restBytes = rest.snapshotBytes()
 
             func meanLum(_ bytes: [UInt8]) -> Double {

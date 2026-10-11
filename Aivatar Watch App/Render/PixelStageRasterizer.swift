@@ -27,6 +27,9 @@ nonisolated final class PixelStageRasterizer {
 
     private let context: CGContext
     private let lut: [(Float, Float, Float)]
+    /// Snap candidates for ACTIVE frames (the LUT minus restDim — see
+    /// the init comment). Rest frames snap against the full `lut`.
+    private let activeSnapLUT: [(Float, Float, Float)]
     private let lutColors: [Color]
     /// Pixel indices per LUT color, reused across frames (no allocation
     /// in the steady state; rebuilt contents only).
@@ -49,8 +52,12 @@ nonisolated final class PixelStageRasterizer {
         // derive from these, so snapped ramps produce the 3-4 tone hi-bit
         // body ramps by construction) plus pure white for the catchlight
         // and rim glow. Sorted for deterministic iteration and pinning.
+        // The REST-DIM color is EXCLUDED from the active LUT: with it
+        // present, antialiased blends between bright body tones and the
+        // dark face color snapped to restDim and smeared muddy
+        // dark-brown pixels across the face (the A6.1 bug).
         var colors: [(Float, Float, Float)] = []
-        for color in painter.roleColors.values {
+        for (role, color) in painter.roleColors {
             if !colors.contains(where: { $0.0 == color.0 && $0.1 == color.1 && $0.2 == color.2 }) {
                 colors.append(color)
             }
@@ -64,6 +71,14 @@ nonisolated final class PixelStageRasterizer {
             return a.2 < b.2
         }
         lut = colors
+        // Active-frame snap candidates: the LUT WITHOUT the rest-dim
+        // color. With restDim present, antialiased blends between bright
+        // body tones and the dark face color snapped to it and smeared
+        // muddy dark pixels across the face (the A6.1 bug). Rest frames
+        // snap with the full LUT so restDim stays exact (the sleep pose
+        // is all restDim + face).
+        let restDim = painter.roleColors[.restDim] ?? (0, 0, 0)
+        activeSnapLUT = colors.filter { !($0.0 == restDim.0 && $0.1 == restDim.1 && $0.2 == restDim.2) }
         lutColors = colors.map { Color(.sRGB, red: Double($0.0), green: Double($0.1), blue: Double($0.2)) }
         pixelsByColor = colors.map { _ in [] }
 
@@ -75,8 +90,10 @@ nonisolated final class PixelStageRasterizer {
     }
 
     /// Rasterizes the painter's current command buffer into the grid and
-    /// snaps pixels to the LUT. Call after painter.paint(...).
-    func rasterize(painter: AvatarSpritePainter) {
+    /// snaps pixels to the LUT. Call after painter.paint(...). `rest`
+    /// selects the snap candidates (full LUT in rest mode, restDim-free
+    /// in active mode).
+    func rasterize(painter: AvatarSpritePainter, rest: Bool = false) {
         let ctx = context
         let k = 1 / Self.rigUnitsPerPixel
         let centerX = CGFloat(Self.gridWidth) / 2
@@ -137,13 +154,16 @@ nonisolated final class PixelStageRasterizer {
             ctx.restoreGState()
         }
 
-        snapToLUT()
+        snapToLUT(rest: rest)
     }
 
-    /// Snaps every lit grid pixel to the nearest LUT color (background
-    /// stays pure black). Edge antialiasing from the raster becomes the
-    /// classic fat-pixel boundary instead of a blur.
-    private func snapToLUT() {
+    /// Snaps every lit grid pixel to the nearest snap-candidate color
+    /// (background stays pure black). Edge antialiasing from the raster
+    /// becomes the classic fat-pixel boundary instead of a blur. The
+    /// snapped color is then located in the FULL LUT for the draw-side
+    /// buckets (restDim never appears in active frames by construction).
+    private func snapToLUT(rest: Bool) {
+        let candidates = rest ? lut : activeSnapLUT
         guard let data = context.data else { return }
         let bytes = data.assumingMemoryBound(to: UInt8.self)
         let count = Self.gridWidth * Self.gridHeight
@@ -160,25 +180,27 @@ nonisolated final class PixelStageRasterizer {
                 bytes[o] = 0; bytes[o + 1] = 0; bytes[o + 2] = 0; bytes[o + 3] = 255
                 continue
             }
-            // Unpremultiply, then nearest-LUT by RGB distance.
+            // Unpremultiply, then nearest-candidate by RGB distance.
             let inv = 255.0 / Double(a)
             let r = min(255.0, Double(bytes[o]) * inv)
             let g = min(255.0, Double(bytes[o + 1]) * inv)
             let b = min(255.0, Double(bytes[o + 2]) * inv)
-            var best = 0
+            var bestColor = candidates[0]
             var bestDist = Double.greatestFiniteMagnitude
-            for (index, color) in lut.enumerated() {
+            for color in candidates {
                 let dr = r - Double(color.0) * 255
                 let dg = g - Double(color.1) * 255
                 let db = b - Double(color.2) * 255
                 let d = dr * dr + dg * dg + db * db
-                if d < bestDist { bestDist = d; best = index }
+                if d < bestDist { bestDist = d; bestColor = color }
             }
-            bytes[o] = UInt8(lut[best].0 * 255)
-            bytes[o + 1] = UInt8(lut[best].1 * 255)
-            bytes[o + 2] = UInt8(lut[best].2 * 255)
+            bytes[o] = UInt8(bestColor.0 * 255)
+            bytes[o + 1] = UInt8(bestColor.1 * 255)
+            bytes[o + 2] = UInt8(bestColor.2 * 255)
             bytes[o + 3] = 255
-            pixelsByColor[best].append(i)
+            if let bucket = lut.firstIndex(where: { $0.0 == bestColor.0 && $0.1 == bestColor.1 && $0.2 == bestColor.2 }) {
+                pixelsByColor[bucket].append(i)
+            }
         }
     }
 
