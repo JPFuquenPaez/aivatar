@@ -1,6 +1,9 @@
 import SwiftUI
 import WatchKit
 import CoreGraphics
+#if DEBUG
+import os
+#endif
 
 /// Owns everything the render loop touches: the engine, the sprite painter,
 /// the cached rest-pose world transforms and the TimelineView epoch. Built
@@ -10,6 +13,11 @@ final class AvatarRenderContext {
     let engine: AvatarEngine
     let painter: AvatarSpritePainter
     let epoch = Date()
+
+    #if DEBUG
+    /// Throttled render-probe counter (diagnostics only).
+    var debugDrawCount = 0
+    #endif
 
     /// Static world transforms for the rest pose, solved once on first use.
     private(set) var restWorld: [Transform2D] = []
@@ -28,6 +36,49 @@ final class AvatarRenderContext {
         restWorld = world
         restPose = pose
     }
+
+    #if DEBUG
+    /// Debug-only CPU raster of the painter command buffer, using the exact
+    /// fit/origin math of the Canvas path (§8). `simctl io screenshot` does
+    /// not capture SwiftUI Canvas GPU surfaces, so this overlay provides
+    /// headless visual verification of layout and content. Never compiled
+    /// into release builds.
+    func debugImage(width: Int, height: Int) -> CGImage? {
+        guard let ctx = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        // Rig space is y-down (screen space); CG is y-up. Flip so the
+        // avatar lands where the Canvas path puts it, with the rig origin
+        // at the canvas center (same mapping as paintCommands).
+        ctx.translateBy(x: 0, y: CGFloat(height))
+        ctx.scaleBy(x: 1, y: -1)
+        let size = CGSize(width: width, height: height)
+        let fit = min(size.width / 205.0, size.height / 251.0)
+        let centerX = 205.0 / 2 * fit
+        let centerY = 251.0 / 2 * fit
+        for i in 0..<painter.commandCount {
+            let command = painter.commands[i]
+            ctx.saveGState()
+            ctx.translateBy(x: centerX + CGFloat(command.tx) * fit, y: centerY + CGFloat(command.ty) * fit)
+            ctx.rotate(by: CGFloat(command.rotation))
+            ctx.scaleBy(x: CGFloat(command.scaleX), y: CGFloat(command.scaleY))
+            ctx.setFillColor(CGColor(
+                colorSpace: CGColorSpaceCreateDeviceRGB(),
+                components: [CGFloat(command.r), CGFloat(command.g), CGFloat(command.b), CGFloat(command.a)]
+            )!)
+            ctx.addPath(painter.shapes[command.shapeIndex].paths[command.pathIndex])
+            ctx.fillPath()
+            ctx.restoreGState()
+        }
+        return ctx.makeImage()
+    }
+    #endif
 }
 
 /// CanvasAvatarRenderer (§8): immediate-mode SwiftUI Canvas under
@@ -71,6 +122,10 @@ struct CanvasAvatarRenderer: View {
 
     private func draw(ctx: GraphicsContext, size: CGSize, date: Date) {
         let engine = context.engine
+        // Reduce Motion (§8): Level 2 (in-app) > Level 1 (system,
+        // WKAccessibilityIsReduceMotionEnabled, watchOS 4+) > full. Polled
+        // per frame — a cheap C call; no notification bookkeeping.
+        engine.accessibilityMode = resolveAccessibilityMode()
         engine.update(atElapsed: date.timeIntervalSince(context.epoch))
         context.painter.paint(
             world: engine.currentWorld,
@@ -79,6 +134,18 @@ struct CanvasAvatarRenderer: View {
             accentPhase: engine.activeGesturePhase
         )
         paintCommands(ctx: ctx, size: size)
+        #if DEBUG
+        context.debugDrawCount += 1
+        if context.debugDrawCount % 60 == 1 {
+            spikeLogger.log("AIVATAR-SPIKE: live draw #\(context.debugDrawCount) commands=\(context.painter.commandCount) frame=\(engine.clock.frame)")
+        }
+        #endif
+    }
+
+    private func resolveAccessibilityMode() -> MotionAccessibilityMode {
+        if reduceMotionL2 { return .reduceMotionL2 }
+        if WKAccessibilityIsReduceMotionEnabled() { return .reduceMotionL1 }
+        return .full
     }
 
     private func drawStaticRest(ctx: GraphicsContext, size: CGSize) {
@@ -91,9 +158,17 @@ struct CanvasAvatarRenderer: View {
     /// commands back-to-front (§8 renderer design).
     private func paintCommands(ctx: GraphicsContext, size: CGSize) {
         let painter = context.painter
-        let fit = min(size.width / 205.0, size.height / 251.0)
-        let originX = (size.width - 205.0 * fit) / 2
-        let originY = (size.height - 251.0 * fit) / 2
+        let rig = context.engine.skeleton.document
+        let rigWidth = CGFloat(rig.width)
+        let rigHeight = CGFloat(rig.height)
+        let fit = min(size.width / rigWidth, size.height / rigHeight)
+        let originX = (size.width - rigWidth * fit) / 2
+        let originY = (size.height - rigHeight * fit) / 2
+        // The rig origin (0,0) is the CENTER of the rig canvas — bone
+        // positions span roughly -half...+half of the canvas (head chain up,
+        // tail down). Without this offset the avatar draws off-screen.
+        let centerX = originX + rigWidth / 2 * fit
+        let centerY = originY + rigHeight / 2 * fit
 
         ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black))
 
@@ -101,8 +176,8 @@ struct CanvasAvatarRenderer: View {
             let command = painter.commands[i]
             var layer = ctx
             layer.translateBy(
-                x: originX + CGFloat(command.tx) * fit,
-                y: originY + CGFloat(command.ty) * fit
+                x: centerX + CGFloat(command.tx) * fit,
+                y: centerY + CGFloat(command.ty) * fit
             )
             layer.rotate(by: Angle(radians: Double(command.rotation)))
             layer.scaleBy(x: CGFloat(command.scaleX), y: CGFloat(command.scaleY))

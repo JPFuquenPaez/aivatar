@@ -512,17 +512,20 @@ private enum GoldenFrameRasterizer {
             throw NSError(domain: "GoldenFrameRasterizer", code: 1)
         }
 
-        // Rig space is y-down (screen space); flip so golden PNGs would be
-        // upright. The hash is orientation-invariant but consistent.
+        // Rig space is y-down with the origin at the canvas CENTER (head
+        // chain up, tail down). Flip for y-up CG space and add the center
+        // offset — same mapping as the live Canvas path.
         ctx.translateBy(x: 0, y: CGFloat(height))
         ctx.scaleBy(x: 1, y: -1)
         ctx.setFillColor(CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(), components: [0, 0, 0, 1])!)
         ctx.fill(CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
 
+        let centerX = CGFloat(width) / 2
+        let centerY = CGFloat(height) / 2
         for i in 0..<painter.commandCount {
             let command = painter.commands[i]
             ctx.saveGState()
-            ctx.translateBy(x: CGFloat(command.tx), y: CGFloat(command.ty))
+            ctx.translateBy(x: centerX + CGFloat(command.tx), y: centerY + CGFloat(command.ty))
             ctx.rotate(by: CGFloat(command.rotation))
             ctx.scaleBy(x: CGFloat(command.scaleX), y: CGFloat(command.scaleY))
             ctx.setFillColor(CGColor(
@@ -553,12 +556,14 @@ final class GoldenFrameTests: XCTestCase {
     func testGoldenFramesMatchRecordedHashes() throws {
         // Recorded from the watchOS simulator (CPU-rasterized, stable).
         // Update deliberately — and say why — when a visual change is intended.
+        // v2: re-recorded after fixing the rig-origin mapping (the rig origin
+        // is the canvas center; the first pins captured off-screen slivers).
         let expected: [Archetype: UInt64] = [
-            .ember: 3_030_589_038_000_147_018,
-            .willow: 16_401_743_260_209_375_663,
-            .compass: 4_798_564_644_076_141_600,
-            .prism: 17_010_560_516_843_042_127,
-            .nimbus: 5_285_766_371_090_174_868,
+            .ember: 12_016_137_667_541_340_369,
+            .willow: 11_247_534_850_468_798_195,
+            .compass: 13_126_774_808_885_116_185,
+            .prism: 9_954_699_415_628_735_132,
+            .nimbus: 16_057_768_090_101_841_999,
         ]
 
         var actual: [Archetype: UInt64] = [:]

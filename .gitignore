@@ -1,11 +1,12 @@
 # Xcode user data
 xcuserdata/
 
-# Local measurement / scratch outputs (A0 spike dumps, test logs)
+# Local measurement / scratch outputs (A0 spike dumps, test logs, screenshots)
 Tools/test-out.log
 Tools/sgout/
 Tools/spike-bytes.txt
-Tools/spike-canvas.bmp
-Tools/spike-canvas.png
-Tools/spike-small.bmp
-Tools/spike-small.png
+Tools/spike-*.bmp
+Tools/spike-*.png
+Tools/launch-*.png
+Tools/probe-*.png
+Tools/final-*.png

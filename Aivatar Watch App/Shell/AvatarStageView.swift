@@ -28,7 +28,8 @@ struct AvatarStageView: View {
                     // randomized per launch and must never be used here).
                     seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0)
                 )
-                context = AvatarRenderContext(engine: engine)
+                let renderContext = AvatarRenderContext(engine: engine)
+                context = renderContext
             }
         }
     }
