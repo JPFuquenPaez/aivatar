@@ -912,12 +912,15 @@ final class GoldenFrameTests: XCTestCase {
         // Update deliberately — and say why — when a visual change is intended.
         // v2: re-recorded after fixing the rig-origin mapping (the rig origin
         // is the canvas center; the first pins captured off-screen slivers).
+        // v3 (nimbus only): Nimbus's head is now the three-puff brand cloud
+        // (logo geometry) and its primary palette is harmonized with the
+        // logo's lavender family (#9C86DB).
         let expected: [Archetype: UInt64] = [
             .ember: 12_016_137_667_541_340_369,
             .willow: 11_247_534_850_468_798_195,
             .compass: 13_126_774_808_885_116_185,
             .prism: 9_954_699_415_628_735_132,
-            .nimbus: 16_057_768_090_101_841_999,
+            .nimbus: 5_352_135_130_477_461_359,
         ]
 
         var actual: [Archetype: UInt64] = [:]

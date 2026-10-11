@@ -82,6 +82,7 @@ struct AvatarStageView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
+        .accessibilityHint("Double-tap to play. Touch and hold for its signature move.")
         // Phase B: tap and the VoiceOver default action send a .tap event;
         // the engine answers with a pooled, in-character reaction clip and
         // the archetype's haptic flavor (§9). Long-press (and a VoiceOver

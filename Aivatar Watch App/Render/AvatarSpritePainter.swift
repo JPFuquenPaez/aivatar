@@ -233,14 +233,27 @@ nonisolated final class AvatarSpritePainter {
                 let r = min(w, h) * 0.14
                 path.addRoundedRect(in: rect, cornerWidth: r, cornerHeight: r)
             case "blob":
-                // Nimbus head: a soft cloud form, slightly wider than tall.
-                let blobRect = CGRect(
-                    x: rect.minX - w * 0.06,
-                    y: rect.minY + h * 0.03,
-                    width: rect.width * 1.12,
-                    height: rect.height * 0.94
-                )
-                path.addEllipse(in: blobRect)
+                // Nimbus head: the brand cloud (unified with the app icon's
+                // logo geometry) — three overlapping puffs with the big
+                // middle puff sitting higher, side puffs lower. Ellipses are
+                // wound the same way, so a nonzero-winding fill renders the
+                // union solidly. Same visual footprint as the old single
+                // wide ellipse (roughly 1.11w x 0.93h); the face slots
+                // (pupils at ±0.25w, brows at ±0.25w) stay on the middle
+                // puff, eyes slightly below its center, as in the logo.
+                // Proportions measured from the source logo.
+                path.addEllipse(in: CGRect(            // middle puff
+                    x: -w * 0.323, y: -h * 0.467,
+                    width: w * 0.646, height: h * 0.934
+                ))
+                path.addEllipse(in: CGRect(            // left puff
+                    x: -w * 0.557, y: -h * 0.148,
+                    width: w * 0.424, height: h * 0.614
+                ))
+                path.addEllipse(in: CGRect(            // right puff
+                    x: w * 0.202, y: -h * 0.148,
+                    width: w * 0.354, height: h * 0.604
+                ))
             default:
                 path.addRect(rect)
             }

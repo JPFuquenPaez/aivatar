@@ -38,6 +38,9 @@ struct SettingsView: View {
                 Section("About") {
                     Text("Aivatar is procedural — no clip files, everything you see is generated live from a shared rig.")
                         .font(.footnote)
+                    Text("Tip: touch and hold your companion for its signature move.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Settings")

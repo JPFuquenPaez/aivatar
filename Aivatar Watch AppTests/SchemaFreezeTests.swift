@@ -23,10 +23,16 @@ final class SchemaFreezeTests: XCTestCase {
     }
 
     func testAllFiveProfilesLoadAndMatchArchetypes() throws {
+        // §10 semantic versioning per archetype set. Nimbus is 1.1.0: the
+        // brand-cloud head (logo geometry) + logo-harmonized lavender.
+        let expectedVersions: [Archetype: String] = [
+            .ember: "1.0.0", .willow: "1.0.0", .compass: "1.0.0",
+            .prism: "1.0.0", .nimbus: "1.1.0",
+        ]
         for archetype in Archetype.allCases {
             let profile = try PersonalityProfile.load(archetype, bundle: .main)
             XCTAssertEqual(profile.id, archetype.rawValue)
-            XCTAssertEqual(profile.assetVersion, "1.0.0")
+            XCTAssertEqual(profile.assetVersion, expectedVersions[archetype])
         }
     }
 
