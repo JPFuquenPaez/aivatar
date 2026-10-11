@@ -26,6 +26,7 @@ nonisolated final class AvatarEngine {
     private let posture: PostureLayer
     private let life: LifeLoopLayer
     private let idle: IdleGestureLayer
+    private let reactions: ReactionLayer
 
     // Integration ports.
     /// L4 (Phase C): blended affect over the archetype baseline.
@@ -69,6 +70,7 @@ nonisolated final class AvatarEngine {
         posture = PostureLayer(profile: profile)
         life = LifeLoopLayer(profile: profile, seed: seed)
         idle = IdleGestureLayer(profile: profile, seed: seed)
+        reactions = ReactionLayer(profile: profile)
         self.telemetry = telemetry ?? NullTelemetrySink()
 
         pose = AvatarPose(boneCount: skeleton.boneCount)
@@ -103,6 +105,8 @@ nonisolated final class AvatarEngine {
     var triggeredGestureCount: Int { idle.triggeredCount }
     /// Blink telemetry (CI rate-budget assertions).
     var blinkCountForTesting: Int { life.blinkCount }
+    /// Reaction telemetry (Phase B tests).
+    var reactionCountForTesting: Int { reactions.reactionCount }
 
     var activeGestureClip: GestureClip? { idle.currentClip }
     var activeGesturePhase: Float { idle.bigClipPhase }
@@ -183,11 +187,17 @@ nonisolated final class AvatarEngine {
             life.step(into: &pose, frame: frame, bones: bones, expressions: &expressions)
         }
 
+        // L3 (Phase B): queued events become reactions, then the reaction
+        // layer applies. Reactions are user-initiated, so they stay on in
+        // L1; in L2 the flatten below keeps the body static and the
+        // reaction reads on the face only (expression channels + lids).
+        drainReactionEvents()
+        reactions.step(into: &pose, frame: frame, bones: bones, expressions: &expressions)
+
         blendAffect(into: &expressions)
         addWakeGreeting(into: &expressions)
         ExpressionMixer.apply(expressions: expressions, bones: bones, pose: &pose)
         followThrough(into: &pose)
-        drainReactionEvents()
 
         if accessibilityMode == .reduceMotionL2 {
             flattenForL2()
@@ -233,7 +243,14 @@ nonisolated final class AvatarEngine {
     }
 
     private func drainReactionEvents() {
-        // L3 stub (Phase B): events are consumed; no reaction clips exist yet.
+        // L3 (Phase B): each queued event is offered to the reaction layer.
+        // Reactions are suppressed while an idle gesture is active (§7).
+        guard !pendingEvents.isEmpty else { return }
+        let frame = clock.frame
+        let idleActive = idle.currentClip != nil
+        for event in pendingEvents {
+            reactions.offer(event, frame: frame, idleActive: idleActive)
+        }
         pendingEvents.removeAll()
     }
 

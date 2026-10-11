@@ -218,17 +218,120 @@ final class AvatarEngineTests: XCTestCase {
         XCTAssertEqual(high.currentPose.rotations[high.bones.spineLower], reference.currentPose.rotations[reference.bones.spineLower])
     }
 
-    func testInteractionEventsAcceptedWithoutBehaviorChange() throws {
-        let engine = try makeEngine(.ember, seed: 4)
-        let reference = try makeEngine(.ember, seed: 4)
+    // MARK: Phase B — L3 reactions
+
+    func testTapTriggersSparkleReactionAndFades() throws {
+        let engine = try makeEngine(.ember, seed: 11)
+        let reference = try makeEngine(.ember, seed: 11)
         engine.handleEvent(.tap)
-        engine.handleEvent(.crownTick(delta: 1))
-        engine.handleEvent(.gesture(name: "wave"))
-        for frame in 1...300 {
+        for frame in 1...20 { // mid-reaction (sparkle lasts ~25 + fade)
             engine.update(toFrame: frame)
             reference.update(toFrame: frame)
         }
-        XCTAssertEqual(engine.currentPose, reference.currentPose, "L3 is a port stub: no reaction behavior yet")
+        XCTAssertEqual(engine.reactionCountForTesting, 1, "tap must trigger a reaction")
+        XCTAssertNotEqual(engine.currentPose, reference.currentPose, "the reaction must alter the pose")
+        // Reactions are transient: the engine re-converges with a
+        // reference that never saw the event (no RNG consumed).
+        for frame in 21...120 {
+            engine.update(toFrame: frame)
+            reference.update(toFrame: frame)
+        }
+        XCTAssertEqual(engine.currentPose, reference.currentPose, "the reaction must fully fade")
+    }
+
+    func testReactionCooldown() throws {
+        let engine = try makeEngine(.ember, seed: 5)
+        engine.handleEvent(.tap)
+        engine.update(toFrame: 5)
+        engine.handleEvent(.tap) // inside the active reaction + cooldown
+        engine.update(toFrame: 10)
+        XCTAssertEqual(engine.reactionCountForTesting, 1, "reactions inside the cooldown are dropped")
+        engine.update(toFrame: 60) // past the reaction end + cooldown
+        engine.handleEvent(.tap)
+        engine.update(toFrame: 65)
+        XCTAssertEqual(engine.reactionCountForTesting, 2, "a tap after the cooldown reacts")
+    }
+
+    func testReactionsSuppressedDuringIdleGesture() throws {
+        // With a fixed seed, find the first frame an idle gesture is active;
+        // a tap there must not start a reaction (§7 suppression).
+        let probe = try makeEngine(.ember, seed: 20261010)
+        var gestureFrame = -1
+        for frame in 1...1_800 {
+            probe.update(toFrame: frame)
+            if probe.activeGestureClip != nil {
+                gestureFrame = frame
+                break
+            }
+        }
+        XCTAssertGreaterThan(gestureFrame, 0, "expected at least one idle gesture in 1 minute")
+
+        let engine = try makeEngine(.ember, seed: 20261010)
+        for frame in 1..<gestureFrame {
+            engine.update(toFrame: frame)
+        }
+        engine.handleEvent(.tap)
+        engine.update(toFrame: gestureFrame + 1)
+        XCTAssertEqual(engine.reactionCountForTesting, 0, "reactions are suppressed during idle gestures")
+    }
+
+    func testCrownTickProducesGazeDart() throws {
+        let engine = try makeEngine(.ember, seed: 7)
+        let reference = try makeEngine(.ember, seed: 7)
+        engine.update(toFrame: 100)
+        reference.update(toFrame: 100)
+        engine.handleEvent(.crownTick(delta: 2))
+        engine.update(toFrame: 101)
+        reference.update(toFrame: 101)
+        XCTAssertEqual(engine.reactionCountForTesting, 0, "crown ticks are a gaze response, not a clip")
+        XCTAssertNotEqual(
+            engine.currentPose.offsetsX[engine.bones.pupilL],
+            reference.currentPose.offsetsX[reference.bones.pupilL],
+            "crown ticks must dart the gaze"
+        )
+        var converged = false
+        for frame in 102...140 {
+            engine.update(toFrame: frame)
+            reference.update(toFrame: frame)
+            if engine.currentPose == reference.currentPose {
+                converged = true
+                break
+            }
+        }
+        XCTAssertTrue(converged, "the gaze dart must decay and the engines re-converge")
+    }
+
+    func testL1ReactionsStayOn() throws {
+        // L1 disables *idle* motion; reactions are user-initiated and stay.
+        let engine = try makeEngine(.ember, seed: 3)
+        engine.accessibilityMode = .reduceMotionL1
+        engine.update(toFrame: 100)
+        engine.handleEvent(.tap)
+        engine.update(toFrame: 105)
+        XCTAssertEqual(engine.reactionCountForTesting, 1)
+        XCTAssertGreaterThan(engine.currentPose.expressionWeights[ExpressionChannel.joy.rawValue], 0)
+    }
+
+    func testL2ReactionsAreFaceOnly() throws {
+        // L2: the body stays static; the reaction reads on the face.
+        let engine = try makeEngine(.ember, seed: 3)
+        engine.accessibilityMode = .reduceMotionL2
+        engine.update(toFrame: 100)
+        let baseline = engine.currentPose
+        engine.handleEvent(.tap)
+        engine.update(toFrame: 105)
+        let after = engine.currentPose
+        XCTAssertEqual(engine.reactionCountForTesting, 1, "user-initiated reactions stay on in L2")
+        for i in 0..<baseline.rotations.count where i != engine.bones.lidL && i != engine.bones.lidR {
+            XCTAssertEqual(after.rotations[i], baseline.rotations[i], "L2 must stay static outside blinks")
+            XCTAssertEqual(after.offsetsX[i], baseline.offsetsX[i])
+            XCTAssertEqual(after.offsetsY[i], baseline.offsetsY[i])
+        }
+        XCTAssertGreaterThan(
+            after.expressionWeights[ExpressionChannel.joy.rawValue],
+            baseline.expressionWeights[ExpressionChannel.joy.rawValue],
+            "the sparkle joy must read on the face"
+        )
     }
 
     // MARK: Painter (§8)
