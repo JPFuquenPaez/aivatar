@@ -84,7 +84,12 @@ struct AvatarStageView: View {
         .accessibilityLabel(accessibilityText)
         // Phase B: tap and the VoiceOver default action send a .tap event;
         // the engine answers with a pooled, in-character reaction clip and
-        // the archetype's haptic flavor (§9).
+        // the archetype's haptic flavor (§9). Long-press (and a VoiceOver
+        // named action) performs the archetype's signature quirk — Ember
+        // spins with a spark trail, Willow sways, Nimbus startles (§5).
+        .onLongPressGesture(minimumDuration: 0.5) {
+            performQuirk()
+        }
         .onTapGesture {
             context?.engine.handleEvent(.tap)
             HapticsChannel.shared.react(to: archetype)
@@ -93,12 +98,20 @@ struct AvatarStageView: View {
             context?.engine.handleEvent(.tap)
             HapticsChannel.shared.react(to: archetype)
         }
+        .accessibilityAction(named: "Play signature move") {
+            performQuirk()
+        }
         .onChange(of: isLuminanceReduced) { reduced in
             isResting = reduced
         }
         .onAppear {
             isResting = isLuminanceReduced
         }
+    }
+
+    private func performQuirk() {
+        context?.engine.handleEvent(.gesture(name: archetype.quirkGesture.rawValue))
+        HapticsChannel.shared.react(to: archetype)
     }
 
     private var accessibilityText: String {

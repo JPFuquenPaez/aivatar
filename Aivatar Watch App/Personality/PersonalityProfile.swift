@@ -27,6 +27,21 @@ nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
         case .nimbus: return "Attentive and responsive, quietly alert"
         }
     }
+
+    /// The archetype's signature quirk clip (§5 quirks), performed on
+    /// long-press (§9 tap/crown/haptic dialogue). Ember's quirk is big, so
+    /// its spark-trail emits (§8 accent particles). In Reduce Motion L2 a
+    /// body-only quirk (Willow's weight shift) degrades to a face-readable
+    /// in-character reaction at the engine level.
+    var quirkGesture: GestureClip {
+        switch self {
+        case .ember: return .spin          // "spark-trail on big gestures"
+        case .willow: return .shiftWeight  // "leaf sway on weight shift"
+        case .compass: return .lookAround  // "metronomic saccade rhythm"
+        case .prism: return .doubleTake    // "double-take gaze"
+        case .nimbus: return .shiver       // "reactive micro-startles"
+        }
+    }
 }
 
 /// Big Five trait vector, 0...1 per trait (§5).

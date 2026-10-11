@@ -112,7 +112,13 @@ nonisolated final class AvatarEngine {
     var currentReactionClip: GestureClip? { reactions.currentClip }
 
     var activeGestureClip: GestureClip? { idle.currentClip }
-    var activeGesturePhase: Float { idle.bigClipPhase }
+    /// Accent-particle phase (§8): fires for big idle gestures AND big
+    /// reactions — Ember's long-press spark-trail quirk is a reaction clip.
+    /// max() keeps event-free runs identical to the idle-only value, so CI
+    /// golden frames are unaffected.
+    var activeGesturePhase: Float {
+        max(idle.bigClipPhase, reactions.bigClipPhase)
+    }
 
     // MARK: - Rest / wake (§6 rest pose, §8 wake transition)
 

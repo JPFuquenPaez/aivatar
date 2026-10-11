@@ -529,6 +529,62 @@ final class AvatarEngineTests: XCTestCase {
         }
     }
 
+    // MARK: Phase B — long-press quirk dialogue (B2d)
+
+    func testQuirkGestureMappingPerArchetype() throws {
+        // Each archetype's long-press quirk maps its §5 quirk to a clip.
+        let expected: [Archetype: GestureClip] = [
+            .ember: .spin, .willow: .shiftWeight, .compass: .lookAround,
+            .prism: .doubleTake, .nimbus: .shiver,
+        ]
+        for (archetype, clip) in expected {
+            XCTAssertEqual(archetype.quirkGesture, clip)
+        }
+        XCTAssertTrue(Archetype.ember.quirkGesture.isBig,
+                      "Ember's spark-trail quirk must be a big clip (drives §8 accent particles)")
+    }
+
+    func testReactionBigClipsDriveSparkPhase() throws {
+        // The §8 spark pool fires for big reaction clips too (Ember's
+        // long-press spark-trail), not just idle gestures.
+        let engine = try makeEngine(.ember, seed: 31)
+        // Find a quiet frame (no idle gesture, no phase).
+        var frame = 1
+        while frame < 600 {
+            engine.update(toFrame: frame)
+            if engine.activeGestureClip == nil, engine.activeGesturePhase == 0 { break }
+            frame += 5
+        }
+        XCTAssertEqual(engine.activeGesturePhase, 0, "expected a quiet frame with no idle gesture")
+        engine.handleEvent(.gesture(name: "spin"))
+        engine.update(toFrame: frame + 3)
+        XCTAssertGreaterThan(engine.activeGesturePhase, 0,
+                             "a big reaction clip must drive the accent-particle phase")
+    }
+
+    func testL2BodyOnlyQuirkDegradesToFaceReadable() throws {
+        // In L2 the body is flattened: Willow's weight-shift quirk would
+        // react invisibly, so it degrades to a face-readable in-character
+        // pick (§8 trumps scripting). Full mode honors it as-is.
+        let l2 = try makeEngine(.willow, seed: 3)
+        l2.accessibilityMode = .reduceMotionL2
+        l2.update(toFrame: 50)
+        l2.handleEvent(.gesture(name: "shiftWeight"))
+        l2.update(toFrame: 51)
+        guard let degraded = l2.currentReactionClip else {
+            return XCTFail("the quirk must still react in L2")
+        }
+        XCTAssertNotEqual(degraded, .shiftWeight, "a body-only clip must not play invisibly in L2")
+        XCTAssertTrue(degraded.writesExpression, "the L2 quirk degradation must be face-readable")
+
+        let full = try makeEngine(.willow, seed: 3)
+        full.update(toFrame: 50)
+        full.handleEvent(.gesture(name: "shiftWeight"))
+        full.update(toFrame: 51)
+        XCTAssertEqual(full.currentReactionClip, .shiftWeight,
+                       "full mode honors explicit gesture events as-is")
+    }
+
     // MARK: Painter (§8)
 
     func testPainterProducesCommandsForEverySlotWithinCapacity() throws {

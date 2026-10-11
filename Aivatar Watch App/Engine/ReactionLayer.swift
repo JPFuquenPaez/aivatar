@@ -40,6 +40,15 @@ nonisolated final class ReactionLayer {
 
     var currentClip: GestureClip? { activeClip }
 
+    /// Big-clip progress 0...1 for the renderer's accent particles (§8):
+    /// mirrors IdleGestureLayer.bigClipPhase so a big *reaction* also emits
+    /// (Ember's long-press spark-trail quirk, §5). Reactions play without
+    /// anticipation, so the phase is the raw action progress.
+    var bigClipPhase: Float {
+        guard let clip = activeClip, clip.isBig, actionFrames > 0 else { return 0 }
+        return min(max(Float(activeElapsed) / Float(actionFrames), 0), 1)
+    }
+
     init(profile: PersonalityProfile, seed: UInt64) {
         self.profile = profile
         // Separate stream (offset from the engine seed) so reaction picks
@@ -69,13 +78,19 @@ nonisolated final class ReactionLayer {
         guard activeClip == nil, frame - lastReactionEndFrame >= cooldownFrames, !idleActive else {
             return false
         }
-        let clip: GestureClip?
+        var clip: GestureClip?
         switch event {
         case .tap:
             clip = pickFromPool(faceOnly: faceOnly)
         case .gesture(let name):
-            // Phase B reaction scripting: explicit clips are honored as-is.
+            // Phase B reaction scripting: explicit clips are honored as-is —
+            // except in L2, where the body is flattened and a body-only clip
+            // would react invisibly; §8 accessibility trumps scripting, so it
+            // degrades to a face-readable in-character pool pick.
             clip = GestureClip(rawValue: name)
+            if faceOnly, let explicit = clip, !explicit.writesExpression {
+                clip = pickFromPool(faceOnly: true)
+            }
         default:
             clip = nil
         }
