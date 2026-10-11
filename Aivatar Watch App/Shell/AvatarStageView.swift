@@ -5,11 +5,22 @@ import SwiftUI
 /// sizes), vertical-paging TabView to Settings, one VoiceOver element with a
 /// state-based label (never per-frame).
 struct AvatarStageView: View {
-    let archetype: Archetype
+    /// Debug/CI launch-argument override (smoke tests, previews); nil in
+    /// normal use, where the persisted selection wins (ArchetypeSelection).
+    private let launchOverride: Archetype?
 
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+    @AppStorage(ArchetypeSelection.storageKey) private var storedArchetype: Archetype = .ember
     @State private var context: AvatarRenderContext?
     @State private var isResting = false
+
+    init(archetype: Archetype? = nil) {
+        launchOverride = archetype
+    }
+
+    private var archetype: Archetype {
+        launchOverride ?? storedArchetype
+    }
 
     var body: some View {
         // watchOS TabView pages vertically natively. The explicit
@@ -20,26 +31,36 @@ struct AvatarStageView: View {
             SettingsView(archetype: archetype)
         }
         .onAppear {
-            if context == nil {
-                let engine = AvatarEngine(
-                    skeleton: try! Skeleton(document: try! RigDocument.load()),
-                    profile: try! PersonalityProfile.load(archetype),
-                    // Stable per-archetype seed (String.hashValue is
-                    // randomized per launch and must never be used here).
-                    seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0)
-                )
-                let renderContext = AvatarRenderContext(engine: engine)
-                context = renderContext
-                // Phase B: notification events reach this engine via the
-                // session registry (§13 port).
-                AvatarSession.shared.register(context: renderContext, archetype: archetype)
-            }
+            buildContextIfNeeded()
         }
-        .onDisappear {
-            if let context {
-                AvatarSession.shared.unregister(context: context)
-            }
+        .onChange(of: archetype) { _ in
+            // Companion switch: each archetype is a distinct engine
+            // (profile, visual set, per-archetype seed), so the context is
+            // rebuilt. The new avatar's launch greeting bloom plays as it
+            // appears (§8) — the switch is its own delight moment.
+            buildContext()
         }
+    }
+
+    private func buildContextIfNeeded() {
+        guard context == nil else { return }
+        buildContext()
+    }
+
+    private func buildContext() {
+        let engine = AvatarEngine(
+            skeleton: try! Skeleton(document: try! RigDocument.load()),
+            profile: try! PersonalityProfile.load(archetype),
+            // Stable per-archetype seed (String.hashValue is
+            // randomized per launch and must never be used here).
+            seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0)
+        )
+        let renderContext = AvatarRenderContext(engine: engine)
+        context = renderContext
+        // Phase B: notification events reach this engine via the
+        // session registry (§13 port); re-registering replaces any
+        // previous context.
+        AvatarSession.shared.register(context: renderContext, archetype: archetype)
     }
 
     private var stage: some View {

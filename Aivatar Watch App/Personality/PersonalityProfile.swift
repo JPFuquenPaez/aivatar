@@ -14,6 +14,19 @@ nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
         case .nimbus: return "Nimbus"
         }
     }
+
+    /// One-line likable-pole blurb for the personality picker (§5: every
+    /// archetype anchors a likable pole — sensitivity reads as responsive,
+    /// never as anxious).
+    var tagline: String {
+        switch self {
+        case .ember: return "Warm and social, always up for a hello"
+        case .willow: return "Gentle and patient, a calm presence"
+        case .compass: return "Steady and precise, keeps its word"
+        case .prism: return "Curious and playful, full of ideas"
+        case .nimbus: return "Attentive and responsive, quietly alert"
+        }
+    }
 }
 
 /// Big Five trait vector, 0...1 per trait (§5).

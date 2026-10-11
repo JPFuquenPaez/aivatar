@@ -23,7 +23,7 @@ struct ContentView: View {
             case "spritekit":
                 SpriteKitGreyboxSpikeView(seed: seed, frameBudget: frames)
             default:
-                AvatarStageView(archetype: stageArchetype(args))
+                AvatarStageView(archetype: launchArchetype(args))
             }
         }
         .onAppear {
@@ -31,12 +31,10 @@ struct ContentView: View {
         }
     }
 
-    private func stageArchetype(_ args: [String]) -> Archetype {
-        guard let index = args.firstIndex(of: "-archetype"), index + 1 < args.count,
-              let archetype = Archetype(rawValue: args[index + 1]) else {
-            return .ember
-        }
-        return archetype
+    /// Debug/CI override only; nil in normal launches, where the persisted
+    /// companion selection wins (ArchetypeSelection precedence).
+    private func launchArchetype(_ args: [String]) -> Archetype? {
+        ArchetypeSelection.fromLaunchArguments(args)
     }
 
     private func value(after flag: String, in args: [String]) -> String? {

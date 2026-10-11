@@ -503,6 +503,32 @@ final class AvatarEngineTests: XCTestCase {
         XCTAssertEqual(engine.currentReactionClip, .puff, "the notification gesture must play on the engine")
     }
 
+    // MARK: Phase B — companion personality picker (B2c)
+
+    func testArchetypeSelectionPrecedence() throws {
+        // Launch argument (CI/smoke reproducibility) > persisted choice >
+        // default; corrupt stored values never crash (§9/§10).
+        XCTAssertEqual(ArchetypeSelection.resolve(launchOverride: nil, storedRawValue: nil), .ember)
+        XCTAssertEqual(ArchetypeSelection.resolve(launchOverride: nil, storedRawValue: "nimbus"), .nimbus)
+        XCTAssertEqual(ArchetypeSelection.resolve(launchOverride: .prism, storedRawValue: "nimbus"), .prism,
+                       "the launch argument must win for reproducible test runs")
+        XCTAssertEqual(ArchetypeSelection.resolve(launchOverride: nil, storedRawValue: "bogus"), .ember,
+                       "a corrupted stored value must fall back to the default")
+        XCTAssertNil(ArchetypeSelection.fromLaunchArguments([]))
+        XCTAssertNil(ArchetypeSelection.fromLaunchArguments(["-archetype", "bogus"]))
+        XCTAssertEqual(ArchetypeSelection.fromLaunchArguments(["-archetype", "willow"]), .willow)
+    }
+
+    func testEveryArchetypeHasPickerCopy() throws {
+        // The picker presents all five at their likable pole (§5 guardrail:
+        // no archetype reads as a negative trait).
+        for archetype in Archetype.allCases {
+            XCTAssertFalse(archetype.displayName.isEmpty)
+            XCTAssertFalse(archetype.tagline.isEmpty,
+                            "\(archetype.rawValue) needs a likable-pole tagline for the picker")
+        }
+    }
+
     // MARK: Painter (§8)
 
     func testPainterProducesCommandsForEverySlotWithinCapacity() throws {
