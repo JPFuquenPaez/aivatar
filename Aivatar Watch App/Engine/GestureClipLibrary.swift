@@ -27,9 +27,16 @@ nonisolated enum GestureClipLibrary {
         return max(6, Int(seconds * 30))
     }
 
-    /// Anticipation frames (>= 120 ms before large motions, §7).
+    /// Anticipation frames before large motions (§7: >= 120 ms), scaled by
+    /// the v3 grammar dial: Ember winds up big, Willow blooms instead (the
+    /// floor keeps the plan's 120 ms on big clips), Compass stays minimal.
+    /// Startle-class clips (shiver) always get a 250 ms pre-cue — a startle
+    /// without a pre-cue reads as a jump-scare (v3 audit finding 6).
     static func anticipationFrames(_ clip: GestureClip, profile: PersonalityProfile) -> Int {
-        clip.isBig ? 5 : 0
+        if clip == .shiver { return 8 }
+        guard clip.isBig else { return 0 }
+        let dial = profile.motionGrammar.map { 0.4 + 0.6 * $0.anticipation } ?? 1.0
+        return max(4, Int(6 * dial))
     }
 
     /// Ease-in-out (12 principles: eased arcs).
@@ -60,6 +67,14 @@ nonisolated enum GestureClipLibrary {
             case .spin: pose.rotations[bones.hips] += -0.12 * pre
             case .stretch: pose.rotations[bones.spineUpper] -= 0.08 * pre
             case .puff: pose.scalesX[bones.chest] -= 0.06 * pre
+            case .shiver:
+                // Startle pre-cue (250 ms): a tiny stiffen — the body braces
+                // before the flinch so it reads as sensitive, not jump-scare.
+                pose.offsetsY[bones.head] -= 0.8 * pre
+                pose.scalesY[bones.head] += 0.04 * pre
+                expressions[ExpressionChannel.alert.rawValue] = max(
+                    expressions[ExpressionChannel.alert.rawValue], pre * 0.3
+                )
             default: break
             }
         }

@@ -171,7 +171,9 @@ struct CanvasAvatarRenderer: View {
             world: engine.currentWorld,
             pose: engine.currentPose,
             rest: false,
-            accentPhase: engine.activeGesturePhase
+            accentPhase: engine.activeGesturePhase,
+            tell: engine.tell,
+            tellPhase: engine.tellPhase
         )
         paintCommands(ctx: ctx, size: size)
         #if DEBUG

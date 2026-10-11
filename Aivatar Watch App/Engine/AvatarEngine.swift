@@ -62,6 +62,41 @@ nonisolated final class AvatarEngine {
     private var tailAngle: Float = 0
     private var tailVelocity: Float = 0
 
+    // v3 motion grammar (A5b): post-clip settle residual + involuntary tells.
+    /// 0 (never fully settles) ... 1 (lands exactly), from the profile.
+    private let settleComplete: Float
+    private var settleResidual: Float = 0
+    private var hadIdleClipLastFrame = false
+    private var hadReactionClipLastFrame = false
+    /// The archetype's involuntary tell (v3 §0); nil = none authored.
+    private let tellKind: PersonalityTell?
+    private var tellFramesLeft = 0
+    private var tellTotalFrames = 1
+    /// Dedicated deterministic stream for idle-scheduled tells (Willow's
+    /// leaf) — drawn only when idle, so the schedule replays exactly.
+    private var tellRng: SeededRandom
+    private(set) var tellTriggerCount = 0
+    /// Previous frame's delight level (joy + surprise) for the flicker's
+    /// rising-edge trigger.
+    private var prevDelightLevel: Float = 0
+
+    /// The active tell's progress, 0...1 (0 = none) — consumed by the
+    /// painter's tell rendering; the pose-side effects (tick bob) are
+    /// written by the engine.
+    var tellPhase: Float {
+        guard tellKind != nil, tellFramesLeft > 0 else { return 0 }
+        return 1 - Float(tellFramesLeft) / Float(tellTotalFrames)
+    }
+    /// CI/testing hook: envelope frames of the most recent tell.
+    var tellActiveForTesting: Bool { tellFramesLeft > 0 }
+    /// CI/testing hook: raw settle-residual state (1 = a clip just ended).
+    var settleResidualForTesting: Float { settleResidual }
+    /// CI/testing hook: the residual's current amplitude contribution
+    /// (radians on the hips) — 0 for exact-settle archetypes.
+    var settleResidualAmplitudeForTesting: Float {
+        0.022 * settleResidual * (1 - settleComplete)
+    }
+
     init(skeleton: Skeleton, profile: PersonalityProfile, seed: UInt64, telemetry: (any TelemetrySink)? = nil) {
         self.skeleton = skeleton
         self.profile = profile
@@ -79,6 +114,9 @@ nonisolated final class AvatarEngine {
         world = [Transform2D](repeating: .identity, count: skeleton.boneCount)
         restPoseBuffer = AvatarPose(boneCount: skeleton.boneCount)
         blendScratch = AvatarPose(boneCount: skeleton.boneCount)
+        settleComplete = profile.motionGrammar?.settleComplete ?? 1
+        tellKind = profile.tell
+        tellRng = SeededRandom(seed ^ 0x7E_11_00_01)
         buildRestPose(into: &restPoseBuffer)
     }
 
@@ -108,10 +146,17 @@ nonisolated final class AvatarEngine {
     var blinkCountForTesting: Int { life.blinkCount }
     /// Reaction telemetry (Phase B tests).
     var reactionCountForTesting: Int { reactions.reactionCount }
+    /// Blink envelope frames of the most recent blink (CI blink-grammar tests).
+    var lastBlinkEnvelopeFramesForTesting: Int { life.lastBlinkEnvelopeFrames }
+    /// Total tells triggered (CI tell tests).
+    var tellTriggerCountForTesting: Int { tellTriggerCount }
     /// The clip the active reaction is playing (tap pool picks; Phase B).
     var currentReactionClip: GestureClip? { reactions.currentClip }
 
     var activeGestureClip: GestureClip? { idle.currentClip }
+    /// The archetype's authored tell (v3); the renderer passes it with
+    /// `tellPhase` to the painter's tell rendering.
+    var tell: PersonalityTell? { tellKind }
     /// Accent-particle phase (§8): fires for big idle gestures AND big
     /// reactions — Ember's long-press spark-trail quirk is a reaction clip.
     /// max() keeps event-free runs identical to the idle-only value, so CI
@@ -202,6 +247,7 @@ nonisolated final class AvatarEngine {
         // reaction reads on the face only (expression channels + lids).
         drainReactionEvents()
         reactions.step(into: &pose, frame: frame, bones: bones, expressions: &expressions)
+        updateSettleAndTells(into: &pose, frame: frame, bones: bones, expressions: &expressions)
 
         blendAffect(into: &expressions)
         addWakeGreeting(into: &expressions)
@@ -249,6 +295,100 @@ nonisolated final class AvatarEngine {
             let p = Float(framesSinceWake - 16) / 30
             expressions[ExpressionChannel.warm.rawValue] += sin(p * .pi) * 0.6
         }
+    }
+
+    /// v3 motion grammar (A5b): the settle residual and the involuntary
+    /// tells. Runs after the reaction layer each frame.
+    ///
+    /// - Settle residual: when a clip ends, a small decaying sway remains —
+    ///   scaled by `settleComplete` (Willow never fully settles; Compass
+    ///   lands exactly with no residual). Clamps to exactly zero below
+    ///   0.001 so a reacted engine still re-converges with an event-free
+    ///   reference (CI determinism).
+    /// - Tells: Compass's approval tick fires at reaction completion (the
+    ///   exact settle's one confirmation pulse); Nimbus's luminous pulse
+    ///   starts after any reaction; Prism's chromatic flicker triggers on
+    ///   the delight rising edge; Willow's leaf is an idle-scheduled
+    ///   unobserved loop (Poisson ~ every 50 s, dedicated deterministic
+    ///   stream, drawn only while idle). Ember's spark tell is the
+    ///   existing accent-particle phase. Tells stay on in L1 (they are
+    ///   micro-behaviors, not idle gestures) and are suppressed in L2
+    ///   (static pose + gentle blink only, §8).
+    private func updateSettleAndTells(
+        into pose: inout AvatarPose, frame: Int, bones: BoneMap, expressions: inout [Float]
+    ) {
+        let idleClipActive = idle.currentClip != nil
+        let reactionClipActive = reactions.currentClip != nil
+        let reactionJustEnded = hadReactionClipLastFrame && !reactionClipActive
+        let clipJustEnded = (hadIdleClipLastFrame && !idleClipActive) || reactionJustEnded
+        hadIdleClipLastFrame = idleClipActive
+        hadReactionClipLastFrame = reactionClipActive
+        let t = Float(frame) / 30.0
+
+        // Settle residual. Amplitude scales with (1 - settleComplete):
+        // Willow (0.15) keeps ~85% of the residual sway, Compass (1.0)
+        // lands exactly — zero contribution, so an event-free reference
+        // converges bit-exactly (CI determinism).
+        if clipJustEnded { settleResidual = 1 }
+        if settleResidual > 0.001 {
+            let amp = 0.022 * settleResidual * (1 - settleComplete)
+            pose.rotations[bones.hips] += sin(t * 2.2) * amp
+            pose.offsetsY[bones.hips] += cos(t * 1.7) * amp * 25
+            settleResidual *= 0.55 + 0.35 * settleComplete
+        } else {
+            settleResidual = 0
+        }
+
+        guard let tell = tellKind, accessibilityMode != .reduceMotionL2 else {
+            if tellFramesLeft > 0 { tellFramesLeft -= 1 }
+            return
+        }
+        if tellFramesLeft > 0 { tellFramesLeft -= 1 }
+
+        switch tell {
+        case .spark:
+            break  // Ember: the painter's accent-particle phase (existing).
+        case .tick:
+            // One metronome bob when it approves — the confirmation pulse
+            // of the exact settle (fires when a reaction completes).
+            if reactionJustEnded, tellFramesLeft == 0 {
+                startTell(frames: 10)
+            }
+            if tellFramesLeft > 0 {
+                let e = sin(tellPhase * .pi)
+                pose.rotations[bones.hips] -= 0.03 * e
+                pose.offsetsY[bones.hips] -= 0.8 * e
+            }
+        case .pulse:
+            // After any reaction, a slow luminous wave passes through the
+            // body once (the painter travels the brightness bottom-to-top).
+            if reactionJustEnded, tellFramesLeft == 0 {
+                startTell(frames: 42)
+            }
+        case .flicker:
+            // Chromatic shift across the accents on genuine delight —
+            // rising-edge triggered so one joy spike is one flicker.
+            let delight = expressions[ExpressionChannel.joy.rawValue]
+                + expressions[ExpressionChannel.surprise.rawValue]
+            if delight > 0.6, prevDelightLevel <= 0.6, tellFramesLeft == 0 {
+                startTell(frames: 15)
+            }
+            prevDelightLevel = delight
+        case .leaf:
+            // One leaf falls; Willow catches it and puts it back — an
+            // unobserved idle loop, scheduled stochastically (~ every 50 s
+            // of idle) from the dedicated tell stream.
+            if tellFramesLeft == 0, !idleClipActive, !reactionClipActive,
+               tellRng.nextFloat() < 1.0 / 1500.0 {
+                startTell(frames: 100)
+            }
+        }
+    }
+
+    private func startTell(frames: Int) {
+        tellTotalFrames = frames
+        tellFramesLeft = frames
+        tellTriggerCount += 1
     }
 
     private func drainReactionEvents() {

@@ -21,6 +21,12 @@ nonisolated final class LifeLoopLayer {
     private var gazeTargetY: Float = 0
     private var gazeSpeed: Float = 0.15
     private var headFollow: Float = 0
+    /// Fixation hold (v3 audit finding 6: darts without holds read
+    /// "shifty"). After a saccade lands, no new saccade may start until the
+    /// hold expires — look -> hold 400-900 ms -> release.
+    private var gazeHoldFrames = 0
+    /// Compass's lighthouse sweep alternates user/away on a fixed period.
+    private var sweepTowardAway = false
 
     /// Named idle gaze targets from the profile (§5 gaze profile), resolved
     /// to pupil offsets in rig points: each archetype's saccades land on its
@@ -29,22 +35,36 @@ nonisolated final class LifeLoopLayer {
 
     // Blink state.
     private var blinkFramesLeft = 0
-    /// Total length of the current blink envelope (stretched by the Willow
-    /// quirk); elapsed is derived from this, never hardcoded.
+    /// Total length of the current blink envelope (scaled by the v3 blink
+    /// grammar — Willow's blinks are watchable, Ember's almost missed).
     private var blinkTotal = 10
+    /// Close phase of the blink envelope, frames (scales with the total).
+    private var blinkCloseFrames = 4
     private var lastBlinkFrame = -1000
     /// Total blinks triggered (CI rate-budget assertions, §7/§11).
     private(set) var blinkCount = 0
+    /// Envelope frames of the most recent blink (CI blink-grammar tests).
+    private(set) var lastBlinkEnvelopeFrames = 0
 
     // Nimbus quirk: higher blink variance via a slow-modulated rate.
     private let blinkVariance: Float
+
+    /// v3 grammar: gaze policy + blink shape + idle drift (schema v2; the
+    /// v1 traits remain the fallback so a v1 profile still behaves).
+    private let gazePolicy: GazePolicy
+    private let blinkDurationScale: Float
+    private let driftScale: Float
 
     init(profile: PersonalityProfile, seed: UInt64) {
         self.profile = profile
         rng = SeededRandom(seed ^ 0x1_1F_E0_00)
         blinkP = profile.gazeProfile.blinkRatePerMin / 1800.0
         saccadeP = profile.gazeProfile.saccadeRatePerMin / 1800.0
-        blinkVariance = profile.traitVector.neuroticism
+        blinkVariance = profile.blink?.variance ?? profile.traitVector.neuroticism
+        gazePolicy = profile.gazePolicy ?? .wander
+        blinkDurationScale = profile.blink?.durationScale ?? 1.0
+        driftScale = profile.motionGrammar.map { 0.6 + 0.8 * $0.drift }
+            ?? 1.0
         gazeTargets = Self.resolveTargets(profile.gazeProfile.idleGazeTargets)
     }
 
@@ -80,24 +100,76 @@ nonisolated final class LifeLoopLayer {
 
         // --- Micro-sway: slow full-body rotation around the hips. 0.035 rad
         // swings the head (~100 units above the hips) ~3.5 units lateral per
-        // half-cycle — a visible drift, still under 0.03 rad/frame.
-        pose.rotations[bones.hips] += sin(t * 0.55) * 0.035 * profile.motionProfile.amplitudeScale
-        pose.offsetsY[bones.hips] += sin(t * 1.1) * 1.6
+        // half-cycle — a visible drift, still under 0.03 rad/frame. The v3
+        // drift grammar scales it per temperament (Nimbus floats the most,
+        // Compass barely moves).
+        pose.rotations[bones.hips] += sin(t * 0.55) * 0.035 * profile.motionProfile.amplitudeScale * driftScale
+        pose.offsetsY[bones.hips] += sin(t * 1.1) * 1.6 * driftScale
 
         // --- Heartbeat shimmer: 60 bpm pulse on the head (~0.6-unit bob).
         let beat = t * Float.pi * 2.0 * 1.0
         let pulse = pow(max(0, sin(beat)), 12)
         pose.offsetsY[bones.head] -= pulse * 0.6
 
-        // --- Saccades: retarget gaze stochastically among the profile's idle
-        //     gaze targets; head follows with probability `headPropensity`
-        //     (head movement propensity model).
-        if rng.nextFloat() < saccadeP {
+        // --- Saccades: policy-driven (v3 grammar). Every policy lands a
+        //     fixation hold after a shift — look -> hold 400-900 ms ->
+        //     release — so no archetype reads "shifty" (audit finding 6).
+        //     The RNG draws only on frames where a saccade is allowed, so
+        //     the deterministic schedule is untouched by the policy gate.
+        if gazeHoldFrames > 0 {
+            gazeHoldFrames -= 1
+        }
+        let saccadeAllowed = gazeHoldFrames == 0
+        switch gazePolicy {
+        case .metricSweep:
+            // Compass lighthouse sweep: alternate user <-> away at a fixed
+            // 5 s period — metronomic, zero-variance, no RNG draws at all.
+            if frame % 150 == 0 {
+                sweepTowardAway.toggle()
+                if sweepTowardAway, let away = gazeTargets.first(where: { $0.x < 0 }) {
+                    gazeTargetX = away.x
+                    gazeTargetY = away.y
+                } else {
+                    gazeTargetX = 0
+                    gazeTargetY = 0
+                }
+                gazeSpeed = 0.35
+                headFollow = 0.03
+                gazeHoldFrames = 150 // the period is the hold
+            }
+        case .lock, .soft, .wander, .detectThenSettle:
+            guard saccadeAllowed, rng.nextFloat() < saccadeP * (gazePolicy == .detectThenSettle ? 1.3 : 1.0) else { break }
             let pick = min(rng.nextFloat() * Float(gazeTargets.count), Float(gazeTargets.count - 1))
-            let target = gazeTargets[Int(pick)]
+            var target = gazeTargets[Int(pick)]
+            switch gazePolicy {
+            case .lock:
+                // Ember: mostly straight at you; a lock, not a beg.
+                if rng.nextFloat() < 0.8 { target = (0, 0) }
+            case .soft:
+                // Willow: looks *near* you, not at you.
+                target = (target.x * 0.35, target.y * 0.35 + rng.nextSignedFloat() * 0.4)
+            default:
+                break
+            }
             gazeTargetX = target.x + rng.nextSignedFloat() * 0.8
             gazeTargetY = target.y + rng.nextSignedFloat() * 0.5
-            gazeSpeed = 0.2 + rng.nextFloat() * 0.35 * profile.motionProfile.tempoScale
+            switch gazePolicy {
+            case .lock:
+                gazeSpeed = 0.45 + rng.nextFloat() * 0.2
+                gazeHoldFrames = 20 + Int(rng.nextFloat() * 7)
+            case .soft:
+                gazeSpeed = 0.07 + rng.nextFloat() * 0.05
+                gazeHoldFrames = 30 + Int(rng.nextFloat() * 10)
+            case .wander:
+                gazeSpeed = 0.15 + rng.nextFloat() * 0.35 * profile.motionProfile.tempoScale
+                gazeHoldFrames = 6 + Int(rng.nextFloat() * 15)
+            case .detectThenSettle:
+                // Fastest dart of the five, then the longest settle.
+                gazeSpeed = 0.5 + rng.nextFloat() * 0.15
+                gazeHoldFrames = 30 + Int(rng.nextFloat() * 15)
+            default:
+                break
+            }
             if rng.nextFloat() < profile.gazeProfile.headPropensity {
                 headFollow = rng.nextSignedFloat() * 0.06
             } else {
@@ -114,33 +186,42 @@ nonisolated final class LifeLoopLayer {
         pose.rotations[bones.head] += headFollow
 
         // --- Blinks: per-tick Bernoulli draw; variance scales the rate
-        //     window (Nimbus "higher blink variance"). Blink is a ~330 ms
-        //     close-open envelope (close over 5 frames, open over 5): quick
-        //     enough to read as a blink, slow enough that lid travel stays
-        //     inside the per-frame continuity budget (§11). Gaze-evoked
+        //     window (Nimbus bursts and long stills). The v3 blink grammar
+        //     shapes the envelope: durationScale stretches the whole
+        //     close-open arc (Willow's blink is one you can watch happen;
+        //     Ember's is almost missed). Blink is a close-open envelope,
+        //     quick enough to read as a blink, slow enough that lid travel
+        //     stays inside the per-frame continuity budget (§11). Gaze-evoked
         //     blink cadence stays stochastic.
         let varianceMod = 1.0 + sin(t * 0.15) * 0.45 * blinkVariance
         let effectiveBlinkP = blinkP * varianceMod
         if blinkFramesLeft == 0 && rng.nextFloat() < effectiveBlinkP {
-            blinkTotal = 10
+            // Envelope floor 10 frames with a >= 4-frame close phase: the
+            // lid travel (5.5 units + the mixer's rest-channel ramp) stays
+            // inside the per-frame continuity budget (§11, 2.5 units/frame).
+            blinkTotal = max(10, Int(Float(10) * blinkDurationScale))
+            blinkCloseFrames = max(4, blinkTotal / 3)
             blinkFramesLeft = blinkTotal
+            lastBlinkEnvelopeFrames = blinkTotal
             lastBlinkFrame = frame
             blinkCount += 1
         }
-        // Long soft blinks (Willow quirk) stretch the envelope once at onset.
-        if profile.traitVector.agreeableness > 0.8 && blinkFramesLeft == blinkTotal - 1 {
+        // v1 fallback: Willow's long-soft-blink quirk stretch applies only
+        // when the profile carries no v2 blink grammar (which owns the
+        // envelope shape at assetVersion 2).
+        if profile.blink == nil, profile.traitVector.agreeableness > 0.8, blinkFramesLeft == blinkTotal - 1 {
             blinkTotal += 5
             blinkFramesLeft += 5
         }
         if blinkFramesLeft > 0 {
             blinkFramesLeft -= 1
             let elapsed = blinkTotal - blinkFramesLeft
-            let openFrames = blinkTotal - 5
+            let openFrames = blinkTotal - blinkCloseFrames
             let close: Float
-            if elapsed <= 5 {
-                close = Float(elapsed) / 5.0
+            if elapsed <= blinkCloseFrames {
+                close = Float(elapsed) / Float(blinkCloseFrames)
             } else {
-                close = 1.0 - Float(elapsed - 5) / Float(openFrames)
+                close = 1.0 - Float(elapsed - blinkCloseFrames) / Float(openFrames)
             }
             let lid = 5.5 * close
             pose.offsetsY[bones.lidL] += lid

@@ -72,7 +72,8 @@ nonisolated final class AvatarSpritePainter {
     /// to a bone with a fixed local offset — patches, grids, interior glows,
     /// sprout pods, wisp tips. `afterSlotName` injects the draw exactly after
     /// that slot so face-layer decorations (catchlights) still sit under the
-    /// lids; nil draws after all slots (on top of the body).
+    /// lids; nil draws after all slots (on top of the body). `id` names the
+    /// tell-animated decorations ("sproutLeaf", "grid").
     private struct Decoration {
         let boneIndex: Int
         let shapeIndex: Int
@@ -82,6 +83,7 @@ nonisolated final class AvatarSpritePainter {
         let rotation: Float
         let alpha: Float
         let afterSlotName: String?
+        let id: String?
     }
 
     private var slots: [Slot] = []
@@ -93,6 +95,9 @@ nonisolated final class AvatarSpritePainter {
     private var speciesAccentColor: (r: Float, g: Float, b: Float)?
     private(set) var shapes: [PaintedShape] = []
     private(set) var roleColors: [PaletteRole: (r: Float, g: Float, b: Float)] = [:]
+    /// Prism's flicker table (v3 tell): accents swapped — a chromatic shift
+    /// with zero per-frame cost (built once; selected by flag).
+    private var flickerColors: [PaletteRole: (r: Float, g: Float, b: Float)] = [:]
 
     private var scratchTransforms: [Transform2D]
 
@@ -172,6 +177,15 @@ nonisolated final class AvatarSpritePainter {
         }
 
         roleColors = Self.resolveColors(visualSet: visualSet)
+        // Prism's flicker table: accents swap — the chromatic tell, built
+        // once (no per-frame allocation; selected by flag in paint()).
+        flickerColors = roleColors
+        if let accentA = roleColors[.accentA] {
+            flickerColors[.accentB] = accentA
+        }
+        if let accentB = roleColors[.accentB] {
+            flickerColors[.accentA] = accentB
+        }
         // Species sparks (Ember's tell) fly in the trait-token color, not
         // the near-black face accent.
         if visualSet.isSpecies {
@@ -185,7 +199,7 @@ nonisolated final class AvatarSpritePainter {
     private func buildSpeciesDecorations(skeleton: Skeleton, archetype: Archetype) {
         func append(_ spec: RigDocument.Shape, kind: String, bone: String,
                     role: PaletteRole, x: Float, y: Float, rotation: Float = 0,
-                    alpha: Float = 1, afterSlot: String? = nil) {
+                    alpha: Float = 1, afterSlot: String? = nil, id: String? = nil) {
             guard let boneIndex = skeleton.boneIndex(bone) else { return }
             shapes.append(Self.buildShape(spec, kind: kind))
             decorations.append(Decoration(
@@ -196,7 +210,8 @@ nonisolated final class AvatarSpritePainter {
                 localY: y,
                 rotation: rotation,
                 alpha: alpha,
-                afterSlotName: afterSlot
+                afterSlotName: afterSlot,
+                id: id
             ))
         }
 
@@ -228,18 +243,21 @@ nonisolated final class AvatarSpritePainter {
             append(RigDocument.Shape(kind: "circle", width: 5, height: 4, bendSegments: nil),
                    kind: "circle", bone: "hips", role: .deep, x: 17, y: 9)
             append(RigDocument.Shape(kind: "triangle", width: 4, height: 7, bendSegments: nil),
-                   kind: "leaf", bone: "hips", role: .accentA, x: 17, y: 3, rotation: 0.2)
+                   kind: "leaf", bone: "hips", role: .accentA, x: 17, y: 3, rotation: 0.2,
+                   id: "sproutLeaf")
         case .compass:
             // The interior progress grid (order token): thin cyan lines on
             // the chest, inside the "translucency". U3: precision lives in
             // the grid and the timing, never in hard edges.
             for (gx, gy) in [(-4.0, 0.0), (0.0, 0.0), (4.0, 0.0)] {
                 append(RigDocument.Shape(kind: "rect", width: 1.2, height: 13, bendSegments: nil),
-                       kind: "rect", bone: "chest", role: .accentA, x: Float(gx), y: Float(gy), alpha: 0.55)
+                       kind: "rect", bone: "chest", role: .accentA, x: Float(gx), y: Float(gy), alpha: 0.55,
+                       id: "grid")
             }
             for gy in [-5.0, 0.0, 5.0] {
                 append(RigDocument.Shape(kind: "rect", width: 11, height: 1.2, bendSegments: nil),
-                       kind: "rect", bone: "chest", role: .accentA, x: 0, y: Float(gy), alpha: 0.55)
+                       kind: "rect", bone: "chest", role: .accentA, x: 0, y: Float(gy), alpha: 0.55,
+                       id: "grid")
             }
         case .prism:
             // Sticker patches: max two, matte (v3 10.4 — the one mismatch is
@@ -559,16 +577,37 @@ nonisolated final class AvatarSpritePainter {
     /// Paints the current pose into the command buffer. `rest` selects the
     /// dimmed rest palette (§6 LOD) — geometry comes from `world` either way.
     /// `accentPhase` is the active big-gesture phase (0...1) driving the
-    /// archetype's spark-trail quirk (§8 accent particles).
-    func paint(world: [Transform2D], pose: AvatarPose, rest: Bool, accentPhase: Float = 0) {
+    /// archetype's spark-trail quirk (§8 accent particles). `tell`/`tellPhase`
+    /// drive the v3 involuntary tells: Prism's accents flicker (color table
+    /// swap), Nimbus's luminous pulse (a brightness wave traveling through
+    /// the body masses), Willow's falling leaf (the sprout leaf's animated
+    /// drop-and-return), Compass's grid flash (the tick's glow boost).
+    func paint(world: [Transform2D], pose: AvatarPose, rest: Bool, accentPhase: Float = 0,
+               tell: PersonalityTell? = nil, tellPhase: Float = 0) {
         commandCount = 0
+        let colors = (tell == .flicker && !rest) ? flickerColors : roleColors
+        let pulseActive = tell == .pulse && !rest && tellPhase > 0
         for (slotIndex, slot) in slots.enumerated() {
             let t = world[slot.boneIndex]
             let shape = shapes[slot.shapeIndex]
             let role = slot.roleOverride ?? slot.role
-            let color = rest
-                ? roleColors[.restDim] ?? (1, 0, 1)
-                : roleColors[role] ?? (1, 1, 1)
+            let baseColor = rest
+                ? colors[.restDim] ?? (1, 0, 1)
+                : colors[role] ?? (1, 1, 1)
+            var colorR = baseColor.0
+            var colorG = baseColor.1
+            var colorB = baseColor.2
+            // Nimbus's pulse: brightness travels bottom -> top through the
+            // body masses (slots draw back-to-front, so the index is the
+            // body position) as the tell phase advances.
+            if pulseActive {
+                let position = Float(slotIndex) / Float(max(slots.count - 1, 1))
+                let wave = max(0, 1 - abs(position - tellPhase))
+                let boost = 0.5 * wave * wave
+                colorR = min(1, colorR + boost)
+                colorG = min(1, colorG + boost)
+                colorB = min(1, colorB + boost)
+            }
             let bend = pose.rotations[slot.boneIndex]
             let slices = shape.paths.count
             for i in 0..<slices {
@@ -585,9 +624,9 @@ nonisolated final class AvatarSpritePainter {
                 command.scaleY = sqrt(t.c * t.c + t.d * t.d)
                 command.shapeIndex = slot.shapeIndex
                 command.pathIndex = i
-                command.r = color.0
-                command.g = color.1
-                command.b = color.2
+                command.r = colorR
+                command.g = colorG
+                command.b = colorB
                 command.a = 1
                 commands[commandCount] = command
                 commandCount += 1
@@ -609,14 +648,16 @@ nonisolated final class AvatarSpritePainter {
                     )
                 }
                 for decoration in decorations where decoration.afterSlotName == slot.name {
-                    emitDecoration(decoration, world: world)
+                    emitDecoration(decoration, world: world, colors: colors,
+                                   tell: tell, tellPhase: tellPhase)
                 }
             }
         }
         // Top-phase decorations: on top of the body (patches, grids, glows).
         if !rest {
             for decoration in decorations where decoration.afterSlotName == nil {
-                emitDecoration(decoration, world: world)
+                emitDecoration(decoration, world: world, colors: colors,
+                               tell: tell, tellPhase: tellPhase)
             }
         }
         if !rest {
@@ -627,23 +668,57 @@ nonisolated final class AvatarSpritePainter {
     /// Emits one decoration command: a small prebuilt shape pinned to a
     /// bone at a fixed local offset, transformed by the bone's world
     /// transform (so tokens ride breathing/sway/blink motion for free).
-    private func emitDecoration(_ decoration: Decoration, world: [Transform2D]) {
+    /// Tell effects apply to named decorations: the sprout leaf drops and
+    /// returns (Willow), the grid flashes on the approval tick (Compass).
+    private func emitDecoration(
+        _ decoration: Decoration,
+        world: [Transform2D],
+        colors: [PaletteRole: (r: Float, g: Float, b: Float)],
+        tell: PersonalityTell?,
+        tellPhase: Float
+    ) {
+        var localX = decoration.localX
+        var localY = decoration.localY
+        var alpha = decoration.alpha
+        if tellPhase > 0 {
+            switch (tell, decoration.id) {
+            case (.leaf, "sproutLeaf"):
+                // One leaf falls; Willow catches it and puts it back:
+                // fall (0...0.4), held (0.4...0.6), placed back (0.6...1).
+                let drop: Float
+                if tellPhase < 0.4 {
+                    drop = GestureClipLibrary.easeInOut(tellPhase / 0.4)
+                } else if tellPhase < 0.6 {
+                    drop = 1
+                } else {
+                    drop = 1 - GestureClipLibrary.easeInOut((tellPhase - 0.6) / 0.4)
+                }
+                localY += 9 * drop
+            case (.tick, "grid"):
+                // The confirmation pulse: the interior grid glows once.
+                alpha = min(1, alpha * (1 + sin(tellPhase * .pi) * 1.2))
+            default:
+                break
+            }
+        }
         emitDecoration(
             boneIndex: decoration.boneIndex,
             shapeIndex: decoration.shapeIndex,
             role: decoration.role,
-            localX: decoration.localX,
-            localY: decoration.localY,
+            localX: localX,
+            localY: localY,
             rotation: decoration.rotation,
-            alpha: decoration.alpha,
-            world: world
+            alpha: alpha,
+            world: world,
+            colors: colors
         )
     }
 
     private func emitDecoration(
         boneIndex: Int, shapeIndex: Int, role: PaletteRole,
         localX: Float, localY: Float, rotation: Float, alpha: Float,
-        world: [Transform2D]
+        world: [Transform2D],
+        colors: [PaletteRole: (r: Float, g: Float, b: Float)]? = nil
     ) {
         guard commandCount < commandCapacity else { return }
         let t = world[boneIndex]
@@ -655,7 +730,7 @@ nonisolated final class AvatarSpritePainter {
         command.scaleY = sqrt(t.c * t.c + t.d * t.d)
         command.shapeIndex = shapeIndex
         command.pathIndex = 0
-        let color = roleColors[role] ?? (1, 1, 1)
+        let color = (colors ?? roleColors)[role] ?? (1, 1, 1)
         command.r = color.0
         command.g = color.1
         command.b = color.2

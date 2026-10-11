@@ -27,6 +27,9 @@ nonisolated final class ReactionLayer {
     private var activeClip: GestureClip?
     private var startFrame = 0
     private var actionFrames = 0
+    /// Anticipation/pre-cue frames before the action starts (v3 grammar;
+    /// startle-class reactions get a 250 ms pre-cue — audit finding 6).
+    private var anticipationFrames = 0
     private var fadeFrames = 9
     private var activeElapsed = 0
 
@@ -52,11 +55,12 @@ nonisolated final class ReactionLayer {
 
     /// Big-clip progress 0...1 for the renderer's accent particles (§8):
     /// mirrors IdleGestureLayer.bigClipPhase so a big *reaction* also emits
-    /// (Ember's long-press spark-trail quirk, §5). Reactions play without
-    /// anticipation, so the phase is the raw action progress.
+    /// (Ember's long-press spark-trail quirk, §5). The phase is the action
+    /// progress, offset by the anticipation/pre-cue frames.
     var bigClipPhase: Float {
         guard let clip = activeClip, clip.isBig, actionFrames > 0 else { return 0 }
-        return min(max(Float(activeElapsed) / Float(actionFrames), 0), 1)
+        let u = Float(max(0, activeElapsed - anticipationFrames)) / Float(actionFrames)
+        return min(max(u, 0), 1)
     }
 
     init(profile: PersonalityProfile, seed: UInt64) {
@@ -112,6 +116,7 @@ nonisolated final class ReactionLayer {
         activeClip = clip
         startFrame = frame
         actionFrames = GestureClipLibrary.durationFrames(clip, profile: profile)
+        anticipationFrames = GestureClipLibrary.anticipationFrames(clip, profile: profile)
         activeElapsed = 0
         reactionCount += 1
         return true
@@ -162,7 +167,7 @@ nonisolated final class ReactionLayer {
 
         if let clip = activeClip {
             activeElapsed = frame - startFrame
-            let total = actionFrames + fadeFrames
+            let total = anticipationFrames + actionFrames + fadeFrames
             var w: Float = 1
             if activeElapsed < fadeFrames {
                 w = GestureClipLibrary.easeInOut(Float(activeElapsed) / Float(fadeFrames))
@@ -172,11 +177,15 @@ nonisolated final class ReactionLayer {
                 let tail = Float(activeElapsed - (total - fadeFrames)) / Float(fadeFrames)
                 w = GestureClipLibrary.easeInOut(1 - min(tail, 1))
             }
-            let u = min(max(Float(activeElapsed) / Float(max(actionFrames, 1)), 0), 1)
+            // Pre-cue phase runs before the action; u starts after it.
+            let aPhase = activeElapsed < anticipationFrames
+                ? Float(activeElapsed) / Float(max(anticipationFrames, 1))
+                : 1
+            let u = min(max(Float(activeElapsed - anticipationFrames) / Float(max(actionFrames, 1)), 0), 1)
             GestureClipLibrary.apply(
                 clip,
                 u: u,
-                anticipation: 0,
+                anticipation: aPhase < 1 ? aPhase : 0,
                 weight: w,
                 profile: profile,
                 bones: bones,

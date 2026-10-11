@@ -559,6 +559,209 @@ final class AvatarEngineTests: XCTestCase {
         }
     }
 
+    // MARK: A5b — v3 motion grammar (gaze policy, blink grammar, settle, tells)
+
+    func testLockGazeStaysNearTheUser() throws {
+        // Ember (lock): the gaze spends its life near the user — the mean
+        // |pupil offset| over a minute must stay small (a lock, not a beg).
+        let ember = try makeEngine(.ember, seed: 20261010)
+        var mean: Float = 0
+        var samples = 0
+        for frame in stride(from: 300, to: 1800, by: 10) {
+            ember.update(toFrame: frame)
+            mean += abs(ember.currentPose.offsetsX[ember.bones.pupilL])
+            samples += 1
+        }
+        mean /= Float(samples)
+        XCTAssertLessThan(mean, 2.0, "ember's lock gaze stays near the user (mean |offset| \(mean))")
+    }
+
+    func testMetricSweepIsMetronomicAndRNGFree() throws {
+        // Compass's lighthouse sweep alternates user/away on a fixed 150-frame
+        // period with no randomness: two engines with different seeds must
+        // produce IDENTICAL pupil tracks (policy overrides the saccade RNG).
+        let a = try makeEngine(.compass, seed: 1)
+        let b = try makeEngine(.compass, seed: 999)
+        for frame in 1...900 {
+            a.update(toFrame: frame)
+            b.update(toFrame: frame)
+        }
+        XCTAssertEqual(
+            a.currentPose.offsetsX[a.bones.pupilL],
+            b.currentPose.offsetsX[b.bones.pupilL],
+            "the metric sweep must be seed-independent (metronomic, zero variance)"
+        )
+        XCTAssertNotEqual(
+            a.currentPose.offsetsX[a.bones.pupilL], 0,
+            "at frame 900 the sweep must be mid-cycle (away phase), not stuck at zero"
+        )
+    }
+
+    func testDetectThenSettleHasLongFixationHolds() throws {
+        // Nimbus: fast darts, then the longest settle — after a saccade the
+        // gaze must HOLD (no retargeting) for at least 400 ms (12 frames).
+        let nimbus = try makeEngine(.nimbus, seed: 20261010)
+        var previous: (x: Float, y: Float) = (0, 0)
+        var holdFrames = 0
+        var minHold = Int.max
+        var saccades = 0
+        for frame in 1...1800 {
+            nimbus.update(toFrame: frame)
+            let x = nimbus.currentPose.offsetsX[nimbus.bones.pupilL]
+            let y = nimbus.currentPose.offsetsY[nimbus.bones.pupilL]
+            let moved = abs(x - previous.x) > 0.08 || abs(y - previous.y) > 0.08
+            if moved {
+                if holdFrames > 0, saccades > 0 { minHold = min(minHold, holdFrames) }
+                saccades += 1
+                holdFrames = 0
+            } else {
+                holdFrames += 1
+            }
+            previous = (x, y)
+        }
+        XCTAssertGreaterThan(saccades, 4, "expected multiple saccades in 60 s")
+        XCTAssertGreaterThanOrEqual(minHold, 12,
+                                    "every fixation must hold >= 400 ms before release (audit finding 6)")
+    }
+
+    func testBlinkGrammarScalesEnvelopePerArchetype() throws {
+        // Willow's blink (durationScale 1.8) must be measurably longer than
+        // Ember's (0.7): the blink-grammar hook reports the envelope.
+        func firstBlinkEnvelope(_ archetype: Archetype) throws -> Int {
+            let engine = try makeEngine(archetype, seed: 3)
+            var frame = 1
+            while frame <= 5400 {
+                engine.update(toFrame: frame)
+                if engine.blinkCountForTesting > 0 {
+                    return engine.lastBlinkEnvelopeFramesForTesting
+                }
+                frame += 1
+            }
+            return 0
+        }
+        let willowLength = try firstBlinkEnvelope(.willow)
+        let emberLength = try firstBlinkEnvelope(.ember)
+        XCTAssertGreaterThan(willowLength, 0, "willow must blink within 3 minutes")
+        XCTAssertGreaterThan(emberLength, 0, "ember must blink within 3 minutes")
+        XCTAssertGreaterThan(Float(willowLength), Float(emberLength) * 1.5,
+                             "willow's blink must be watchable vs ember's flick (got \(willowLength) vs \(emberLength))")
+    }
+
+    func testStartleClipsGetPrecue() throws {
+        // Audit finding 6: a startle without a pre-cue reads jump-scare.
+        // Shiver always gets a 250 ms (8 frame) pre-cue, scaled by nothing.
+        let nimbusProfile = try PersonalityProfile.load(.nimbus)
+        XCTAssertEqual(GestureClipLibrary.anticipationFrames(.shiver, profile: nimbusProfile), 8)
+        // Big clips keep the plan's >= 120 ms anticipation floor for every
+        // archetype, even the bloom-tempo ones (willow dial 0 -> 4 frames).
+        let willowProfile = try PersonalityProfile.load(.willow)
+        XCTAssertGreaterThanOrEqual(
+            GestureClipLibrary.anticipationFrames(.bounce, profile: willowProfile), 4
+        )
+        // The pre-cue visibly moves the pose before the action: at 3 frames
+        // into a shiver reaction the head is already bracing (offset differs
+        // from a reference with no event).
+        let engine = try makeEngine(.nimbus, seed: 8)
+        let reference = try makeEngine(.nimbus, seed: 8)
+        engine.update(toFrame: 40)
+        reference.update(toFrame: 40)
+        engine.handleEvent(.gesture(name: "shiver"))
+        engine.update(toFrame: 43)
+        reference.update(toFrame: 43)
+        XCTAssertNotEqual(engine.currentPose.offsetsY[engine.bones.head],
+                          reference.currentPose.offsetsY[reference.bones.head],
+                          "the startle pre-cue must brace the head before the flinch")
+    }
+
+    func testSettleResidualMatchesGrammar() throws {
+        // Willow (settleComplete 0.15): a clip end charges the settle
+        // residual and it decays over the following seconds — visible
+        // post-gesture life. Compass (1.0): the amplitude contribution is
+        // exactly zero (lands like a machine closing). Driven by a named
+        // gesture event so the schedule is deterministic, not statistical.
+        let willow = try makeEngine(.willow, seed: 20261010)
+        willow.update(toFrame: 30)
+        willow.handleEvent(.gesture(name: "nod"))  // willow's pool clip
+        var charged = false
+        var decayed = false
+        for frame in 31...220 {
+            willow.update(toFrame: frame)
+            let amp = willow.settleResidualAmplitudeForTesting
+            if amp > 0.005 { charged = true }
+            if charged, amp > 0, amp < 0.001 { decayed = true; break }
+        }
+        XCTAssertTrue(charged, "willow's clip end must charge the settle residual")
+        XCTAssertTrue(decayed, "the residual must decay (clamp to zero) after the gesture")
+
+        let compass = try makeEngine(.compass, seed: 5)
+        compass.update(toFrame: 30)
+        compass.handleEvent(.tap)
+        for frame in 31...220 {
+            compass.update(toFrame: frame)
+            XCTAssertEqual(compass.settleResidualAmplitudeForTesting, 0,
+                           "compass lands exactly — the residual amplitude must be zero (settleComplete 1.0)")
+        }
+    }
+
+    func testTellsTriggerPerArchetype() throws {
+        // Compass: the approval tick fires when a reaction completes.
+        let compass = try makeEngine(.compass, seed: 5)
+        compass.update(toFrame: 30)
+        compass.handleEvent(.tap)
+        var tickSeen = false
+        for frame in 31...120 {
+            compass.update(toFrame: frame)
+            if compass.tellPhase > 0 { tickSeen = true; break }
+        }
+        XCTAssertTrue(tickSeen, "compass's approval tick must fire at reaction completion")
+
+        // Nimbus: the luminous pulse starts after any reaction.
+        let nimbus = try makeEngine(.nimbus, seed: 5)
+        nimbus.update(toFrame: 30)
+        nimbus.handleEvent(.tap)
+        var pulseSeen = false
+        for frame in 31...120 {
+            nimbus.update(toFrame: frame)
+            if nimbus.tellPhase > 0 { pulseSeen = true; break }
+        }
+        XCTAssertTrue(pulseSeen, "nimbus's luminous pulse must start after a reaction")
+
+        // Prism: the chromatic flicker triggers on the delight rising edge.
+        let prism = try makeEngine(.prism, seed: 5)
+        prism.update(toFrame: 30)
+        prism.handleEvent(.gesture(name: "sparkle"))  // joy pulse 0.9
+        var flickerSeen = false
+        for frame in 31...120 {
+            prism.update(toFrame: frame)
+            if prism.tellPhase > 0 { flickerSeen = true; break }
+        }
+        XCTAssertTrue(flickerSeen, "prism's chromatic flicker must trigger on delight")
+
+        // Willow: the leaf tell is idle-scheduled (~ every 50 s) — expect at
+        // least one in 3 minutes, and the schedule must be deterministic.
+        func leafCount(seed: UInt64) -> Int {
+            let willow = try! makeEngine(.willow, seed: seed)
+            willow.update(toFrame: 5400)
+            return willow.tellTriggerCountForTesting
+        }
+        XCTAssertGreaterThan(leafCount(seed: 20261010), 0,
+                             "willow's leaf must fall at least once in 3 idle minutes")
+        XCTAssertEqual(leafCount(seed: 20261010), leafCount(seed: 20261010),
+                       "the leaf schedule must be deterministic (same seed, same schedule)")
+    }
+
+    func testTellsSuppressedInReduceMotionL2() throws {
+        // L2 = static pose + gentle blink only (§8): no tells.
+        let compass = try makeEngine(.compass, seed: 5)
+        compass.accessibilityMode = .reduceMotionL2
+        compass.update(toFrame: 30)
+        compass.handleEvent(.tap)
+        for frame in 31...120 {
+            compass.update(toFrame: frame)
+            XCTAssertEqual(compass.tellPhase, 0, "tells must be suppressed in Reduce Motion L2")
+        }
+    }
+
     // MARK: Phase B — long-press quirk dialogue (B2d)
 
     func testQuirkGestureMappingPerArchetype() throws {
@@ -587,7 +790,9 @@ final class AvatarEngineTests: XCTestCase {
         }
         XCTAssertEqual(engine.activeGesturePhase, 0, "expected a quiet frame with no idle gesture")
         engine.handleEvent(.gesture(name: "spin"))
-        engine.update(toFrame: frame + 3)
+        // Step past the anticipation/pre-cue frames (ember: 5) into the
+        // action phase — the spark trail starts with the action.
+        engine.update(toFrame: frame + 10)
         XCTAssertGreaterThan(engine.activeGesturePhase, 0,
                              "a big reaction clip must drive the accent-particle phase")
     }
@@ -923,7 +1128,9 @@ private enum GoldenFrameRasterizer {
             world: engine.currentWorld,
             pose: engine.currentPose,
             rest: false,
-            accentPhase: engine.activeGesturePhase
+            accentPhase: engine.activeGesturePhase,
+            tell: engine.tell,
+            tellPhase: engine.tellPhase
         )
 
         let width = 205
@@ -1003,12 +1210,15 @@ final class GoldenFrameTests: XCTestCase {
         // the cloud anatomy (3-puff head, puff masses, wisp antenna, no
         // limbs) with tint + token + tell; wave/stretch re-authored
         // whole-body; catchlights on the pupils.
+        // v6 (A5b): motion grammar live — gaze policies (fixation holds,
+        // metric sweep), drift-scaled sway, blink grammar envelopes,
+        // anticipation/pre-cue phases, settle residual, tell rendering.
         let expected: [Archetype: UInt64] = [
-            .ember: 16_647_557_891_968_117_514,
-            .willow: 11_538_216_942_261_174_258,
-            .compass: 8_483_377_309_503_067_277,
-            .prism: 13_006_807_534_711_468_236,
-            .nimbus: 2_409_713_356_007_991_929,
+            .ember: 13_834_120_393_254_196_390,
+            .willow: 1_164_055_568_244_073_751,
+            .compass: 11_845_351_112_787_990_538,
+            .prism: 9_352_759_805_435_496_363,
+            .nimbus: 5_075_700_460_536_205_262,
         ]
 
         var actual: [Archetype: UInt64] = [:]
