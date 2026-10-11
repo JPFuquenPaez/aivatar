@@ -20,7 +20,20 @@
     "palette": ["#9C86DB", "#EDEAFB", "#120E22"],
     "silhouetteWeights": { "roundness": 0.95, "angularity": 0.05 }
   },
+  "speciesTokens": {
+    "bodyLight": "#C3B8F5",
+    "bodyMid": "#9C86DB",
+    "shadow": "#8B7FD4",
+    "face": "#191521",
+    "accentA": "#F4F1FF"
+  },
+  "motionGrammar": { "settleComplete": 0.9, "drift": 1.0, "anticipation": 0.2 },
+  "gazePolicy": "detectThenSettle",
+  "blink": { "durationScale": 1.0, "variance": 0.6 },
+  "tell": "pulse",
+  "quirkLoop": "weatherMap",
+  "voiceStyle": "short, echoic, mirrors your phrasing",
   "gesturePoolWeights": { "wave": 0.0, "bounce": 0.0, "stretch": 0.0, "spin": 0.0, "nod": 0.0, "tilt": 0.0, "lookAround": 0.0, "shiftWeight": 0.25, "shiver": 0.3, "doubleTake": 0.0, "sparkle": 0.2, "puff": 0.25 },
   "quirks": ["reactive micro-startles", "weather-like drift", "high blink variance"],
-  "assetVersion": "1.1.0"
+  "assetVersion": "2.0.0"
 }

@@ -94,8 +94,87 @@ nonisolated struct SilhouetteWeights: Codable, Sendable, Equatable {
     var angularity: Float
 }
 
+// MARK: - Schema v2 (A5a: unified cloud-species, additive)
+
+/// Species tint + token stack (v3: tint -> one trait token -> eye/motion
+/// grammar -> tell). The silhouette is constant across all five archetypes;
+/// identity rests on these tokens, never on anatomy.
+nonisolated struct SpeciesTokens: Codable, Sendable, Equatable {
+    /// Light upper body mass (head middle puff, chest top).
+    var bodyLight: String
+    /// Mid body mass (side puffs, lower masses, antenna).
+    var bodyMid: String
+    /// Deep shade (tail wisps, undersides).
+    var shadow: String
+    /// Near-black eye/mouth/brow accent (v3: large matte eyes).
+    var face: String
+    /// Trait token color A (Ember flame, Willow leaf, Compass grid,
+    /// Prism patch A).
+    var accentA: String
+    /// Trait token color B (Ember amber rim, Prism patch B).
+    var accentB: String?
+    /// Interior glow (Ember embers; optional).
+    var glow: String?
+}
+
+/// Motion grammar (v3 §0 grammar layer; consumed by the engine from A5b on).
+nonisolated struct MotionGrammar: Codable, Sendable, Equatable {
+    /// 0...1 — residual motion allowed to remain after a gesture settles
+    /// (Willow never fully settles: 0; Compass settles exactly: 1).
+    var settleComplete: Float
+    /// Continuous idle positional wander scale (Nimbus drift).
+    var drift: Float
+    /// Wind-up strength before a gesture, 0...1 (Ember high, Willow none,
+    /// Prism varied, Compass minimal).
+    var anticipation: Float
+}
+
+/// Gaze policy (v3 §0 grammar; consumed from A5b on — fixation holds,
+/// sweeps, detect-then-settle).
+nonisolated enum GazePolicy: String, Codable, Sendable {
+    case lock            // Ember: locks onto you and shines
+    case soft            // Willow: looks near you, long mutual gazes
+    case metricSweep     // Compass: lighthouse sweep at metronomic intervals
+    case wander           // Prism: inspects corners/hands, double-takes
+    case detectThenSettle // Nimbus: fast dart, then the longest settle
+}
+
+/// Blink grammar (v3: rate lives in gazeProfile; shape lives here).
+nonisolated struct BlinkGrammar: Codable, Sendable, Equatable {
+    /// Envelope-length scale (Willow's blinks are watchable; Ember's are
+    /// almost missed).
+    var durationScale: Float
+    /// Rate variance (Nimbus bursts and long stills; Compass near-zero but
+    /// never exactly zero — zero-variance blinks read "dead").
+    var variance: Float
+}
+
+/// The archetype's involuntary micro-behavior (v3 §0 tell; testable at
+/// 205x251 pt in the A4 study).
+nonisolated enum PersonalityTell: String, Codable, Sendable {
+    case spark   // Ember: glowing ash sparks trail big moves
+    case leaf    // Willow: catches a falling leaf and puts it back
+    case tick    // Compass: one metronome bob of approval
+    case flicker // Prism: chromatic shift across accents on delight
+    case pulse   // Nimbus: slow luminous wave after any event
+}
+
+/// The unobserved idle quirk loop (v3 §0 interiority / quirk; data-driven
+/// variants like weather mapping arrive behind Phase B/C ports).
+nonisolated enum QuirkLoop: String, Codable, Sendable {
+    case preen            // Ember: pats its own head before the wrist rises
+    case phototropism     // Willow: tilts toward the brightest region
+    case alignmentFidget  // Compass: nudges something crooked to symmetry
+    case mirrorMoment     // Prism: studies its reflection, adjusts a patch
+    case weatherMap       // Nimbus: drift syncs with live weather (port-fed)
+}
+
 /// PersonalityProfile (§5): one JSON per archetype, frozen at end of A1
 /// (schema v1). Breaking changes require migration notes (§10).
+///
+/// Schema v2 (A5a) is strictly additive: every new field is optional and the
+/// engine defaults when absent, so v1 profiles still load. v1 fields are
+/// byte-for-byte unchanged.
 nonisolated struct PersonalityProfile: Codable, Sendable, Equatable {
     var id: String
     var traitVector: TraitVector
@@ -106,6 +185,22 @@ nonisolated struct PersonalityProfile: Codable, Sendable, Equatable {
     var quirks: [String]
     /// Asset-set semantic version (§10); the engine pins to the bundle version.
     var assetVersion: String
+
+    // Schema v2 (A5a, unified cloud-species): all optional, additive.
+    /// v3 species tint + token stack; nil = v1 palette fallback.
+    var speciesTokens: SpeciesTokens?
+    /// v3 motion grammar (settle_complete / drift / anticipation).
+    var motionGrammar: MotionGrammar?
+    /// v3 gaze policy.
+    var gazePolicy: GazePolicy?
+    /// v3 blink grammar (rate stays in gazeProfile).
+    var blink: BlinkGrammar?
+    /// v3 involuntary tell.
+    var tell: PersonalityTell?
+    /// v3 unobserved quirk loop.
+    var quirkLoop: QuirkLoop?
+    /// v3 voice copy style (future chat surface; metadata only).
+    var voiceStyle: String?
 
     static func load(_ archetype: Archetype, bundle: Bundle = .main) throws -> PersonalityProfile {
         guard let url = bundle.url(forResource: "profile_\(archetype.rawValue)", withExtension: "json", subdirectory: "AvatarAssets")

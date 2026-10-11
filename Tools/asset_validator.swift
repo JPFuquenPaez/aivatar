@@ -42,12 +42,39 @@ struct Profile: Decodable {
     let motionProfile: MotionProfile
     let visualTokens: VisualTokens
     let gesturePoolWeights: [String: Float]
+    // Schema v2 (A5a, additive — all optional).
+    let speciesTokens: SpeciesTokens?
+    let motionGrammar: MotionGrammar?
+    let gazePolicy: String?
+    let blink: BlinkGrammar?
+    let tell: String?
+    let quirkLoop: String?
+    let voiceStyle: String?
+    let assetVersion: String?
     struct MotionProfile: Decodable {
         let gestureRatePerMin: Float
         let amplitudeScale: Float
         let tempoScale: Float
         let transitionDurationSec: [Float]
         let overshoot: Float
+    }
+    struct SpeciesTokens: Decodable {
+        let bodyLight: String
+        let bodyMid: String
+        let shadow: String
+        let face: String
+        let accentA: String
+        let accentB: String?
+        let glow: String?
+    }
+    struct MotionGrammar: Decodable {
+        let settleComplete: Float
+        let drift: Float
+        let anticipation: Float
+    }
+    struct BlinkGrammar: Decodable {
+        let durationScale: Float
+        let variance: Float
     }
     struct VisualTokens: Decodable {
         let dominantShape: String
@@ -163,6 +190,64 @@ for archetype in archetypes {
             if clean.count != 6 || Int(clean, radix: 16) == nil {
                 fail("profile_\(archetype): palette entry \(hex) is not a hex color")
             }
+        }
+        // Schema v2 (A5a): species tokens + grammar, all optional but
+        // mutually consistent when present.
+        if let species = profile.speciesTokens {
+            for (label, hex) in [
+                ("bodyLight", species.bodyLight), ("bodyMid", species.bodyMid),
+                ("shadow", species.shadow), ("face", species.face),
+                ("accentA", species.accentA),
+            ] {
+                let clean = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+                if clean.count != 6 || Int(clean, radix: 16) == nil {
+                    fail("profile_\(archetype): speciesTokens.\(label) \(hex) is not a hex color")
+                }
+            }
+            if let accentB = species.accentB {
+                let clean = accentB.hasPrefix("#") ? String(accentB.dropFirst()) : accentB
+                if clean.count != 6 || Int(clean, radix: 16) == nil {
+                    fail("profile_\(archetype): speciesTokens.accentB \(accentB) is not a hex color")
+                }
+            }
+        }
+        if let grammar = profile.motionGrammar {
+            for (label, value) in [
+                ("settleComplete", grammar.settleComplete),
+                ("drift", grammar.drift),
+                ("anticipation", grammar.anticipation),
+            ] where !(0...1).contains(value) {
+                fail("profile_\(archetype): motionGrammar.\(label) \(value) outside 0...1")
+            }
+        }
+        if let blink = profile.blink {
+            if blink.durationScale <= 0 || blink.durationScale > 3 {
+                fail("profile_\(archetype): blink.durationScale \(blink.durationScale) outside 0...3")
+            }
+            if !(0...1).contains(blink.variance) {
+                fail("profile_\(archetype): blink.variance \(blink.variance) outside 0...1")
+            }
+        }
+        if let policy = profile.gazePolicy {
+            let valid = ["lock", "soft", "metricSweep", "wander", "detectThenSettle"]
+            if !valid.contains(policy) {
+                fail("profile_\(archetype): gazePolicy \(policy) not in \(valid)")
+            }
+        }
+        if let tell = profile.tell {
+            let valid = ["spark", "leaf", "tick", "flicker", "pulse"]
+            if !valid.contains(tell) {
+                fail("profile_\(archetype): tell \(tell) not in \(valid)")
+            }
+        }
+        if let quirkLoop = profile.quirkLoop {
+            let valid = ["preen", "phototropism", "alignmentFidget", "mirrorMoment", "weatherMap"]
+            if !valid.contains(quirkLoop) {
+                fail("profile_\(archetype): quirkLoop \(quirkLoop) not in \(valid)")
+            }
+        }
+        if profile.assetVersion != nil, profile.assetVersion!.hasPrefix("1.") {
+            fail("profile_\(archetype): v2 fields require assetVersion >= 2 (got \(profile.assetVersion!))")
         }
     } catch {
         fail("profile_\(archetype).json failed to decode: \(error)")

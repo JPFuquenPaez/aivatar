@@ -19,10 +19,10 @@ import ImageIO
 
 let dir = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "."
 
-func analyze(path: String) -> (coverage: Double, regionBright: Int, centroidX: Double, avg: (Double, Double, Double)) {
+func analyze(path: String) -> (coverage: Double, regionBright: Int, centroidX: Double, avg: (Double, Double, Double), magentaPx: Int, cyanPx: Int) {
     guard let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
           let img = CGImageSourceCreateImageAtIndex(src, 0, nil) else {
-        return (0, 0, 0, (0, 0, 0))
+        return (0, 0, 0, (0, 0, 0), 0, 0)
     }
     let w = img.width, h = img.height
     guard w > 0, h > 0,
@@ -31,16 +31,20 @@ func analyze(path: String) -> (coverage: Double, regionBright: Int, centroidX: D
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
           ) else {
-        return (0, 0, 0, (0, 0, 0))
+        return (0, 0, 0, (0, 0, 0), 0, 0)
     }
     ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
-    guard let data = ctx.data else { return (0, 0, 0, (0, 0, 0)) }
+    guard let data = ctx.data else { return (0, 0, 0, (0, 0, 0), 0, 0) }
     let bytes = data.assumingMemoryBound(to: UInt8.self)
 
     var nonBlack = 0
     var brightR = 0.0, brightG = 0.0, brightB = 0.0, brightCount = 0.0
     var regionBright = 0
     var regionSumX = 0.0
+    // v3 token probes: Prism's identity is its sticker patches (magenta +
+    // cyan), not its white body — count pixels in each patch family.
+    var magentaPx = 0
+    var cyanPx = 0
     // Avatar band: excludes status-bar time (top right) and name text (bottom).
     let regionX0 = Int(Double(w) * 0.15), regionX1 = Int(Double(w) * 0.68)
     let regionY0 = Int(Double(h) * 0.05), regionY1 = Int(Double(h) * 0.65)
@@ -50,6 +54,8 @@ func analyze(path: String) -> (coverage: Double, regionBright: Int, centroidX: D
             let r = Double(bytes[o]), g = Double(bytes[o + 1]), b = Double(bytes[o + 2])
             let lum = 0.299 * r + 0.587 * g + 0.114 * b
             if lum > 8 { nonBlack += 1 }
+            if r > 170 && b > 150 && g < r - 60 && g < b - 40 { magentaPx += 1 }
+            if g > 170 && b > 170 && r < g - 60 { cyanPx += 1 }
             if lum > 60 {
                 brightR += r; brightG += g; brightB += b; brightCount += 1
                 if x >= regionX0 && x < regionX1 && y >= regionY0 && y < regionY1 {
@@ -64,15 +70,21 @@ func analyze(path: String) -> (coverage: Double, regionBright: Int, centroidX: D
         ? (brightR / brightCount, brightG / brightCount, brightB / brightCount)
         : (0, 0, 0)
     let centroidX = regionBright > 0 ? regionSumX / Double(regionBright) / Double(w) : 0
-    return (coverage, regionBright, centroidX, avg)
+    return (coverage, regionBright, centroidX, avg, magentaPx, cyanPx)
 }
 
-let paletteChecks: [(name: String, desc: String, check: (Double, Double, Double) -> Bool)] = [
-    ("ember", "warm (R>B)", { r, g, b in r > b }),
-    ("willow", "green (G>B)", { r, g, b in g > b }),
-    ("compass", "cool (B>R)", { r, g, b in b > r }),
-    ("prism", "magenta (B>G)", { r, g, b in b > g }),
-    ("nimbus", "lavender (B>G)", { r, g, b in b > g }),
+// v3: identity is the tint + token stack. The four tint-bodied archetypes
+// are checked by family; Prism's white body carries no family, so its gate
+// is the sticker patches themselves (magenta + cyan must both be present).
+let paletteChecks: [(name: String, desc: String,
+                     check: (Double, Double, Double, Int, Int) -> Bool)] = [
+    ("ember", "warm (R>B)", { r, g, b, _, _ in r > b }),
+    ("willow", "green (G>B)", { r, g, b, _, _ in g > b }),
+    ("compass", "cool (B>R)", { r, g, b, _, _ in b > r }),
+    ("prism", "patches (magenta+cyan present)", { _, _, _, magenta, cyan in
+        magenta > 100 && cyan > 100
+    }),
+    ("nimbus", "lavender (B>G)", { r, g, b, _, _ in b > g }),
 ]
 
 var failed = false
@@ -89,8 +101,8 @@ for entry in paletteChecks {
     if !(0.25...0.75).contains(s.centroidX) {
         reasons.append("centroidX \(String(format: "%.2f", s.centroidX)) outside 0.25...0.75 (avatar not centered?)")
     }
-    if !entry.check(s.avg.0, s.avg.1, s.avg.2) {
-        reasons.append("palette \(entry.desc) violated: (\(Int(s.avg.0)),\(Int(s.avg.1)),\(Int(s.avg.2)))")
+    if !entry.check(s.avg.0, s.avg.1, s.avg.2, s.magentaPx, s.cyanPx) {
+        reasons.append("palette \(entry.desc) violated: (\(Int(s.avg.0)),\(Int(s.avg.1)),\(Int(s.avg.2))) magenta=\(s.magentaPx) cyan=\(s.cyanPx)")
     }
     let ok = reasons.isEmpty
     if !ok { failed = true }

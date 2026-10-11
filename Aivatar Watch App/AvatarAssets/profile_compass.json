@@ -20,7 +20,21 @@
     "palette": ["#4A7FA8", "#A9C6DC", "#0A141C"],
     "silhouetteWeights": { "roundness": 0.2, "angularity": 0.8 }
   },
+  "speciesTokens": {
+    "bodyLight": "#98A5B1",
+    "bodyMid": "#676E75",
+    "shadow": "#4E5358",
+    "face": "#14181C",
+    "accentA": "#8FD9E8",
+    "accentB": "#C9CDD2"
+  },
+  "motionGrammar": { "settleComplete": 1.0, "drift": 0.2, "anticipation": 0.15 },
+  "gazePolicy": "metricSweep",
+  "blink": { "durationScale": 1.0, "variance": 0.06 },
+  "tell": "tick",
+  "quirkLoop": "alignmentFidget",
+  "voiceStyle": "terse, numeric, report-style",
   "gesturePoolWeights": { "wave": 0.2, "bounce": 0.0, "stretch": 0.0, "spin": 0.0, "nod": 0.25, "tilt": 0.2, "lookAround": 0.1, "shiftWeight": 0.25, "shiver": 0.0, "doubleTake": 0.0, "sparkle": 0.0, "puff": 0.0 },
   "quirks": ["metronomic saccade rhythm"],
-  "assetVersion": "1.0.0"
+  "assetVersion": "2.0.0"
 }

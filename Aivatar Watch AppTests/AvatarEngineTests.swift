@@ -884,6 +884,19 @@ private struct RasterBytes {
         return mask
     }
 
+    /// Mean color of lit pixels (0...255 per channel) — the tint signal.
+    func meanLitColor(threshold: UInt8 = 8) -> (Double, Double, Double) {
+        var r = 0.0, g = 0.0, b = 0.0, n = 0.0
+        for i in 0..<(width * height) {
+            let o = i * 4
+            if max(bytes[o], max(bytes[o + 1], bytes[o + 2])) > threshold {
+                r += Double(bytes[o]); g += Double(bytes[o + 1]); b += Double(bytes[o + 2]); n += 1
+            }
+        }
+        guard n > 0 else { return (0, 0, 0) }
+        return (r / n, g / n, b / n)
+    }
+
     /// Intersection-over-union of two binary masks (1 = identical).
     static func iou(_ a: [Bool], _ b: [Bool]) -> Double {
         var inter = 0, union = 0
@@ -986,12 +999,16 @@ final class GoldenFrameTests: XCTestCase {
         // chest scale ~2.3x, sway rotation ~3x, heartbeat bob ~2.4x) — the
         // post-polish assessment found the avatar read as frozen between
         // blinks (~2% pixels moved per second).
+        // v5 (A5a): the v3 unified cloud-species — every archetype is now
+        // the cloud anatomy (3-puff head, puff masses, wisp antenna, no
+        // limbs) with tint + token + tell; wave/stretch re-authored
+        // whole-body; catchlights on the pupils.
         let expected: [Archetype: UInt64] = [
-            .ember: 11_117_809_796_357_006_278,
-            .willow: 12_049_078_547_383_160_587,
-            .compass: 10_375_914_817_836_150_481,
-            .prism: 871_704_784_707_370_524,
-            .nimbus: 3_029_167_971_646_149_126,
+            .ember: 16_647_557_891_968_117_514,
+            .willow: 11_538_216_942_261_174_258,
+            .compass: 8_483_377_309_503_067_277,
+            .prism: 13_006_807_534_711_468_236,
+            .nimbus: 2_409_713_356_007_991_929,
         ]
 
         var actual: [Archetype: UInt64] = [:]
@@ -1032,81 +1049,63 @@ final class GoldenFrameTests: XCTestCase {
 }
 
 /// Machine proxy for the §11 silhouette-readability criterion (the A1
-/// silhouette gate): binarizes the golden rasters (lit pixels = silhouette,
-/// palette-free) and measures pairwise IoU. High overlap means two
-/// archetypes read as the same shape at a glance — the §12 "personalities
-/// don't separate" risk, quantified. The n>=12 human study remains the
-/// acceptance authority; this test guards regressions between studies.
-final class SilhouetteSeparationTests: XCTestCase {
-    /// Pairwise IoU ceilings: measured + 0.02 margin, so any silhouette
-    /// regression fails CI and any deliberate improvement requires (and
-    /// gets) a fresh measurement. Empty table = RECORD MODE (prints the
-    /// measured matrix).
-    ///
-    /// Measured v1 (frame 300, seed 42, after Willow's §5 leaf accents):
-    /// ember-willow 0.939, ember-compass 0.823, ember-prism 0.957,
-    /// ember-nimbus 0.818, willow-compass 0.821, willow-prism 0.939,
-    /// willow-nimbus 0.815, compass-prism 0.816, compass-nimbus 0.792,
-    /// prism-nimbus 0.834.
-    ///
-    /// Measured v2 (L1 amplitude retune, v4 goldens): re-measured because
-    /// frame-300 poses moved with the larger life-loop amplitudes.
-    ///
-    /// FINDING: the round trio (ember/willow/prism) overlaps at ~0.94-0.96
-    /// because §5 assigns all three a circle head; compass (square) and
-    /// nimbus (cloud) separate from everything. The ember/prism overlap is
-    /// inherent to the plan's §5 shape tokens, so the §11 "identify pairs
-    /// from silhouette alone" bar is at risk for that pair — flagged, with
-    /// a minimal amendment proposed (a faceted head for Prism), NOT applied.
-    /// The n>=12 human study remains the acceptance authority.
-    private static let ceilings: [String: Double] = [
-        // Measured v2 (frame 300, seed 42, L1 amplitude retune): the larger
-        // life-loop motion slightly *improved* separation of the round trio
-        // (ember-willow 0.919 vs 0.939, ember-prism 0.949 vs 0.957).
-        "ember-willow": 0.939,
-        "ember-compass": 0.838,
-        "ember-prism": 0.969,
-        "ember-nimbus": 0.834,
-        "willow-compass": 0.817,
-        "willow-prism": 0.965,
-        "willow-nimbus": 0.835,
-        "compass-prism": 0.824,
-        "compass-nimbus": 0.817,
-        "prism-nimbus": 0.848,
-    ]
-
-    func testPairwiseSilhouetteSeparation() throws {
+/// v3 species invariants (A5a, §6 v2). The silhouette is deliberately
+/// CONSTANT across all five archetypes — motion-only personality attribution
+/// is the A4 experiment, so anatomy must not be a confound. Distinctness
+/// rests on the tint + token + tell stack: pairwise silhouette IoU must stay
+/// high (constancy), and the mean lit color (tint) must separate pairwise.
+///
+/// This SUPERSEDES the v1 silhouette-readability gate (§11 amendment,
+/// ratified with the v3 direction): with one species, "identify the
+/// archetype from silhouette alone" is void by design. The acceptance
+/// criterion becomes stance legibility (<= 3 s, motion + tint + tell),
+/// measured in the A4 perception study.
+final class SpeciesInvariantsTests: XCTestCase {
+    /// Constancy: every pair of archetypes shares the same cloud silhouette.
+    /// 0.85 leaves room for the sanctioned trait tokens — Willow's drooping
+    /// base + leaf wisps + sprout measure 0.881-0.888 vs the others — while
+    /// failing hard if anatomy ever diverges (a square head lands ~0.6-0.7).
+    func testSilhouetteIsConstantAcrossArchetypes() throws {
         var masks: [Archetype: [Bool]] = [:]
-        var litCounts: [Archetype: Int] = [:]
         for archetype in Archetype.allCases {
             let raster = try GoldenFrameRasterizer.render(archetype: archetype)
-            let mask = raster.silhouetteMask()
-            masks[archetype] = mask
-            litCounts[archetype] = mask.filter { $0 }.count
+            masks[archetype] = raster.silhouetteMask()
         }
-
         let sorted = Archetype.allCases
-        var overlaps: [(Archetype, Archetype, Double)] = []
         for i in 0..<sorted.count {
             for j in (i + 1)..<sorted.count {
                 let a = sorted[i], b = sorted[j]
                 let overlap = RasterBytes.iou(masks[a]!, masks[b]!)
-                overlaps.append((a, b, overlap))
-                if let ceiling = Self.ceilings["\(a.rawValue)-\(b.rawValue)"] {
-                    XCTAssertLessThanOrEqual(
-                        overlap, ceiling,
-                        "\(a.rawValue)/\(b.rawValue) silhouettes regressed (IoU \(overlap) > ceiling \(ceiling)) — §11 separation risk"
-                    )
-                }
+                XCTAssertGreaterThanOrEqual(
+                    overlap, 0.85,
+                    "\(a.rawValue)/\(b.rawValue) silhouettes diverged (IoU \(String(format: "%.3f", overlap)) < 0.85) — the species must stay constant (v3)"
+                )
             }
         }
+    }
 
-        let lit = sorted.map { "\($0.rawValue)=\(litCounts[$0]!)" }.joined(separator: " ")
-        let matrix = overlaps
-            .map { String(format: "%@-%@=%.3f", $0.0.rawValue, $0.1.rawValue, $0.2) }
-            .joined(separator: ", ")
-        if Self.ceilings.isEmpty {
-            XCTFail("RECORD MODE — lit: \(lit); \(matrix)")
+    /// Tint separation: the mean lit color of each golden frame must differ
+    /// pairwise by a visible margin (0...255 scale) — identity is tint,
+    /// so two archetypes drifting to the same tint is a regression.
+    func testTintSeparatesArchetypes() throws {
+        var tints: [Archetype: (Double, Double, Double)] = [:]
+        for archetype in Archetype.allCases {
+            let raster = try GoldenFrameRasterizer.render(archetype: archetype)
+            tints[archetype] = raster.meanLitColor()
+        }
+        let sorted = Archetype.allCases
+        for i in 0..<sorted.count {
+            for j in (i + 1)..<sorted.count {
+                let a = sorted[i], b = sorted[j]
+                let ta = tints[a]!, tb = tints[b]!
+                let distance = sqrt(
+                    pow(ta.0 - tb.0, 2) + pow(ta.1 - tb.1, 2) + pow(ta.2 - tb.2, 2)
+                )
+                XCTAssertGreaterThanOrEqual(
+                    distance, 20,
+                    "\(a.rawValue)/\(b.rawValue) tints too close (distance \(String(format: "%.1f", distance)) < 20) — the token stack must separate"
+                )
+            }
         }
     }
 }

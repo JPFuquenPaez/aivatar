@@ -20,7 +20,21 @@
     "palette": ["#7BC96F", "#C9F2D2", "#0D1A10"],
     "silhouetteWeights": { "roundness": 0.9, "angularity": 0.1 }
   },
+  "speciesTokens": {
+    "bodyLight": "#C7D9C7",
+    "bodyMid": "#B8C9B3",
+    "shadow": "#8E8D77",
+    "face": "#1C2018",
+    "accentA": "#6F8F55",
+    "accentB": "#EBEBD1"
+  },
+  "motionGrammar": { "settleComplete": 0.15, "drift": 0.5, "anticipation": 0.0 },
+  "gazePolicy": "soft",
+  "blink": { "durationScale": 1.8, "variance": 0.2 },
+  "tell": "leaf",
+  "quirkLoop": "phototropism",
+  "voiceStyle": "understated, present progressive, no exclamation marks",
   "gesturePoolWeights": { "wave": 0.2, "bounce": 0.0, "stretch": 0.3, "spin": 0.0, "nod": 0.35, "tilt": 0.15, "lookAround": 0.0, "shiftWeight": 0.0, "shiver": 0.0, "doubleTake": 0.0, "sparkle": 0.0, "puff": 0.0 },
   "quirks": ["long soft blinks", "leaf sway on weight shift"],
-  "assetVersion": "1.0.0"
+  "assetVersion": "2.0.0"
 }

@@ -69,15 +69,17 @@ nonisolated enum GestureClipLibrary {
 
         switch clip {
         case .wave:
-            // Right arm swings up, forearm oscillates, arm returns down by
-            // u = 1 so the end-of-clip crossfade has no offset to unwind. The
-            // raise starts after the crossfade fade-in window so the weight
-            // ramp and the motion ramp don't stack velocities (§11).
-            let raise = easeInOut(min(max((u - 0.25) / 0.3, 0), 1))
+            // v3 species greeting (U1/U5: no pseudo-limbs — a limb emerging
+            // from a limbless body is a realism inconsistency). The wave is
+            // now a whole-body lean-and-bob: the body tilts toward the
+            // viewer, bobs once on a springy arc, and rights itself by
+            // u = 1 so the end-of-clip crossfade has no offset to unwind.
+            let lean = easeInOut(min(max((u - 0.2) / 0.35, 0), 1))
                 * (1 - easeInOut(min(max((u - 0.6) / 0.3, 0), 1)))
-            pose.rotations[bones.upperArmR] += -1.6 * raise * w * amp
-            pose.rotations[bones.forearmR] += sin(u * Float.pi * 4) * 0.35 * w * amp
-            pose.rotations[bones.handR] += sin(u * Float.pi * 4 + 0.6) * 0.3 * w * amp
+            pose.rotations[bones.spineUpper] += 0.10 * lean * w * amp
+            pose.rotations[bones.head] += 0.14 * lean * w * amp
+            pose.offsetsY[bones.hips] += 2.5 * sin(u * Float.pi) * w * amp
+            pose.scalesX[bones.chest] += 0.06 * sin(u * Float.pi) * w
             expressions[ExpressionChannel.warm.rawValue] = max(expressions[ExpressionChannel.warm.rawValue], arc * 0.6 * w)
 
         case .bounce:
@@ -91,13 +93,15 @@ nonisolated enum GestureClipLibrary {
             pose.rotations[bones.appendageB] += arc * 0.25 * w * amp
 
         case .stretch:
-            // Spine lengthens upward, arms rise, settles with overshoot.
+            // Whole-body lengthen upward with overshoot settle (v3: the
+            // puff masses stretch tall, no arms — U1/U5).
             let reach = e * (1 + over * arc)
             pose.rotations[bones.spineUpper] -= 0.14 * reach * w
             pose.rotations[bones.spineLower] -= 0.06 * reach * w
-            pose.rotations[bones.upperArmL] += 0.7 * reach * w * amp
-            pose.rotations[bones.upperArmR] -= 0.7 * reach * w * amp
             pose.scalesY[bones.neck] += 0.15 * reach * w
+            pose.scalesY[bones.chest] += 0.10 * reach * w
+            pose.scalesX[bones.chest] -= 0.06 * reach * w
+            pose.offsetsY[bones.hips] += 2 * reach * w
             expressions[ExpressionChannel.joy.rawValue] = max(expressions[ExpressionChannel.joy.rawValue], arc * 0.5 * w)
 
         case .spin:

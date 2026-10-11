@@ -23,17 +23,57 @@ final class SchemaFreezeTests: XCTestCase {
     }
 
     func testAllFiveProfilesLoadAndMatchArchetypes() throws {
-        // §10 semantic versioning per archetype set. Nimbus is 1.1.0: the
-        // brand-cloud head (logo geometry) + logo-harmonized lavender.
+        // §10 semantic versioning per archetype set. 2.0.0 (A5a): the v3
+        // unified cloud-species — tint + token + tell stack; schema v2
+        // fields (speciesTokens, motionGrammar, gazePolicy, blink, tell,
+        // quirkLoop, voiceStyle) are additive and validated below.
         let expectedVersions: [Archetype: String] = [
-            .ember: "1.0.0", .willow: "1.0.0", .compass: "1.0.0",
-            .prism: "1.0.0", .nimbus: "1.1.0",
+            .ember: "2.0.0", .willow: "2.0.0", .compass: "2.0.0",
+            .prism: "2.0.0", .nimbus: "2.0.0",
         ]
         for archetype in Archetype.allCases {
             let profile = try PersonalityProfile.load(archetype, bundle: .main)
             XCTAssertEqual(profile.id, archetype.rawValue)
             XCTAssertEqual(profile.assetVersion, expectedVersions[archetype])
         }
+    }
+
+    /// Schema v2 (A5a): every profile carries the species token stack and a
+    /// consistent v3 grammar (one tell, one quirk loop, one gaze policy per
+    /// temperament — the distinctness discipline of §6 v2).
+    func testSpeciesSchemaV2FieldsPresentAndDistinct() throws {
+        var tells: Set<String> = []
+        var quirks: Set<String> = []
+        var policies: Set<String> = []
+        var expectedTell: [Archetype: PersonalityTell] = [
+            .ember: .spark, .willow: .leaf, .compass: .tick,
+            .prism: .flicker, .nimbus: .pulse,
+        ]
+        var expectedQuirk: [Archetype: QuirkLoop] = [
+            .ember: .preen, .willow: .phototropism, .compass: .alignmentFidget,
+            .prism: .mirrorMoment, .nimbus: .weatherMap,
+        ]
+        var expectedPolicy: [Archetype: GazePolicy] = [
+            .ember: .lock, .willow: .soft, .compass: .metricSweep,
+            .prism: .wander, .nimbus: .detectThenSettle,
+        ]
+        for archetype in Archetype.allCases {
+            let profile = try PersonalityProfile.load(archetype, bundle: .main)
+            let species = try XCTUnwrap(profile.speciesTokens, "\(archetype.rawValue): speciesTokens required at assetVersion 2")
+            XCTAssertFalse(species.bodyLight.isEmpty)
+            XCTAssertEqual(profile.tell, expectedTell[archetype])
+            XCTAssertEqual(profile.quirkLoop, expectedQuirk[archetype])
+            XCTAssertEqual(profile.gazePolicy, expectedPolicy[archetype])
+            XCTAssertNotNil(profile.motionGrammar, "\(archetype.rawValue): motionGrammar required")
+            XCTAssertNotNil(profile.blink, "\(archetype.rawValue): blink grammar required")
+            XCTAssertNotNil(profile.voiceStyle, "\(archetype.rawValue): voiceStyle required")
+            tells.insert(profile.tell?.rawValue ?? "")
+            quirks.insert(profile.quirkLoop?.rawValue ?? "")
+            policies.insert(profile.gazePolicy?.rawValue ?? "")
+        }
+        XCTAssertEqual(tells.count, Archetype.allCases.count, "each archetype must own a unique tell")
+        XCTAssertEqual(quirks.count, Archetype.allCases.count, "each archetype must own a unique quirk loop")
+        XCTAssertEqual(policies.count, Archetype.allCases.count, "each archetype must own a unique gaze policy")
     }
 
     /// §10 parity: every gesture clip must exist for every archetype

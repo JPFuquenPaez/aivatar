@@ -74,11 +74,12 @@ nonisolated enum ShapeLanguage: Sendable, Equatable {
 /// ArchetypeVisualSet (§3): palette + shape tokens resolved per archetype plus
 /// LOD variants (§6): `active` (full color) and `rest` (dimmed sleep pose).
 ///
-/// In this codebase the visual set is data-driven from the profile's
-/// `visualTokens`: sprites are vector primitives from rig.json tinted with the
-/// palette and re-shaped by the archetype's shape language. A future artist
-/// atlas replaces the primitive rasterizer without touching the engine or the
-/// renderer contract (flagged deviation, see report).
+/// v3 (A5a): the five archetypes are one cloud species — the silhouette is
+/// deliberately constant; identity is tint -> one trait token -> eye/motion
+/// grammar -> tell. The v1 shape-language families remain for the alternate
+/// direction in the project's render history; the species path is chosen by
+/// `isSpecies` below. A future artist atlas replaces the primitive
+/// rasterizer without touching the engine or the renderer contract.
 nonisolated struct ArchetypeVisualSet: Sendable, Equatable {
     let archetype: Archetype
 
@@ -100,6 +101,21 @@ nonisolated struct ArchetypeVisualSet: Sendable, Equatable {
     /// Face accent color (eyes/mouth), the "where the eye should land" pixels.
     let faceAccentHex: String
 
+    // v3 species tokens (A5a). Nil profile fields fall back to the v1
+    // palette so a v1 profile still renders (schema v2 is additive).
+    /// The v3 species is live for this visual set.
+    let isSpecies: Bool
+    let species: SpeciesTokens?
+    /// The archetype's involuntary tell (v3 §0; drive logic lands in A5b).
+    let tell: PersonalityTell?
+    /// The unobserved quirk loop id (v3 §0).
+    let quirkLoop: QuirkLoop?
+
+    /// The species has no limbs (U5: never drift humanoid). Whole-body
+    /// squash-and-stretch replaces articulated arm gestures; the rig's arm
+    /// bones stay in the skeleton (schema-frozen) but paint nothing.
+    var isLimbless: Bool { isSpecies }
+
     init(profile: PersonalityProfile) {
         archetype = Archetype(rawValue: profile.id) ?? .ember
         let palette = profile.visualTokens.palette
@@ -110,6 +126,13 @@ nonisolated struct ArchetypeVisualSet: Sendable, Equatable {
         accentShape = profile.visualTokens.accentShape
         faceAccentHex = secondaryHex
         emitsSparkTrail = profile.quirks.contains("spark-trail on big gestures")
+        species = profile.speciesTokens
+        tell = profile.tell
+        quirkLoop = profile.quirkLoop
+        // A profile with species tokens selects the v3 species path; a v1
+        // profile (no tokens) keeps its v1 shape language for the alternate
+        // direction.
+        isSpecies = profile.speciesTokens != nil
 
         let weights = profile.visualTokens.silhouetteWeights
         switch (dominantShape, accentShape) {
