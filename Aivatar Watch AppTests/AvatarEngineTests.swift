@@ -1163,12 +1163,37 @@ private enum GoldenFrameRasterizer {
             ctx.translateBy(x: centerX + CGFloat(command.tx), y: centerY + CGFloat(command.ty))
             ctx.rotate(by: CGFloat(command.rotation))
             ctx.scaleBy(x: CGFloat(command.scaleX), y: CGFloat(command.scaleY))
-            ctx.setFillColor(CGColor(
-                colorSpace: CGColorSpaceCreateDeviceRGB(),
-                components: [CGFloat(command.r), CGFloat(command.g), CGFloat(command.b), CGFloat(command.a)]
-            )!)
             ctx.addPath(painter.shapes[command.shapeIndex].paths[command.pathIndex])
-            ctx.fillPath()
+            if command.useGradient {
+                // Volumetric fill, same span math as the live Canvas path.
+                // Gradients are cached per stop pair (static set per
+                // archetype -> cache warm after first use).
+                let shape = painter.shapes[command.shapeIndex]
+                let startY: CGFloat
+                let endY: CGFloat
+                if shape.perPathGradient {
+                    startY = -CGFloat(shape.pathHeights[command.pathIndex]) / 2
+                    endY = CGFloat(shape.pathHeights[command.pathIndex]) / 2
+                } else {
+                    let offset = CGFloat(shape.offsetsY[command.pathIndex])
+                    startY = -(CGFloat(shape.height) / 2 + offset)
+                    endY = CGFloat(shape.height) / 2 - offset
+                }
+                let gradient = try Self.cachedGradient(command: command)
+                ctx.clip()
+                ctx.drawLinearGradient(
+                    gradient,
+                    start: CGPoint(x: 0, y: startY),
+                    end: CGPoint(x: 0, y: endY),
+                    options: []
+                )
+            } else {
+                ctx.setFillColor(CGColor(
+                    colorSpace: CGColorSpaceCreateDeviceRGB(),
+                    components: [CGFloat(command.r), CGFloat(command.g), CGFloat(command.b), CGFloat(command.a)]
+                )!)
+                ctx.fillPath()
+            }
             ctx.restoreGState()
         }
 
@@ -1186,6 +1211,30 @@ private enum GoldenFrameRasterizer {
             hash = hash &* 0x100000001b3 // FNV-1a prime
         }
         return hash
+    }
+
+    /// CGGradient cache per stop pair (v3 volumetric shading) — static set
+    /// per archetype, so this fills once and never churns. Test-only.
+    private nonisolated(unsafe) static var gradientCache: [UInt64: CGGradient] = [:]
+
+    private static func cachedGradient(command: SpriteCommand) throws -> CGGradient {
+        func q(_ v: Float) -> UInt64 { UInt64(max(0, min(255, v * 255))) }
+        let key = (q(command.r) << 40) | (q(command.g) << 32) | (q(command.b) << 24)
+            | (q(command.r2) << 16) | (q(command.g2) << 8) | q(command.b2)
+        if let cached = gradientCache[key] { return cached }
+        let colors = [
+            CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(),
+                    components: [CGFloat(command.r), CGFloat(command.g), CGFloat(command.b), 1])!,
+            CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(),
+                    components: [CGFloat(command.r2), CGFloat(command.g2), CGFloat(command.b2), 1])!,
+        ]
+        let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: colors as CFArray,
+            locations: [0, 1]
+        )!
+        gradientCache[key] = gradient
+        return gradient
     }
 }
 
@@ -1213,12 +1262,14 @@ final class GoldenFrameTests: XCTestCase {
         // v6 (A5b): motion grammar live — gaze policies (fixation holds,
         // metric sweep), drift-scaled sway, blink grammar envelopes,
         // anticipation/pre-cue phases, settle residual, tell rendering.
+        // v7 (A5b.1): volumetric shading — per-mass gradients (top lit),
+        // per-puff occlusion on the cloud head, foliage/flame gradients.
         let expected: [Archetype: UInt64] = [
-            .ember: 13_834_120_393_254_196_390,
-            .willow: 1_164_055_568_244_073_751,
-            .compass: 11_845_351_112_787_990_538,
-            .prism: 9_352_759_805_435_496_363,
-            .nimbus: 5_075_700_460_536_205_262,
+            .ember: 3_587_470_302_135_163_827,
+            .willow: 17_785_780_858_784_263_314,
+            .compass: 452_740_332_954_172_361,
+            .prism: 2_481_319_319_026_286_214,
+            .nimbus: 2_913_192_878_458_312_622,
         ]
 
         var actual: [Archetype: UInt64] = [:]
@@ -1297,8 +1348,7 @@ final class SpeciesInvariantsTests: XCTestCase {
     /// Tint separation: the mean lit color of each golden frame must differ
     /// pairwise by a visible margin (0...255 scale) — identity is tint,
     /// so two archetypes drifting to the same tint is a regression.
-    func testTintSeparatesArchetypes() throws {
-        var tints: [Archetype: (Double, Double, Double)] = [:]
+    func testTintSeparatesArchetypes() throws {        var tints: [Archetype: (Double, Double, Double)] = [:]
         for archetype in Archetype.allCases {
             let raster = try GoldenFrameRasterizer.render(archetype: archetype)
             tints[archetype] = raster.meanLitColor()
@@ -1316,6 +1366,64 @@ final class SpeciesInvariantsTests: XCTestCase {
                     "\(a.rawValue)/\(b.rawValue) tints too close (distance \(String(format: "%.1f", distance)) < 20) — the token stack must separate"
                 )
             }
+        }
+    }
+}
+
+extension SpeciesInvariantsTests {
+    /// v3 volumetric shading (A5b.1): every mass shades light-top ->
+    /// dark-bottom under the key light. Measured on the head's middle puff
+    /// with EXACT geometry: the band rows come from the head bone's world
+    /// position (the puff spans +/-21.5 rig units around it), not from a
+    /// lit-run scan — a scan anchors late on the puff's narrow top arc and
+    /// its "chin" band then leaks into the bright torso-top gradient, which
+    /// is what the earlier inverted measurements were. (A whole-silhouette
+    /// upper/lower split is NOT the invariant: Willow's drooping base and
+    /// Prism's patches legitimately brighten the lower region.)
+    func testHeadMassShadesTopToBottom() throws {
+        for archetype in Archetype.allCases {
+            let engine = try makeGoldenEngine(archetype)
+            engine.update(toFrame: 300)
+            let raster = try GoldenFrameRasterizer.render(archetype: archetype)
+            let headWorld = engine.currentWorld[engine.bones.head]
+            let centerY = Double(raster.height) / 2
+            let puffTop = Int(centerY + Double(headWorld.ty) - 21.5)
+            let puffBottom = Int(centerY + Double(headWorld.ty) + 21.5)
+
+            func meanLum(_ y0: Int, _ y1: Int) -> (Double, Int) {
+                let lo = max(0, y0)
+                let hi = min(raster.height, y1)
+                guard lo < hi else { return (0, 0) }
+                var lum = 0.0
+                var n = 0
+                for y in lo..<hi {
+                    for x in (raster.width / 3)..<(2 * raster.width / 3) {
+                        let o = (y * raster.width + x) * 4
+                        guard max(raster.bytes[o], max(raster.bytes[o + 1], raster.bytes[o + 2])) > 8 else { continue }
+                        lum += 0.299 * Double(raster.bytes[o])
+                            + 0.587 * Double(raster.bytes[o + 1])
+                            + 0.114 * Double(raster.bytes[o + 2])
+                        n += 1
+                    }
+                }
+                return (lum / Double(max(n, 1)), n)
+            }
+            // Bands inside the middle puff, clear of the antenna (above),
+            // the eyes (middle) and the torso top (below the puff bottom).
+            let (top, topN) = meanLum(puffTop, puffTop + 10)
+            let (chin, chinN) = meanLum(puffBottom - 10, puffBottom)
+            // Diagnostic trace (failure message only).
+            var trace: [String] = []
+            for y in stride(from: max(puffTop - 6, 0), to: min(puffBottom + 6, raster.height), by: 6) {
+                let (lum, n) = meanLum(y, y + 4)
+                trace.append("y\(y)=\(Int(lum))(n\(n))")
+            }
+            XCTAssertGreaterThan(topN, 20, "\(archetype.rawValue): head top band should be lit")
+            XCTAssertGreaterThan(chinN, 20, "\(archetype.rawValue): head chin band should be lit")
+            XCTAssertGreaterThan(
+                top, chin + 10,
+                "\(archetype.rawValue): the head mass must shade light-top -> dark-bottom (top \(String(format: "%.1f", top)) vs chin \(String(format: "%.1f", chin))); trace: \(trace.joined(separator: " "))"
+            )
         }
     }
 }

@@ -51,6 +51,30 @@ final class AvatarRenderContext {
     let painter: AvatarSpritePainter
     let epoch = Date()
 
+    /// Cached gradient fill objects per color pair (v3 volumetric shading).
+    /// The pairs are static per archetype, so the cache is warm after the
+    /// first frame and the render loop allocates nothing (§7). Key: the two
+    /// stop colors quantized to 8 bits per channel.
+    private var gradientCache: [UInt64: Gradient] = [:]
+
+    /// Returns the cached Gradient for a stop pair, building it on first
+    /// use (one-time allocation per pair, never per frame).
+    func cachedGradient(
+        top: (r: Float, g: Float, b: Float),
+        bottom: (r: Float, g: Float, b: Float)
+    ) -> Gradient {
+        func q(_ v: Float) -> UInt64 { UInt64(max(0, min(255, v * 255))) }
+        let key = (q(top.r) << 40) | (q(top.g) << 32) | (q(top.b) << 24)
+            | (q(bottom.r) << 16) | (q(bottom.g) << 8) | q(bottom.b)
+        if let cached = gradientCache[key] { return cached }
+        let gradient = Gradient(colors: [
+            Color(.sRGB, red: Double(top.r), green: Double(top.g), blue: Double(top.b)),
+            Color(.sRGB, red: Double(bottom.r), green: Double(bottom.g), blue: Double(bottom.b)),
+        ])
+        gradientCache[key] = gradient
+        return gradient
+    }
+
     #if DEBUG
     /// Throttled render-probe counter (diagnostics only).
     var debugDrawCount = 0
@@ -108,12 +132,45 @@ final class AvatarRenderContext {
             ctx.translateBy(x: centerX + CGFloat(command.tx) * fit, y: centerY + CGFloat(command.ty) * fit)
             ctx.rotate(by: CGFloat(command.rotation))
             ctx.scaleBy(x: CGFloat(command.scaleX), y: CGFloat(command.scaleY))
-            ctx.setFillColor(CGColor(
-                colorSpace: CGColorSpaceCreateDeviceRGB(),
-                components: [CGFloat(command.r), CGFloat(command.g), CGFloat(command.b), CGFloat(command.a)]
-            )!)
             ctx.addPath(painter.shapes[command.shapeIndex].paths[command.pathIndex])
-            ctx.fillPath()
+            if command.useGradient {
+                // Volumetric fill, same span math as the live Canvas path.
+                let shape = painter.shapes[command.shapeIndex]
+                let startY: CGFloat
+                let endY: CGFloat
+                if shape.perPathGradient {
+                    startY = -CGFloat(shape.pathHeights[command.pathIndex]) / 2
+                    endY = CGFloat(shape.pathHeights[command.pathIndex]) / 2
+                } else {
+                    let offset = CGFloat(shape.offsetsY[command.pathIndex])
+                    startY = -(CGFloat(shape.height) / 2 + offset)
+                    endY = CGFloat(shape.height) / 2 - offset
+                }
+                let colors = [
+                    CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(),
+                            components: [CGFloat(command.r), CGFloat(command.g), CGFloat(command.b), 1])!,
+                    CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(),
+                            components: [CGFloat(command.r2), CGFloat(command.g2), CGFloat(command.b2), 1])!,
+                ]
+                let gradient = CGGradient(
+                    colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                    colors: colors as CFArray,
+                    locations: [0, 1]
+                )!
+                ctx.clip()
+                ctx.drawLinearGradient(
+                    gradient,
+                    start: CGPoint(x: 0, y: startY),
+                    end: CGPoint(x: 0, y: endY),
+                    options: []
+                )
+            } else {
+                ctx.setFillColor(CGColor(
+                    colorSpace: CGColorSpaceCreateDeviceRGB(),
+                    components: [CGFloat(command.r), CGFloat(command.g), CGFloat(command.b), CGFloat(command.a)]
+                )!)
+                ctx.fillPath()
+            }
             ctx.restoreGState()
         }
         return ctx.makeImage()
@@ -220,12 +277,41 @@ struct CanvasAvatarRenderer: View {
             )
             layer.rotate(by: Angle(radians: Double(command.rotation)))
             layer.scaleBy(x: CGFloat(command.scaleX), y: CGFloat(command.scaleY))
-            let color = Color(.sRGB,
-                               red: Double(command.r),
-                               green: Double(command.g),
-                               blue: Double(command.b),
-                               opacity: Double(command.a))
-            layer.fill(Path(painter.shapes[command.shapeIndex].paths[command.pathIndex]), with: .color(color))
+            let path = Path(painter.shapes[command.shapeIndex].paths[command.pathIndex])
+            if command.useGradient {
+                // Volumetric fill (v3): the gradient spans the mass's local
+                // bbox — per path for self-shaded masses (the cloud head's
+                // puffs), or the WHOLE shape for bend slices (top edge at
+                // h/2 + slice offset, bottom at h/2 - slice offset) so a
+                // sliced capsule shades as one volume, not bands.
+                let shape = painter.shapes[command.shapeIndex]
+                let startY: CGFloat
+                let endY: CGFloat
+                if shape.perPathGradient {
+                    startY = -CGFloat(shape.pathHeights[command.pathIndex]) / 2
+                    endY = CGFloat(shape.pathHeights[command.pathIndex]) / 2
+                } else {
+                    let offset = CGFloat(shape.offsetsY[command.pathIndex])
+                    startY = -(CGFloat(shape.height) / 2 + offset)
+                    endY = CGFloat(shape.height) / 2 - offset
+                }
+                let gradient = context.cachedGradient(
+                    top: (command.r, command.g, command.b),
+                    bottom: (command.r2, command.g2, command.b2)
+                )
+                layer.fill(path, with: .linearGradient(
+                    gradient,
+                    startPoint: CGPoint(x: 0, y: startY),
+                    endPoint: CGPoint(x: 0, y: endY)
+                ))
+            } else {
+                let color = Color(.sRGB,
+                                   red: Double(command.r),
+                                   green: Double(command.g),
+                                   blue: Double(command.b),
+                                   opacity: Double(command.a))
+                layer.fill(path, with: .color(color))
+            }
         }
     }
 }

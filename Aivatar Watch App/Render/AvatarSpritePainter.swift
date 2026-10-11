@@ -15,22 +15,41 @@ nonisolated struct SpriteCommand: Sendable {
     /// Index into the painter's prebuilt shape (shapeIndex + pathIndex).
     var shapeIndex: Int = 0
     var pathIndex: Int = 0
-    /// Resolved color, 0...1 linear components.
+    /// Gradient fill (v3 volumetric shading): top stop color. When
+    /// `useGradient` is false this is the flat fill color and (r2,g2,b2)
+    /// mirror it.
     var r: Float = 1
     var g: Float = 1
     var b: Float = 1
+    /// Gradient bottom stop color.
+    var r2: Float = 1
+    var g2: Float = 1
+    var b2: Float = 1
     var a: Float = 1
+    var useGradient: Bool = false
 }
 
 /// Prebuilt shape: one CGPath per bend slice plus slice local offsets
 /// (§6 mesh deformation approximated as along-bone slices; rigid parts have
-/// a single slice).
+/// a single slice). The v3 cloud head ("blob") uses the slice array for its
+/// three puffs — separate fills so the raised middle puff occludes the side
+/// puffs (the depth cue of the reference renders).
 nonisolated struct PaintedShape {
     var paths: [CGPath]
     /// Slice offset from the shape origin along the bone (-Y), rig points.
     var offsetsY: [Float]
     /// Per-slice rotation fraction (bend accumulation along the bone).
     var bendFractions: [Float]
+    /// Per-path local height (gradient endpoints span the path's own bbox).
+    var pathHeights: [Float]
+    /// Per-path shade multiplier (1 = fully lit; the cloud head's side puffs
+    /// sit at ~0.86 so the middle puff reads as raised toward the light).
+    var pathShades: [Float]
+    /// True when each path is a self-shaded mass (the cloud head's puffs):
+    /// the gradient spans each path's own bbox. False for bend slices —
+    /// the gradient then spans the WHOLE shape continuously so a sliced
+    /// capsule shades as one volume, not bands.
+    var perPathGradient: Bool
     var width: Float
     var height: Float
 }
@@ -98,6 +117,11 @@ nonisolated final class AvatarSpritePainter {
     /// Prism's flicker table (v3 tell): accents swapped — a chromatic shift
     /// with zero per-frame cost (built once; selected by flag).
     private var flickerColors: [PaletteRole: (r: Float, g: Float, b: Float)] = [:]
+    /// v3 volumetric shading: per-role gradient stops (top lightened toward
+    /// white, bottom deepened toward the shadow tone), precomputed so the
+    /// render loop only reads — the renderer caches fill objects per pair.
+    private var gradientPairs: [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))] = [:]
+    private var flickerGradientPairs: [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))] = [:]
 
     private var scratchTransforms: [Transform2D]
 
@@ -191,6 +215,10 @@ nonisolated final class AvatarSpritePainter {
         if visualSet.isSpecies {
             speciesAccentColor = roleColors[.accentA]
         }
+        // Volumetric gradient stops per role (static set -> the renderer's
+        // fill-object cache is fully warm after the first frame).
+        gradientPairs = Self.buildGradientPairs(roleColors)
+        flickerGradientPairs = Self.buildGradientPairs(flickerColors)
     }
 
     /// v3 trait tokens per archetype (§6 v2: tint -> ONE token -> tell).
@@ -429,6 +457,39 @@ nonisolated final class AvatarSpritePainter {
         ]
     }
 
+    /// v3 volumetric shading: gradient stop pairs per role — the top stop is
+    /// the role color lifted toward white (the key light above), the bottom
+    /// stop is the role color deepened toward the shadow tone. Face accents
+    /// (eyes/brows/lids/mouth) stay FLAT matte (audit finding 4: no glossy
+    /// eyes); catchlights and the rest LOD stay flat. All pairs are static
+    /// so the renderer/rasterizer cache their fill objects once.
+    private static func buildGradientPairs(
+        _ colors: [PaletteRole: (r: Float, g: Float, b: Float)]
+    ) -> [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))] {
+        let shadow = colors[.deep] ?? (0, 0, 0)
+        var pairs: [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))] = [:]
+        for (role, c) in colors {
+            switch role {
+            case .face, .catchlight, .restDim:
+                continue  // matte / flat by design
+            default:
+                break
+            }
+            let top = (
+                c.0 + (1 - c.0) * 0.22,
+                c.1 + (1 - c.1) * 0.22,
+                c.2 + (1 - c.2) * 0.22
+            )
+            let bottom = (
+                c.0 * 0.62 + shadow.0 * 0.38,
+                c.1 * 0.62 + shadow.1 * 0.38,
+                c.2 * 0.62 + shadow.2 * 0.38
+            )
+            pairs[role] = (top, bottom)
+        }
+        return pairs
+    }
+
     private static func buildShape(_ shape: RigDocument.Shape, kind: String) -> PaintedShape {
         let w = CGFloat(shape.width)
         let h = CGFloat(shape.height)
@@ -440,9 +501,44 @@ nonisolated final class AvatarSpritePainter {
         var paths: [CGPath] = []
         var offsetsY: [Float] = []
         var bendFractions: [Float] = []
-        paths.reserveCapacity(segments)
-        offsetsY.reserveCapacity(segments)
-        bendFractions.reserveCapacity(segments)
+        var pathHeights: [Float] = []
+        var pathShades: [Float] = []
+        paths.reserveCapacity(max(segments, 3))
+        offsetsY.reserveCapacity(max(segments, 3))
+
+        func append(_ path: CGPath, centerY: Float, height: Float, shade: Float = 1) {
+            paths.append(path)
+            offsetsY.append(centerY)
+            pathHeights.append(height)
+            pathShades.append(shade)
+        }
+
+        if kind == "blob" {
+            // Nimbus-head anatomy, v3 volumetric: THREE SEPARATE fills
+            // (back-to-front: side puffs, then the raised middle puff on
+            // top) with per-puff shade — the middle puff occludes the side
+            // puffs and reads as raised toward the light. Proportions
+            // measured from the source logo; face slots (pupils at
+            // ±0.25w) stay on the middle puff, eyes slightly below its
+            // center. pathShades: sides 0.86, middle 1.0.
+            let midRect = CGRect(x: -w * 0.323, y: -h * 0.467,
+                                 width: w * 0.646, height: h * 0.934)
+            let leftRect = CGRect(x: -w * 0.557, y: -h * 0.148,
+                                  width: w * 0.424, height: h * 0.614)
+            let rightRect = CGRect(x: w * 0.202, y: -h * 0.148,
+                                   width: w * 0.354, height: h * 0.604)
+            let left = CGMutablePath(); left.addEllipse(in: leftRect)
+            let right = CGMutablePath(); right.addEllipse(in: rightRect)
+            let middle = CGMutablePath(); middle.addEllipse(in: midRect)
+            append(left, centerY: Float(leftRect.midY), height: Float(leftRect.height), shade: 0.86)
+            append(right, centerY: Float(rightRect.midY), height: Float(rightRect.height), shade: 0.86)
+            append(middle, centerY: Float(midRect.midY), height: Float(midRect.height), shade: 1.0)
+            bendFractions = [0, 0, 0]
+            return PaintedShape(paths: paths, offsetsY: offsetsY, bendFractions: bendFractions,
+                                pathHeights: pathHeights, pathShades: pathShades,
+                                perPathGradient: true,
+                                width: shape.width, height: shape.height)
+        }
 
         let sliceHeight = h / CGFloat(segments)
         for i in 0..<segments {
@@ -541,37 +637,16 @@ nonisolated final class AvatarSpritePainter {
                 path.addRoundedRect(
                     in: rect, cornerWidth: w * 0.22, cornerHeight: w * 0.22
                 )
-            case "blob":
-                // Nimbus head: the brand cloud (unified with the app icon's
-                // logo geometry) — three overlapping puffs with the big
-                // middle puff sitting higher, side puffs lower. Ellipses are
-                // wound the same way, so a nonzero-winding fill renders the
-                // union solidly. Same visual footprint as the old single
-                // wide ellipse (roughly 1.11w x 0.93h); the face slots
-                // (pupils at ±0.25w, brows at ±0.25w) stay on the middle
-                // puff, eyes slightly below its center, as in the logo.
-                // Proportions measured from the source logo.
-                path.addEllipse(in: CGRect(            // middle puff
-                    x: -w * 0.323, y: -h * 0.467,
-                    width: w * 0.646, height: h * 0.934
-                ))
-                path.addEllipse(in: CGRect(            // left puff
-                    x: -w * 0.557, y: -h * 0.148,
-                    width: w * 0.424, height: h * 0.614
-                ))
-                path.addEllipse(in: CGRect(            // right puff
-                    x: w * 0.202, y: -h * 0.148,
-                    width: w * 0.354, height: h * 0.604
-                ))
             default:
                 path.addRect(rect)
             }
-            paths.append(path)
-            // Slice center in bone-local space (points along -Y are "up").
-            offsetsY.append(Float(top) + Float(sliceHeight) / 2)
+            append(path, centerY: Float(top) + Float(sliceHeight) / 2, height: Float(sliceHeight))
             bendFractions.append(Float(i) / Float(segments))
         }
-        return PaintedShape(paths: paths, offsetsY: offsetsY, bendFractions: bendFractions, width: shape.width, height: shape.height)
+        return PaintedShape(paths: paths, offsetsY: offsetsY, bendFractions: bendFractions,
+                           pathHeights: pathHeights, pathShades: pathShades,
+                           perPathGradient: false,
+                           width: shape.width, height: shape.height)
     }
 
     /// Paints the current pose into the command buffer. `rest` selects the
@@ -586,6 +661,7 @@ nonisolated final class AvatarSpritePainter {
                tell: PersonalityTell? = nil, tellPhase: Float = 0) {
         commandCount = 0
         let colors = (tell == .flicker && !rest) ? flickerColors : roleColors
+        let pairs = (tell == .flicker && !rest) ? flickerGradientPairs : gradientPairs
         let pulseActive = tell == .pulse && !rest && tellPhase > 0
         for (slotIndex, slot) in slots.enumerated() {
             let t = world[slot.boneIndex]
@@ -594,20 +670,11 @@ nonisolated final class AvatarSpritePainter {
             let baseColor = rest
                 ? colors[.restDim] ?? (1, 0, 1)
                 : colors[role] ?? (1, 1, 1)
-            var colorR = baseColor.0
-            var colorG = baseColor.1
-            var colorB = baseColor.2
-            // Nimbus's pulse: brightness travels bottom -> top through the
-            // body masses (slots draw back-to-front, so the index is the
-            // body position) as the tell phase advances.
-            if pulseActive {
-                let position = Float(slotIndex) / Float(max(slots.count - 1, 1))
-                let wave = max(0, 1 - abs(position - tellPhase))
-                let boost = 0.5 * wave * wave
-                colorR = min(1, colorR + boost)
-                colorG = min(1, colorG + boost)
-                colorB = min(1, colorB + boost)
-            }
+            // Volumetric fill: body masses and leaf/flame tokens take the
+            // role's gradient stops (shade-adjusted per path so the cloud
+            // head's side puffs read as turned away from the light); face
+            // accents stay flat matte. Rest mode stays flat dim (§6 LOD).
+            let pair = rest ? nil : pairs[role]
             let bend = pose.rotations[slot.boneIndex]
             let slices = shape.paths.count
             for i in 0..<slices {
@@ -624,12 +691,67 @@ nonisolated final class AvatarSpritePainter {
                 command.scaleY = sqrt(t.c * t.c + t.d * t.d)
                 command.shapeIndex = slot.shapeIndex
                 command.pathIndex = i
-                command.r = colorR
-                command.g = colorG
-                command.b = colorB
+                if let pair {
+                    let shade = i < shape.pathShades.count ? shape.pathShades[i] : 1
+                    var top = pair.top
+                    let bottom = pair.bottom
+                    if shade < 1 {
+                        // Side puffs: pull the lit stop toward the shadow
+                        // stop — reads as turned away from the key light.
+                        let k = 1 - shade
+                        top.0 = top.0 + (bottom.0 - top.0) * k
+                        top.1 = top.1 + (bottom.1 - top.1) * k
+                        top.2 = top.2 + (bottom.2 - top.2) * k
+                    }
+                    command.r = top.0
+                    command.g = top.1
+                    command.b = top.2
+                    command.r2 = bottom.0
+                    command.g2 = bottom.1
+                    command.b2 = bottom.2
+                    command.useGradient = true
+                } else {
+                    command.r = baseColor.0
+                    command.g = baseColor.1
+                    command.b = baseColor.2
+                    command.r2 = baseColor.0
+                    command.g2 = baseColor.1
+                    command.b2 = baseColor.2
+                    command.useGradient = false
+                }
                 command.a = 1
                 commands[commandCount] = command
                 commandCount += 1
+            }
+            // Nimbus's pulse: a flat white overlay per body mass whose
+            // opacity is the traveling wave (body slots draw before the
+            // face slots, so the face is never washed out). Kept as an
+            // overlay so the gradient stops stay static — the renderer's
+            // fill cache never churns (§7 no per-frame allocations).
+            if pulseActive {
+                let position = Float(slotIndex) / Float(max(slots.count - 1, 1))
+                let wave = max(0, 1 - abs(position - tellPhase))
+                let overlayAlpha = 0.45 * wave * wave
+                if overlayAlpha > 0.01, commandCount < commandCapacity {
+                    var overlay = commands[commandCount]
+                    overlay.tx = t.tx + shape.offsetsY[0] * t.c
+                    overlay.ty = t.ty + shape.offsetsY[0] * t.d
+                    overlay.rotation = atan2(t.b, t.a)
+                    overlay.scaleX = sqrt(t.a * t.a + t.b * t.b)
+                    overlay.scaleY = sqrt(t.c * t.c + t.d * t.d)
+                    overlay.shapeIndex = slot.shapeIndex
+                    overlay.pathIndex = 0
+                    overlay.r = 1
+                    overlay.g = 1
+                    overlay.b = 1
+                    overlay.r2 = 1
+                    overlay.g2 = 1
+                    overlay.b2 = 1
+                    overlay.a = overlayAlpha
+                    overlay.useGradient = false
+                    commands[commandCount] = overlay
+                    commandCount += 1
+                }
             }
             // Face-phase injections: catchlights ride their pupil bone
             // (right after the pupil slot, still under the lids), then any
@@ -648,7 +770,7 @@ nonisolated final class AvatarSpritePainter {
                     )
                 }
                 for decoration in decorations where decoration.afterSlotName == slot.name {
-                    emitDecoration(decoration, world: world, colors: colors,
+                    emitDecoration(decoration, world: world, colors: colors, pairs: pairs,
                                    tell: tell, tellPhase: tellPhase)
                 }
             }
@@ -656,7 +778,7 @@ nonisolated final class AvatarSpritePainter {
         // Top-phase decorations: on top of the body (patches, grids, glows).
         if !rest {
             for decoration in decorations where decoration.afterSlotName == nil {
-                emitDecoration(decoration, world: world, colors: colors,
+                emitDecoration(decoration, world: world, colors: colors, pairs: pairs,
                                tell: tell, tellPhase: tellPhase)
             }
         }
@@ -674,6 +796,7 @@ nonisolated final class AvatarSpritePainter {
         _ decoration: Decoration,
         world: [Transform2D],
         colors: [PaletteRole: (r: Float, g: Float, b: Float)],
+        pairs: [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))],
         tell: PersonalityTell?,
         tellPhase: Float
     ) {
@@ -701,6 +824,9 @@ nonisolated final class AvatarSpritePainter {
                 break
             }
         }
+        // The sprout leaf takes foliage gradient depth; every other token
+        // (patches, grid, glow, catchlight) stays flat matte by design.
+        let pair = decoration.id == "sproutLeaf" ? pairs[decoration.role] : nil
         emitDecoration(
             boneIndex: decoration.boneIndex,
             shapeIndex: decoration.shapeIndex,
@@ -710,7 +836,8 @@ nonisolated final class AvatarSpritePainter {
             rotation: decoration.rotation,
             alpha: alpha,
             world: world,
-            colors: colors
+            colors: colors,
+            gradientPair: pair
         )
     }
 
@@ -718,7 +845,8 @@ nonisolated final class AvatarSpritePainter {
         boneIndex: Int, shapeIndex: Int, role: PaletteRole,
         localX: Float, localY: Float, rotation: Float, alpha: Float,
         world: [Transform2D],
-        colors: [PaletteRole: (r: Float, g: Float, b: Float)]? = nil
+        colors: [PaletteRole: (r: Float, g: Float, b: Float)]? = nil,
+        gradientPair: (top: (Float, Float, Float), bottom: (Float, Float, Float))? = nil
     ) {
         guard commandCount < commandCapacity else { return }
         let t = world[boneIndex]
@@ -731,9 +859,23 @@ nonisolated final class AvatarSpritePainter {
         command.shapeIndex = shapeIndex
         command.pathIndex = 0
         let color = (colors ?? roleColors)[role] ?? (1, 1, 1)
-        command.r = color.0
-        command.g = color.1
-        command.b = color.2
+        if let pair = gradientPair {
+            command.r = pair.top.0
+            command.g = pair.top.1
+            command.b = pair.top.2
+            command.r2 = pair.bottom.0
+            command.g2 = pair.bottom.1
+            command.b2 = pair.bottom.2
+            command.useGradient = true
+        } else {
+            command.r = color.0
+            command.g = color.1
+            command.b = color.2
+            command.r2 = color.0
+            command.g2 = color.1
+            command.b2 = color.2
+            command.useGradient = false
+        }
         command.a = alpha
         commands[commandCount] = command
         commandCount += 1
@@ -786,6 +928,10 @@ nonisolated final class AvatarSpritePainter {
             command.r = face.0
             command.g = face.1
             command.b = face.2
+            command.r2 = face.0
+            command.g2 = face.1
+            command.b2 = face.2
+            command.useGradient = false
             command.a = Float(p.life) / Float(p.maxLife) * 0.9
             commands[commandCount] = command
             commandCount += 1
