@@ -1058,6 +1058,29 @@ final class AvatarPerformanceTests: XCTestCase {
             }
         }
     }
+
+    /// Hi-bit pixel stage cost (§11.3): rasterize + LUT snap of the 51x63
+    /// grid must stay a small fraction of the 33 ms frame budget (the
+    /// stage also halves its tick rate to 15 fps).
+    func testMeasurePixelRasterizeCostPerFrame() throws {
+        let engine = try makeEngine(.ember)
+        engine.update(toFrame: 600)
+        let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+        let rasterizer = PixelStageRasterizer(painter: painter)
+        painter.paint(
+            world: engine.currentWorld,
+            pose: engine.currentPose,
+            rest: false,
+            accentPhase: engine.activeGesturePhase,
+            tell: engine.tell,
+            tellPhase: engine.tellPhase
+        )
+        measure {
+            for _ in 0..<300 {
+                rasterizer.rasterize(painter: painter)
+            }
+        }
+    }
 }
 
 // MARK: - A3 Golden-frame visual regression (§10, §11)
@@ -1266,12 +1289,14 @@ final class GoldenFrameTests: XCTestCase {
         // per-puff occlusion on the cloud head, foliage/flame gradients.
         // v8 (A5b.2): bounce-light lift on gradient bottoms (fake SSS) +
         // rim-light crescent on the head (species spec silver rim).
+        // v9 (A6.1): vivid v4 palettes (§11.2) — muted tints replaced with
+        // saturated hue-separated bodies.
         let expected: [Archetype: UInt64] = [
-            .ember: 5_712_369_233_219_474_756,
-            .willow: 17_872_146_934_551_876_698,
-            .compass: 9_952_001_963_029_917_838,
-            .prism: 9_222_277_076_055_390_298,
-            .nimbus: 1_665_479_958_891_703_544,
+            .ember: 2_163_605_488_693_583_837,
+            .willow: 16_395_695_612_764_117_208,
+            .compass: 12_881_850_497_902_596_937,
+            .prism: 6_259_452_286_938_053_347,
+            .nimbus: 13_040_412_923_109_962_975,
         ]
 
         var actual: [Archetype: UInt64] = [:]
@@ -1478,6 +1503,166 @@ extension SpeciesInvariantsTests {
                       shape.pathShades[command.pathIndex] < 0 else { continue }
                 XCTAssertEqual(command.a, 1, accuracy: 0.001, "\(archetype.rawValue): rest LOD must not render a rim highlight")
             }
+        }
+    }
+}
+
+// MARK: - A6.1 hi-bit pixel stage (§11.3 v4)
+
+/// Pixel-frame visual regression: renders the 51x63 LUT-snapped grid per
+/// archetype at the golden pose and pins it by FNV-1a hash (same
+/// determinism contract as the vector golden frames — same seed, same
+/// pose, same pixels).
+final class PixelStageTests: XCTestCase {
+    private func makeRasterizer(_ archetype: Archetype, seed: UInt64 = 42, frame: Int = 300) throws -> PixelStageRasterizer {
+        let engine = try makeGoldenEngine(archetype, seed: seed)
+        engine.update(toFrame: frame)
+        let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+        painter.paint(
+            world: engine.currentWorld,
+            pose: engine.currentPose,
+            rest: false,
+            accentPhase: engine.activeGesturePhase,
+            tell: engine.tell,
+            tellPhase: engine.tellPhase
+        )
+        let rasterizer = PixelStageRasterizer(painter: painter)
+        rasterizer.rasterize(painter: painter)
+        return rasterizer
+    }
+
+    private func hash(_ bytes: [UInt8]) -> UInt64 {
+        var value: UInt64 = 0xcbf29ce484222325
+        for byte in bytes {
+            value ^= UInt64(byte)
+            value = value &* 0x100000001b3
+        }
+        return value
+    }
+
+    func testPixelFramesMatchRecordedHashes() throws {
+        // v1 (A6.1): first pixel-stage pins — vivid v4 palettes, 51x63
+        // grid, LUT snap. Update deliberately — and say why.
+        let expected: [Archetype: UInt64] = [
+            .ember: 12_093_100_890_318_142_509,
+            .willow: 15_220_900_056_946_158_264,
+            .compass: 16_637_641_543_945_049_322,
+            .prism: 11_443_566_159_302_803_918,
+            .nimbus: 8_719_967_813_410_397_485,
+        ]
+        var actual: [Archetype: UInt64] = [:]
+        for archetype in Archetype.allCases {
+            let bytes = try makeRasterizer(archetype).snapshotBytes()
+            actual[archetype] = hash(bytes)
+            let pin = expected[archetype] ?? 0
+            if pin != 0 {
+                XCTAssertEqual(actual[archetype]!, pin, "\(archetype.rawValue) pixel frame changed")
+            }
+        }
+        let recorded = Archetype.allCases
+            .map { "\($0.rawValue) = \(actual[$0]!)" }
+            .joined(separator: ", ")
+        XCTAssertTrue(
+            expected.values.allSatisfy { $0 != 0 },
+            "RECORD MODE — pixel hashes to pin: \(recorded)"
+        )
+    }
+
+    func testPixelFramesAreDeterministic() throws {
+        for archetype in Archetype.allCases {
+            let first = hash(try makeRasterizer(archetype).snapshotBytes())
+            let second = hash(try makeRasterizer(archetype).snapshotBytes())
+            XCTAssertEqual(first, second, "\(archetype.rawValue) pixel frame must be reproducible")
+        }
+    }
+
+    func testPixelFramesArePairwiseDistinct() throws {
+        var seen: [UInt64] = []
+        for archetype in Archetype.allCases {
+            let value = hash(try makeRasterizer(archetype).snapshotBytes())
+            XCTAssertFalse(seen.contains(value), "\(archetype.rawValue) pixel frame collides with an earlier archetype")
+            seen.append(value)
+        }
+    }
+
+    /// Every non-background pixel is EXACTLY a LUT color — the snap is
+    /// what makes the stage read as pixel art (no continuous shading).
+    func testPixelColorsSnapToLUT() throws {
+        for archetype in Archetype.allCases {
+            let rasterizer = try makeRasterizer(archetype)
+            let bytes = rasterizer.snapshotBytes()
+            let lut = rasterizer.lutForTesting
+            var lit = 0
+            for i in 0..<(PixelStageRasterizer.gridWidth * PixelStageRasterizer.gridHeight) {
+                let o = i * 4
+                guard max(bytes[o], max(bytes[o + 1], bytes[o + 2])) > 8 else { continue }
+                lit += 1
+                let r = Double(bytes[o]) / 255, g = Double(bytes[o + 1]) / 255, b = Double(bytes[o + 2]) / 255
+                XCTAssertTrue(
+                    lut.contains { abs(Double($0.0) - r) < 0.01 && abs(Double($0.1) - g) < 0.01 && abs(Double($0.2) - b) < 0.01 },
+                    "\(archetype.rawValue): pixel (\(bytes[o]),\(bytes[o + 1]),\(bytes[o + 2])) is not a LUT color"
+                )
+            }
+            XCTAssertGreaterThan(lit, 150, "\(archetype.rawValue): pixel grid should be substantially lit")
+        }
+    }
+
+    /// v4 vivid palettes (§11.2): the DOMINANT lit color of each grid must
+    /// be strongly saturated — the muted-lavender washout was the v3
+    /// sameness diagnosis.
+    func testPixelPalettesAreVivid() throws {
+        for archetype in Archetype.allCases {
+            let bytes = try makeRasterizer(archetype).snapshotBytes()
+            var counts: [Int: Int] = [:]
+            for i in 0..<(PixelStageRasterizer.gridWidth * PixelStageRasterizer.gridHeight) {
+                let o = i * 4
+                guard max(bytes[o], max(bytes[o + 1], bytes[o + 2])) > 30 else { continue }
+                let key = Int(bytes[o]) << 16 | Int(bytes[o + 1]) << 8 | Int(bytes[o + 2])
+                counts[key, default: 0] += 1
+            }
+            let dominant = counts.max { $0.value < $1.value }!.key
+            let r = Double((dominant >> 16) & 0xFF) / 255
+            let g = Double((dominant >> 8) & 0xFF) / 255
+            let b = Double(dominant & 0xFF) / 255
+            let maxC = max(r, max(g, b))
+            let sat = maxC > 0 ? (maxC - min(r, min(g, b))) / maxC : 0
+            XCTAssertGreaterThan(sat, 0.4, "\(archetype.rawValue): dominant body color must be vivid (saturation \(String(format: "%.2f", sat)))")
+        }
+    }
+
+    /// Wrist-down rest (§8): the rest grid must render far dimmer than the
+    /// active grid — the sleep pose carries no glow.
+    func testPixelRestFrameIsDim() throws {
+        for archetype in Archetype.allCases {
+            let engine = try makeGoldenEngine(archetype)
+            engine.update(toFrame: 300)
+            let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+
+            painter.paint(
+                world: engine.currentWorld, pose: engine.currentPose, rest: false,
+                accentPhase: engine.activeGesturePhase, tell: engine.tell, tellPhase: engine.tellPhase
+            )
+            let active = PixelStageRasterizer(painter: painter)
+            active.rasterize(painter: painter)
+            let activeBytes = active.snapshotBytes()
+
+            painter.paint(world: engine.currentWorld, pose: engine.currentPose, rest: true)
+            let rest = PixelStageRasterizer(painter: painter)
+            rest.rasterize(painter: painter)
+            let restBytes = rest.snapshotBytes()
+
+            func meanLum(_ bytes: [UInt8]) -> Double {
+                var total = 0.0
+                for i in 0..<(PixelStageRasterizer.gridWidth * PixelStageRasterizer.gridHeight) {
+                    let o = i * 4
+                    total += 0.299 * Double(bytes[o]) + 0.587 * Double(bytes[o + 1]) + 0.114 * Double(bytes[o + 2])
+                }
+                return total / Double(PixelStageRasterizer.gridWidth * PixelStageRasterizer.gridHeight)
+            }
+            XCTAssertLessThan(
+                meanLum(restBytes) + 1, meanLum(activeBytes) * 0.55,
+                "\(archetype.rawValue): rest grid must render dimmer than the active grid (restDim is 0.22x bodyLight; the active mean runs below full bodyLight, so the designed ratio is ~0.35-0.4 — a rest pose at active brightness fails this)"
+            )
         }
     }
 }

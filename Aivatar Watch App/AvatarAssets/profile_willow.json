@@ -21,12 +21,13 @@
     "silhouetteWeights": { "roundness": 0.9, "angularity": 0.1 }
   },
   "speciesTokens": {
-    "bodyLight": "#C7D9C7",
-    "bodyMid": "#B8C9B3",
-    "shadow": "#8E8D77",
-    "face": "#1C2018",
-    "accentA": "#6F8F55",
-    "accentB": "#EBEBD1"
+    "bodyLight": "#55D98A",
+    "bodyMid": "#2FA46A",
+    "shadow": "#14684F",
+    "face": "#0C2018",
+    "accentA": "#F2D64B",
+    "accentB": "#40E8D0",
+    "glow": "#B8F5CF"
   },
   "motionGrammar": { "settleComplete": 0.15, "drift": 0.5, "anticipation": 0.0 },
   "gazePolicy": "soft",

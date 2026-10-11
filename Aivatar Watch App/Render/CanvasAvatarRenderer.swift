@@ -50,6 +50,9 @@ final class AvatarRenderContext {
     let engine: AvatarEngine
     let painter: AvatarSpritePainter
     let epoch = Date()
+    /// Hi-bit pixel stage (§11.3 v4): rasterizes the command buffer to a
+    /// 51x63 sprite grid snapped to the vivid archetype LUT.
+    lazy var pixelRasterizer = PixelStageRasterizer(painter: painter)
 
     /// Cached gradient fill objects per color pair (v3 volumetric shading).
     /// The pairs are static per archetype, so the cache is warm after the
@@ -200,7 +203,10 @@ struct CanvasAvatarRenderer: View {
                     drawStaticRest(ctx: ctx, size: size)
                 }
             } else {
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                // Hi-bit cadence (§11.3): idle loops at ~15 fps read as
+                // deliberately steppy retro animation and halve the tick
+                // cost of the 30 fps vector stage.
+                TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { timeline in
                     Canvas { ctx, size in
                         draw(ctx: ctx, size: size, date: timeline.date)
                     }
@@ -232,7 +238,8 @@ struct CanvasAvatarRenderer: View {
             tell: engine.tell,
             tellPhase: engine.tellPhase
         )
-        paintCommands(ctx: ctx, size: size)
+        context.pixelRasterizer.rasterize(painter: context.painter)
+        context.pixelRasterizer.draw(into: ctx, size: size)
         #if DEBUG
         context.debugDrawCount += 1
         if context.debugDrawCount % 60 == 1 {
@@ -250,7 +257,8 @@ struct CanvasAvatarRenderer: View {
     private func drawStaticRest(ctx: GraphicsContext, size: CGSize) {
         context.solveRestIfNeeded()
         context.painter.paint(world: context.restWorld, pose: context.restPose!, rest: true)
-        paintCommands(ctx: ctx, size: size)
+        context.pixelRasterizer.rasterize(painter: context.painter)
+        context.pixelRasterizer.draw(into: ctx, size: size)
     }
 
     /// Fit the rig content into the view (§9 composition via
