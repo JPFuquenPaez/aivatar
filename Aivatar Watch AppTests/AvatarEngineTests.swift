@@ -1264,12 +1264,14 @@ final class GoldenFrameTests: XCTestCase {
         // anticipation/pre-cue phases, settle residual, tell rendering.
         // v7 (A5b.1): volumetric shading — per-mass gradients (top lit),
         // per-puff occlusion on the cloud head, foliage/flame gradients.
+        // v8 (A5b.2): bounce-light lift on gradient bottoms (fake SSS) +
+        // rim-light crescent on the head (species spec silver rim).
         let expected: [Archetype: UInt64] = [
-            .ember: 3_587_470_302_135_163_827,
-            .willow: 17_785_780_858_784_263_314,
-            .compass: 452_740_332_954_172_361,
-            .prism: 2_481_319_319_026_286_214,
-            .nimbus: 2_913_192_878_458_312_622,
+            .ember: 5_712_369_233_219_474_756,
+            .willow: 17_872_146_934_551_876_698,
+            .compass: 9_952_001_963_029_917_838,
+            .prism: 9_222_277_076_055_390_298,
+            .nimbus: 1_665_479_958_891_703_544,
         ]
 
         var actual: [Archetype: UInt64] = [:]
@@ -1424,6 +1426,58 @@ extension SpeciesInvariantsTests {
                 top, chin + 10,
                 "\(archetype.rawValue): the head mass must shade light-top -> dark-bottom (top \(String(format: "%.1f", top)) vs chin \(String(format: "%.1f", chin))); trace: \(trace.joined(separator: " "))"
             )
+        }
+    }
+
+    /// A5b.2 rim light: every archetype's head emits a flat, translucent,
+    /// near-silver crescent command (species spec §6 v2 "faint silver rim
+    /// light") — and the rest LOD must NOT emit it (wrist-down is the
+    /// designed sleep pose; no highlights on a sleeping body).
+    func testHeadRimLightCommand() throws {
+        for archetype in Archetype.allCases {
+            let engine = try makeGoldenEngine(archetype)
+            engine.update(toFrame: 300)
+            let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+            painter.paint(
+                world: engine.currentWorld,
+                pose: engine.currentPose,
+                rest: false,
+                accentPhase: engine.activeGesturePhase,
+                tell: engine.tell,
+                tellPhase: engine.tellPhase
+            )
+            var rimCommands = 0
+            for i in 0..<painter.commandCount {
+                let command = painter.commands[i]
+                let shape = painter.shapes[command.shapeIndex]
+                guard command.pathIndex < shape.pathShades.count,
+                      shape.pathShades[command.pathIndex] < 0 else { continue }
+                rimCommands += 1
+                XCTAssertFalse(command.useGradient, "\(archetype.rawValue): rim light must be a flat fill")
+                XCTAssertEqual(command.a, AvatarSpritePainter.rimLightAlpha, accuracy: 0.001, "\(archetype.rawValue): rim light is translucent (a highlight, not a sticker)")
+                XCTAssertEqual(command.r, AvatarSpritePainter.rimLight.0, accuracy: 0.001)
+                XCTAssertEqual(command.g, AvatarSpritePainter.rimLight.1, accuracy: 0.001)
+                XCTAssertEqual(command.b, AvatarSpritePainter.rimLight.2, accuracy: 0.001)
+            }
+            XCTAssertEqual(rimCommands, 1, "\(archetype.rawValue): exactly one rim-light crescent (on the head blob)")
+
+            // Rest LOD: the rim path must blend in (full alpha) so the
+            // sleep pose carries no highlight.
+            painter.paint(
+                world: engine.currentWorld,
+                pose: engine.currentPose,
+                rest: true,
+                accentPhase: 0,
+                tell: nil,
+                tellPhase: 0
+            )
+            for i in 0..<painter.commandCount {
+                let command = painter.commands[i]
+                let shape = painter.shapes[command.shapeIndex]
+                guard command.pathIndex < shape.pathShades.count,
+                      shape.pathShades[command.pathIndex] < 0 else { continue }
+                XCTAssertEqual(command.a, 1, accuracy: 0.001, "\(archetype.rawValue): rest LOD must not render a rim highlight")
+            }
         }
     }
 }

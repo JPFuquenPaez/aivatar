@@ -463,6 +463,14 @@ nonisolated final class AvatarSpritePainter {
     /// (eyes/brows/lids/mouth) stay FLAT matte (audit finding 4: no glossy
     /// eyes); catchlights and the rest LOD stay flat. All pairs are static
     /// so the renderer/rasterizer cache their fill objects once.
+    /// Species rim-light color (§6 v2: "faint silver rim light" shared by
+    /// all five archetypes). Slightly cool neutral silver, translucent in
+    /// the paint loop so it reads as a highlight on the mass, not a sticker.
+    static let rimLight: (Float, Float, Float) = (0.92, 0.94, 1.0)
+    /// Rim-light opacity: enough to read at 205x251 as a lit edge, low
+    /// enough to stay inside the matte stylization level (U1).
+    static let rimLightAlpha: Float = 0.85
+
     private static func buildGradientPairs(
         _ colors: [PaletteRole: (r: Float, g: Float, b: Float)]
     ) -> [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))] {
@@ -480,10 +488,18 @@ nonisolated final class AvatarSpritePainter {
                 c.1 + (1 - c.1) * 0.22,
                 c.2 + (1 - c.2) * 0.22
             )
-            let bottom = (
+            let deep = (
                 c.0 * 0.62 + shadow.0 * 0.38,
                 c.1 * 0.62 + shadow.1 * 0.38,
                 c.2 * 0.62 + shadow.2 * 0.38
+            )
+            // Bounce light (fake SSS): light enters the mass, scatters, and
+            // exits from the underside — the 2D equivalent is a bottom stop
+            // lifted off pure shadow back toward the lit tone.
+            let bottom = (
+                deep.0 + (top.0 - deep.0) * 0.12,
+                deep.1 + (top.1 - deep.1) * 0.12,
+                deep.2 + (top.2 - deep.2) * 0.12
             )
             pairs[role] = (top, bottom)
         }
@@ -533,7 +549,33 @@ nonisolated final class AvatarSpritePainter {
             append(left, centerY: Float(leftRect.midY), height: Float(leftRect.height), shade: 0.86)
             append(right, centerY: Float(rightRect.midY), height: Float(rightRect.height), shade: 0.86)
             append(middle, centerY: Float(midRect.midY), height: Float(midRect.height), shade: 1.0)
-            bendFractions = [0, 0, 0]
+            // Rim-light crescent (species spec: faint silver rim light): a
+            // thin ellipse laid along the middle puff's upper-left arc,
+            // inset so it never crosses the silhouette edge. shade < 0 is
+            // the painter's marker for a flat rim fill (see paint loop);
+            // drawn last within the shape so it rides on the puff.
+            // COMMAND-ORIGIN CONVENTION: the renderer's origin is the bone
+            // transform applied to the SLICE CENTER (offsetsY[i]), and
+            // paths are drawn in that local space — so the rim ellipse is
+            // built relative to its own slice center (x = rimCx, y = 0),
+            // NOT in absolute shape coordinates (the puff rects predate
+            // this convention; do not copy their style for new paths).
+            let rimCx = -w * 0.09
+            let rimCy = -h * 0.36
+            let rimRect = CGRect(
+                x: rimCx - w * 0.15, y: -h * 0.045,
+                width: w * 0.30, height: h * 0.09
+            )
+            let rim = CGMutablePath()
+            rim.addEllipse(
+                in: rimRect,
+                transform: CGAffineTransform.identity
+                    .translatedBy(x: rimCx, y: 0)
+                    .rotated(by: -0.5)
+                    .translatedBy(x: -rimCx, y: 0)
+            )
+            append(rim, centerY: Float(rimCy), height: Float(rimRect.height), shade: -1)
+            bendFractions = [0, 0, 0, 0]
             return PaintedShape(paths: paths, offsetsY: offsetsY, bendFractions: bendFractions,
                                 pathHeights: pathHeights, pathShades: pathShades,
                                 perPathGradient: true,
@@ -693,6 +735,22 @@ nonisolated final class AvatarSpritePainter {
                 command.pathIndex = i
                 if let pair {
                     let shade = i < shape.pathShades.count ? shape.pathShades[i] : 1
+                    if shade < 0, !rest {
+                        // Rim-light crescent: flat near-silver, translucent —
+                        // a spec highlight, never a sticker (U1: same matte
+                        // stylization level, just a lighter stop).
+                        command.r = Self.rimLight.0
+                        command.g = Self.rimLight.1
+                        command.b = Self.rimLight.2
+                        command.r2 = Self.rimLight.0
+                        command.g2 = Self.rimLight.1
+                        command.b2 = Self.rimLight.2
+                        command.a = Self.rimLightAlpha
+                        command.useGradient = false
+                        commands[commandCount] = command
+                        commandCount += 1
+                        continue
+                    }
                     var top = pair.top
                     let bottom = pair.bottom
                     if shade < 1 {
