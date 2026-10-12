@@ -195,10 +195,16 @@ struct CanvasAvatarRenderer: View {
     /// Reduce Motion Level 2: the in-app user setting (§8) — static pose +
     /// gentle blink. Strongest level wins over the system setting.
     @AppStorage("reduceMotionL2") private var reduceMotionL2 = false
+    /// A5c farewell beat (U9): while true, the animated stage keeps playing
+    /// the goodbye gesture after the wrist drops; static rest takes over
+    /// when it completes. The generation counter invalidates stale timers
+    /// if the wrist comes back up mid-farewell.
+    @State private var farewellPending = false
+    @State private var farewellGeneration = 0
 
     var body: some View {
         Group {
-            if isLuminanceReduced {
+            if isLuminanceReduced && !farewellPending {
                 Canvas { ctx, size in
                     drawStaticRest(ctx: ctx, size: size)
                 }
@@ -212,11 +218,43 @@ struct CanvasAvatarRenderer: View {
         }
         .ignoresSafeArea()
         .onChange(of: isLuminanceReduced) { reduced in
-            context.engine.setResting(reduced)
-            if !reduced {
+            if reduced {
+                beginFarewell()
+            } else {
+                farewellGeneration += 1
+                farewellPending = false
+                context.engine.setResting(false)
                 // Wrist raise: wake-up crossfade + haptic (§8 wake, §9).
                 HapticsChannel.shared.wake()
             }
+        }
+    }
+
+    /// U9 farewell beat: wrist-drop plays the archetype's soft goodbye at
+    /// full palette, THEN hands over to the dimmed rest pose — every
+    /// session ends warm, never mid-gesture. If an idle gesture is active
+    /// the named gesture is suppressed; one bounded retry 250 ms in makes
+    /// the goodbye reliable without preemption semantics.
+    private func beginFarewell() {
+        let clip = Archetype(rawValue: context.engine.profile.id)?.farewellGesture ?? .nod
+        context.engine.handleEvent(.gesture(name: clip.rawValue))
+        farewellPending = true
+        farewellGeneration += 1
+        let generation = farewellGeneration
+        let engine = context.engine
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard generation == farewellGeneration else { return }
+            if engine.currentReactionClip == nil {
+                engine.handleEvent(.gesture(name: clip.rawValue))
+            }
+        }
+        let seconds = Double(GestureClipLibrary.durationFrames(clip, profile: engine.profile)) / 30.0 + 0.45
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            guard generation == farewellGeneration else { return }
+            farewellPending = false
+            engine.setResting(true)
         }
     }
 

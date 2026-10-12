@@ -18,10 +18,11 @@ final class SchemaFreezeTests: XCTestCase {
 
     func testGestureClipRegistryMatchesPlan() {
         // v5b: +5 owner-exclusive quirk clips (preen, swayCatch, tick,
-        // mirror, driftFloat) — one per archetype.
-        XCTAssertEqual(GestureClip.allCases.count, 17)
+        // mirror, driftFloat) — one per archetype. A5c: +slowBlink (the
+        // long-press ritual, event-only — weight 0 everywhere).
+        XCTAssertEqual(GestureClip.allCases.count, 18)
         let names = GestureClip.allCases.map { "\($0)" }
-        XCTAssertEqual(names, ["wave", "bounce", "stretch", "spin", "nod", "tilt", "lookAround", "shiftWeight", "shiver", "doubleTake", "sparkle", "puff", "preen", "swayCatch", "tick", "mirror", "driftFloat"])
+        XCTAssertEqual(names, ["wave", "bounce", "stretch", "spin", "nod", "tilt", "lookAround", "shiftWeight", "shiver", "doubleTake", "sparkle", "puff", "preen", "swayCatch", "tick", "mirror", "driftFloat", "slowBlink"])
     }
 
     func testAllFiveProfilesLoadAndMatchArchetypes() throws {

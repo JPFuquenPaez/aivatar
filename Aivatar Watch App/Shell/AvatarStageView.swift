@@ -10,9 +10,18 @@ struct AvatarStageView: View {
     private let launchOverride: Archetype?
 
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(ArchetypeSelection.storageKey) private var storedArchetype: Archetype = .ember
+    /// A5c naming ceremony (§10.5.1): the user-owned name replaces the
+    /// archetype display name once the ceremony completes.
+    @AppStorage("companionName") private var companionName = ""
+    @AppStorage("namingCompleted") private var namingCompleted = false
     @State private var context: AvatarRenderContext?
     @State private var isResting = false
+    @State private var showNaming = false
+    /// "It noticed" (§10.5.5): timestamp when the app left the active
+    /// phase; a return after a long absence gets a soft noticed-nod.
+    @State private var wentToBackgroundAt: Date?
 
     init(archetype: Archetype? = nil) {
         launchOverride = archetype
@@ -66,6 +75,10 @@ struct AvatarStageView: View {
         AvatarSession.shared.register(context: renderContext, archetype: archetype)
     }
 
+    private var stageName: String {
+        companionName.isEmpty ? archetype.displayName : companionName
+    }
+
     private var stage: some View {
         ZStack(alignment: .bottom) {
             if let context {
@@ -74,7 +87,7 @@ struct AvatarStageView: View {
                 Color.black
             }
             VStack(spacing: 2) {
-                Text(archetype.displayName)
+                Text(stageName)
                     .font(.footnote)
                 Text(isResting ? "resting" : "is here")
                     .font(.caption2)
@@ -85,14 +98,13 @@ struct AvatarStageView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
-        .accessibilityHint("Double-tap to play. Touch and hold for its signature move.")
-        // Phase B: tap and the VoiceOver default action send a .tap event;
-        // the engine answers with a pooled, in-character reaction clip and
-        // the archetype's haptic flavor (§9). Long-press (and a VoiceOver
-        // named action) performs the archetype's signature quirk — Ember
-        // spins with a spark trail, Willow sways, Nimbus startles (§5).
+        .accessibilityHint("Double-tap to play. Touch and hold to share a slow blink.")
+        // A5c: tap sends a .tap event (pooled in-character reaction);
+        // long-press is the SLOW-BLINK RITUAL (U8 — the trust exchange:
+        // mutual gaze, then a blink you can watch happen). The signature
+        // quirk stays on the VoiceOver named action and the idle schedule.
         .onLongPressGesture(minimumDuration: 0.5) {
-            performQuirk()
+            context?.engine.handleEvent(.gesture(name: "slowBlink"))
         }
         .onTapGesture {
             context?.engine.handleEvent(.tap)
@@ -110,7 +122,40 @@ struct AvatarStageView: View {
         }
         .onAppear {
             isResting = isLuminanceReduced
+            // A5c naming ceremony (first-run only — the ceremony never
+            // nags; it can be re-run from Settings). CI/smoke launches
+            // pass an -archetype override and skip the sheet: the
+            // ceremony belongs to real users, not capture loops.
+            if launchOverride == nil && !namingCompleted {
+                showNaming = true
+            }
         }
+        .onChange(of: scenePhase) { phase in
+            // "It noticed" (§10.5.5): returning after a long absence
+            // (>= 30 min — a long meeting, a workout, sleep) earns one
+            // soft noticed-nod within the U7 300 ms contingency window.
+            if phase == .active {
+                if let leftAt = wentToBackgroundAt,
+                   Date().timeIntervalSince(leftAt) >= 1800 {
+                    context?.engine.handleEvent(.gesture(name: "nod"))
+                }
+                wentToBackgroundAt = nil
+            } else if phase == .background {
+                wentToBackgroundAt = Date()
+            }
+        }
+        .sheet(isPresented: $showNaming) {
+            NamingCeremonyView(archetype: archetype, isPresented: $showNaming) { _ in
+                celebrateNaming()
+            }
+        }
+    }
+
+    /// The naming ceremony's answer: the companion celebrates its new
+    /// name (§10.5.1 — the moment personalization becomes ownership).
+    private func celebrateNaming() {
+        context?.engine.handleEvent(.gesture(name: "sparkle"))
+        HapticsChannel.shared.react(to: archetype)
     }
 
     private func performQuirk() {
@@ -119,11 +164,10 @@ struct AvatarStageView: View {
     }
 
     private var accessibilityText: String {
-        let name = archetype.displayName
         if isResting {
-            return "\(name), your companion, is resting"
+            return "\(stageName), your companion, is resting"
         }
-        return "\(name), your companion, is calm"
+        return "\(stageName), your companion, is calm"
     }
 }
 

@@ -15,6 +15,19 @@ nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
         }
     }
 
+    /// A5c farewell beat (U9 — peak-end rule): the wrist-drop goodbye is
+    /// ONE soft micro-gesture, never a guilt gesture. Small clips only —
+    /// no anticipation wind-up, no squash: the session ends warm.
+    var farewellGesture: GestureClip {
+        switch self {
+        case .ember: return .wave      // one last wave for the audience
+        case .willow: return .nod      // a slow nod, gardener-style
+        case .compass: return .nod     // a level acknowledgment
+        case .prism: return .wave      // a loose, friendly flip-wave
+        case .nimbus: return .nod       // a quiet settle-nod
+        }
+    }
+
     /// One-line likable-pole blurb for the personality picker (§5: every
     /// archetype anchors a likable pole — sensitivity reads as responsive,
     /// never as anxious).

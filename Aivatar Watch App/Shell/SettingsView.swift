@@ -9,10 +9,29 @@ struct SettingsView: View {
     /// gentle blink only. Strongest level wins over the system setting.
     @AppStorage("reduceMotionL2") private var reduceMotionL2 = false
 
+    /// A5c naming ceremony: rename access (§10.5.1).
+    @AppStorage("companionName") private var companionName = ""
+    @State private var showNaming = false
+
+    private var stageName: String {
+        companionName.isEmpty ? archetype.displayName : companionName
+    }
+
     var body: some View {
         NavigationStack {
             List {
                 Section("Companion") {
+                    Button {
+                        showNaming = true
+                    } label: {
+                        HStack {
+                            Text("Name")
+                            Spacer()
+                            Text(stageName)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityLabel("Name, currently \(stageName)")
                     NavigationLink {
                         ArchetypePickerView()
                     } label: {
@@ -38,12 +57,15 @@ struct SettingsView: View {
                 Section("About") {
                     Text("Aivatar is procedural — no clip files, everything you see is generated live from a shared rig.")
                         .font(.footnote)
-                    Text("Tip: touch and hold your companion for its signature move.")
+                    Text("Tip: touch and hold your companion to share a slow blink — its trust ritual.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Settings")
+            .sheet(isPresented: $showNaming) {
+                NamingCeremonyView(archetype: archetype, isPresented: $showNaming, onName: nil)
+            }
         }
     }
 }

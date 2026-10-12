@@ -89,7 +89,7 @@ struct Profile: Decodable {
 }
 
 let expressionChannels = ["joy", "sad", "surprise", "alert", "sleepy", "focus", "warm", "wry", "startle", "rest"]
-let gestures = ["wave", "bounce", "stretch", "spin", "nod", "tilt", "lookAround", "shiftWeight", "shiver", "doubleTake", "sparkle", "puff", "preen", "swayCatch", "tick", "mirror", "driftFloat"]
+let gestures = ["wave", "bounce", "stretch", "spin", "nod", "tilt", "lookAround", "shiftWeight", "shiver", "doubleTake", "sparkle", "puff", "preen", "swayCatch", "tick", "mirror", "driftFloat", "slowBlink"]
 let archetypes = ["ember", "willow", "compass", "prism", "nimbus"]
 
 var failures: [String] = []

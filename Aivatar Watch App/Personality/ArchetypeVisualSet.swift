@@ -24,6 +24,9 @@ nonisolated enum GestureClip: String, Sendable, CaseIterable, Codable {
     case tick        // Compass: one exact metronome bob
     case mirror      // Prism: freezes, studies itself, flips a color
     case driftFloat  // Nimbus: two-frequency floating wander
+    // A5c ritual: the long-press slow-blink exchange (U8) — an EVENT-ONLY
+    // clip, never idle-scheduled (weight 0 everywhere by parity contract).
+    case slowBlink
 
     /// Clips the engine treats as "big" (anticipation frames >= 120 ms,
     /// squash & stretch, §7).
@@ -55,7 +58,7 @@ nonisolated enum GestureClip: String, Sendable, CaseIterable, Codable {
     var writesExpression: Bool {
         switch self {
         case .wave, .stretch, .spin, .lookAround, .shiver, .doubleTake, .sparkle, .puff,
-             .preen, .swayCatch, .tick, .mirror, .driftFloat:
+             .preen, .swayCatch, .tick, .mirror, .driftFloat, .slowBlink:
             return true
         case .bounce, .nod, .tilt, .shiftWeight:
             return false

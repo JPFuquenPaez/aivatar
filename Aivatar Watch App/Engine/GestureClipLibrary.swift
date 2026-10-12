@@ -25,6 +25,9 @@ nonisolated enum GestureClipLibrary {
         case .tick: return 0.9
         case .mirror: return 2.4
         case .driftFloat: return 3.4
+        // A5c ritual: a slow, watchable blink exchange. Tempo-scaled, so
+        // Willow (0.8x) owns the softest version by construction (U8).
+        case .slowBlink: return 2.6
         }
     }
 
@@ -267,6 +270,42 @@ nonisolated enum GestureClipLibrary {
             pose.scalesX[bones.chest] += 0.03 * sin(u * Float.pi * 2) * w
             pose.rotations[bones.appendageB] += 0.10 * sin(u * Float.pi * 2 - 0.5) * w
             expressions[ExpressionChannel.warm.rawValue] = max(expressions[ExpressionChannel.warm.rawValue], 0.3 * w)
+
+        case .slowBlink:
+            // A5c RITUAL (U8 — the slow-blink exchange, event-only): hold
+            // mutual gaze, then one slow deliberate blink you can watch
+            // happen, then release. The trust signal of cats and people:
+            // it says "I feel safe with you" without a word.
+            // Phases: gaze hold 0...0.2 -> close 0.2...0.45 -> hold closed
+            // 0.45...0.6 -> open 0.6...0.85 -> soft settle.
+            let close: Float
+            if u < 0.2 {
+                close = 0
+            } else if u < 0.45 {
+                close = easeInOut((u - 0.2) / 0.25)
+            } else if u < 0.6 {
+                close = 1
+            } else if u < 0.85 {
+                close = 1 - easeInOut((u - 0.6) / 0.25)
+            } else {
+                close = 0
+            }
+            // Mutual gaze: accumulated pupil wander is pulled toward the
+            // neutral (user) direction and held for the whole exchange —
+            // the same "look at you" semantics as the dropped-tap ack.
+            let gaze = u < 0.85 ? 1.0 : 1 - easeInOut((u - 0.85) / 0.15)
+            for pupil in [bones.pupilL, bones.pupilR] {
+                pose.offsetsX[pupil] -= pose.offsetsX[pupil] * 0.6 * gaze * w
+                pose.offsetsY[pupil] -= pose.offsetsY[pupil] * 0.6 * gaze * w
+            }
+            pose.rotations[bones.head] += 0.05 * gaze * w
+            // The lids use the same 5.5-unit travel as the life-loop blink
+            // (LifeLoopLayer) so the ritual reads as a blink, not a mask.
+            let lid = 5.5 * close * w
+            pose.offsetsY[bones.lidL] += lid
+            pose.offsetsY[bones.lidR] += lid
+            expressions[ExpressionChannel.rest.rawValue] = max(expressions[ExpressionChannel.rest.rawValue], close * 0.35 * w)
+            expressions[ExpressionChannel.warm.rawValue] = max(expressions[ExpressionChannel.warm.rawValue], 0.5 * gaze * w)
         }
     }
 }

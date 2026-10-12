@@ -1887,3 +1887,94 @@ final class QuirkClipTests: XCTestCase {
         )
     }
 }
+
+// MARK: - A5c bonding mechanics (slow-blink ritual, farewell beat)
+
+final class RitualTests: XCTestCase {
+    private func applyRitual(
+        _ clip: GestureClip, u: Float, engine: AvatarEngine,
+        pose: inout AvatarPose, expressions: inout [Float]
+    ) {
+        GestureClipLibrary.apply(
+            clip, u: u, anticipation: 0, weight: 1,
+            profile: engine.profile, bones: engine.bones,
+            pose: &pose, expressions: &expressions
+        )
+    }
+
+    /// U8 — the slow-blink exchange: mutual gaze hold, a blink you can
+    /// watch happen (lids fully closed mid-ritual, using the same 5.5-unit
+    /// lid travel as the life-loop blink), open again by the end.
+    func testSlowBlinkRitualEnvelope() throws {
+        let engine = try makeGoldenEngine(.willow)
+        let b = engine.bones
+        // Open at the start of the gaze hold.
+        do {
+            var pose = AvatarPose(boneCount: engine.skeleton.boneCount)
+            var expressions = [Float](repeating: 0, count: ExpressionChannel.count)
+            applyRitual(.slowBlink, u: 0.05, engine: engine, pose: &pose, expressions: &expressions)
+            XCTAssertLessThan(pose.offsetsY[b.lidL], 0.5, "lids open during the gaze hold")
+        }
+        // Fully closed mid-ritual (u = 0.5 is inside the 0.45-0.6 hold).
+        do {
+            var pose = AvatarPose(boneCount: engine.skeleton.boneCount)
+            var expressions = [Float](repeating: 0, count: ExpressionChannel.count)
+            applyRitual(.slowBlink, u: 0.5, engine: engine, pose: &pose, expressions: &expressions)
+            XCTAssertGreaterThan(pose.offsetsY[b.lidL], 4.5, "lids fully closed mid-ritual")
+            XCTAssertGreaterThan(pose.offsetsY[b.lidR], 4.5, "both lids close together")
+        }
+        // Open again by the end.
+        do {
+            var pose = AvatarPose(boneCount: engine.skeleton.boneCount)
+            var expressions = [Float](repeating: 0, count: ExpressionChannel.count)
+            applyRitual(.slowBlink, u: 0.95, engine: engine, pose: &pose, expressions: &expressions)
+            XCTAssertLessThan(pose.offsetsY[b.lidL], 0.5, "lids reopen before the ritual ends")
+        }
+        // Mutual gaze: accumulated pupil wander is pulled toward neutral.
+        do {
+            var pose = AvatarPose(boneCount: engine.skeleton.boneCount)
+            var expressions = [Float](repeating: 0, count: ExpressionChannel.count)
+            pose.offsetsX[b.pupilL] = 3
+            pose.offsetsX[b.pupilR] = 3
+            applyRitual(.slowBlink, u: 0.3, engine: engine, pose: &pose, expressions: &expressions)
+            XCTAssertLessThan(pose.offsetsX[b.pupilL], 2.0, "the ritual pulls the gaze back to the user")
+        }
+    }
+
+    /// The ritual is EVENT-ONLY (long-press): weight 0 in every pool — it
+    /// must never surface from the idle schedule, or it stops being a
+    /// ritual and becomes a tic.
+    func testSlowBlinkIsNeverIdleScheduled() throws {
+        for archetype in Archetype.allCases {
+            let profile = try PersonalityProfile.load(archetype)
+            XCTAssertEqual(profile.gesturePoolWeights["slowBlink"] ?? 0, 0,
+                           "\(archetype.rawValue): slowBlink is event-only (weight must be 0)")
+        }
+    }
+
+    /// Willow owns the softest version (§10.5.2): tempo-scaled duration —
+    /// Willow's ritual (0.8x tempo) outlasts Ember's (1.2x).
+    func testWillowRitualIsTheSoftest() throws {
+        let willow = try PersonalityProfile.load(.willow)
+        let ember = try PersonalityProfile.load(.ember)
+        let willowFrames = GestureClipLibrary.durationFrames(.slowBlink, profile: willow)
+        let emberFrames = GestureClipLibrary.durationFrames(.slowBlink, profile: ember)
+        XCTAssertGreaterThan(
+            willowFrames, emberFrames,
+            "Willow's slow blink must outlast Ember's (tempo-scaled softness)"
+        )
+    }
+
+    /// U9 — the farewell beat: every archetype's wrist-drop goodbye is a
+    /// SOLO small clip (no anticipation wind-up, no squash-and-stretch) —
+    /// never a guilt gesture and never a big finish.
+    func testFarewellGestureIsSoftForEveryArchetype() throws {
+        for archetype in Archetype.allCases {
+            let clip = archetype.farewellGesture
+            XCTAssertFalse(
+                clip.isBig,
+                "\(archetype.rawValue): the farewell must be a small clip (got \(clip.rawValue))"
+            )
+        }
+    }
+}

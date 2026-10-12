@@ -35,7 +35,7 @@
   "tell": "flicker",
   "quirkLoop": "mirrorMoment",
   "voiceStyle": "analogies, tangents, questions back",
-  "gesturePoolWeights": { "wave": 0.1, "bounce": 0.0, "stretch": 0.15, "spin": 0.15, "nod": 0.0, "tilt": 0.1, "lookAround": 0.0, "shiftWeight": 0.0, "shiver": 0.0, "doubleTake": 0.2, "sparkle": 0.15, "puff": 0.0, "preen": 0.0, "swayCatch": 0.0, "tick": 0.0, "mirror": 0.15, "driftFloat": 0.0 },
+  "gesturePoolWeights": { "wave": 0.1, "bounce": 0.0, "stretch": 0.15, "spin": 0.15, "nod": 0.0, "tilt": 0.1, "lookAround": 0.0, "shiftWeight": 0.0, "shiver": 0.0, "doubleTake": 0.2, "sparkle": 0.15, "puff": 0.0, "preen": 0.0, "swayCatch": 0.0, "tick": 0.0, "mirror": 0.15, "driftFloat": 0.0, "slowBlink": 0.0 },
   "quirks": ["double-take gaze", "unpredictable tempo"],
   "assetVersion": "2.0.0"
 }
