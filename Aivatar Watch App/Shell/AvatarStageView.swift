@@ -67,12 +67,81 @@ struct AvatarStageView: View {
             // pass (§3 telemetry port, §11 budgets).
             telemetry: OsLogTelemetrySink()
         )
-        let renderContext = AvatarRenderContext(engine: engine)
+        // A5d interiority: record the visit, hand the persistent traces
+        // to the painter (memory is an input, never wall-clock in the
+        // engine). CI/debug launches may simulate absence via -absence.
+        let summary = recordVisitForBuild()
+        let renderContext = AvatarRenderContext(engine: engine, interiority: summary.tuning)
         context = renderContext
         // Phase B: notification events reach this engine via the
         // session registry (§13 port); re-registering replaces any
         // previous context.
         AvatarSession.shared.register(context: renderContext, archetype: archetype)
+        presentInteriority(summary)
+    }
+
+    /// The visit record (A5d). The -absence launch argument (debug/E2E
+    /// only) seeds the memory with an old lastSeen so the unobserved
+    /// behaviors can be captured without waiting real days.
+    private func recordVisitForBuild() -> VisitSummary {
+        let store = CompanionMemoryStore()
+        let args = ProcessInfo.processInfo.arguments
+        if let index = args.firstIndex(of: "-absence"),
+           index + 1 < args.count,
+           let absence = Int(args[index + 1]) {
+            // Seed a memory whose last visit was `absence` days ago.
+            let existing = store.load()
+            var memory = existing ?? CompanionMemory(firstLaunch: Date().addingTimeInterval(-Double(absence) * 86_400))
+            memory.lastSeen = Date().addingTimeInterval(-Double(absence) * 86_400)
+            if existing == nil {
+                memory.firstLaunch = memory.lastSeen
+                memory.sessions = max(0, absence * 2)  // a plausible history
+                memory.sproutDays = Double(absence)
+                memory.streakDays = max(0, absence - 1)
+            }
+            store.save(memory)
+        }
+        return store.recordVisit()
+    }
+
+    /// A5d — the return presentation: what the companion did while
+    /// nobody was watching, shown on the first frame of a visit after a
+    /// real absence (§1: "it kept something while I was gone").
+    private func presentInteriority(_ summary: VisitSummary) {
+        guard summary.absenceDays >= 1, let context else { return }
+        let engine = context.engine
+        switch archetype {
+        case .ember:
+            // The rehearsal: it practiced a dance while you were away —
+            // now it shows you. The show improves with the rehearsal
+            // level (a longer run for a practiced performer).
+            engine.handleEvent(.gesture(name: "sparkle"))
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                engine.handleEvent(.gesture(name: "spin"))
+                if summary.rehearsalLevel >= 3 {
+                    try? await Task.sleep(nanoseconds: 1_400_000_000)
+                    engine.handleEvent(.gesture(name: "bounce"))
+                }
+            }
+        case .willow:
+            // It kept watering the sprout — the swaying settle says the
+            // tending continued without you (the grown sprout is the trace).
+            engine.handleEvent(.gesture(name: "swayCatch"))
+        case .compass:
+            // The audit is done: one approval tick — the week grid it
+            // drew is waiting below the body.
+            engine.handleEvent(.gesture(name: "tick"))
+        case .prism:
+            // It found something while you were out and brought it back.
+            engine.handleEvent(.gesture(name: "doubleTake"))
+        case .nimbus:
+            // The barometer: if this is your usual time, it started its
+            // little drift BEFORE you arrived — it saw you coming.
+            if summary.nearUsualHour {
+                engine.handleEvent(.gesture(name: "driftFloat"))
+            }
+        }
     }
 
     private var stageName: String {

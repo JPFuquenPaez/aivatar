@@ -87,9 +87,13 @@ final class AvatarRenderContext {
     private(set) var restWorld: [Transform2D] = []
     private(set) var restPose: AvatarPose?
 
-    init(engine: AvatarEngine) {
+    init(engine: AvatarEngine, interiority: InteriorityTuning = .default) {
         self.engine = engine
-        painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+        painter = AvatarSpritePainter(
+            skeleton: engine.skeleton,
+            visualSet: engine.visualSet,
+            interiority: interiority
+        )
     }
 
     func solveRestIfNeeded() {

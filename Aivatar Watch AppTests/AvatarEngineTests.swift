@@ -1196,10 +1196,12 @@ private struct RasterBytes {
 /// the pixels with FNV-1a. Same seed + frame -> same hash, so any visual
 /// change (geometry, palette, mixer, engine) shows up as a hash change.
 private enum GoldenFrameRasterizer {
-    static func render(archetype: Archetype, seed: UInt64 = 42, frame: Int = 300) throws -> RasterBytes {
+    static func render(archetype: Archetype, seed: UInt64 = 42, frame: Int = 300,
+                       interiority: InteriorityTuning = .default) throws -> RasterBytes {
         let engine = try makeGoldenEngine(archetype, seed: seed)
         engine.update(toFrame: frame)
-        let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+        let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet,
+                                          interiority: interiority)
         painter.paint(
             world: engine.currentWorld,
             pose: engine.currentPose,
@@ -1976,5 +1978,146 @@ final class RitualTests: XCTestCase {
                 "\(archetype.rawValue): the farewell must be a small clip (got \(clip.rawValue))"
             )
         }
+    }
+}
+
+// MARK: - A5d interiority (unobserved behavior with persistence)
+
+/// §1: what the character does when nobody is watching — and the traces
+/// it leaves. The memory is a pure function of (previous state, now);
+/// the painter artifacts are neutral by default so pinned renders never
+/// drift.
+final class InteriorityTests: XCTestCase {
+    private var suiteName: String!
+    private var defaults: UserDefaults!
+
+    override func setUpWithError() throws {
+        suiteName = "interiority-tests-\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)
+    }
+
+    override func tearDownWithError() throws {
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    private func date(_ year: Int, _ month: Int, _ day: Int, hour: Int = 9, minute: Int = 0) -> Date {
+        var components = DateComponents()
+        components.year = year; components.month = month; components.day = day
+        components.hour = hour; components.minute = minute
+        return Calendar.current.date(from: components)!
+    }
+
+    private func store() -> CompanionMemoryStore {
+        CompanionMemoryStore(defaults: defaults)
+    }
+
+    /// First visit: streak starts at 1, sprout just sprouted, nothing to
+    /// present — the interiority pass never fabricates absence.
+    func testFirstVisitBaseline() throws {
+        let summary = store().recordVisit(now: date(2026, 10, 10))
+        XCTAssertEqual(summary.absenceDays, 0)
+        XCTAssertEqual(summary.streakDays, 1)
+        XCTAssertFalse(summary.trinketPresent)
+        XCTAssertLessThan(summary.sproutGrowth, 0.35, "a fresh sprout is small")
+    }
+
+    /// Streak (Compass): yesterday extends it, a gap resets it to day 1 —
+    /// the reset is an invitation, never an accusation.
+    func testStreakExtendsThenResets() throws {
+        let s = store()
+        _ = s.recordVisit(now: date(2026, 10, 8))
+        let second = s.recordVisit(now: date(2026, 10, 9))
+        XCTAssertEqual(second.streakDays, 2, "a visit yesterday extends the streak")
+        let third = s.recordVisit(now: date(2026, 10, 15))
+        XCTAssertEqual(third.streakDays, 1, "a gap resets the streak to day 1")
+        XCTAssertEqual(third.absenceDays, 6)
+    }
+
+    /// Sprout (Willow): it kept watering while you were away — growth
+    /// accumulates with attended days (absence included), toward maturity.
+    func testSproutGrowsWithAbsence() throws {
+        let s = store()
+        let first = s.recordVisit(now: date(2026, 10, 1))
+        let afterThreeWeeks = s.recordVisit(now: date(2026, 10, 22))
+        XCTAssertGreaterThan(afterThreeWeeks.sproutGrowth, first.sproutGrowth,
+                            "the sprout grew while nobody was watching")
+        XCTAssertGreaterThanOrEqual(afterThreeWeeks.sproutGrowth, 0.95,
+                                    "three attended weeks reach maturity")
+    }
+
+    /// Rehearsal (Ember): the practiced dance improves with sessions,
+    /// capped at 5 — a practiced performer, never a maniac.
+    func testRehearsalLevelGrowsAndCaps() throws {
+        let s = store()
+        var last = s.recordVisit(now: date(2026, 10, 1))
+        for day in 2...60 {
+            last = s.recordVisit(now: date(2026, 10, 1).addingTimeInterval(Double(day) * 86_400))
+        }
+        XCTAssertEqual(last.rehearsalLevel, 5, "60 sessions cap the rehearsal at level 5")
+    }
+
+    /// Trinket (Prism): a fresh find per day of absence; a same-day
+    /// re-open never invents a second one.
+    func testTrinketFoundAfterAbsenceOnly() throws {
+        let s = store()
+        _ = s.recordVisit(now: date(2026, 10, 8))
+        let nextDay = s.recordVisit(now: date(2026, 10, 9))
+        XCTAssertTrue(nextDay.trinketPresent, "it found something while you were out")
+        let sameDayAgain = s.recordVisit(now: date(2026, 10, 9, hour: 20))
+        XCTAssertFalse(sameDayAgain.trinketPresent, "the same day twice is never the same event — but the trinket is already presented")
+    }
+
+    /// Barometer (Nimbus): it learns the rhythm of your returns and
+    /// recognizes your usual time — anticipation without being told.
+    func testBarometerLearnsUsualHour() throws {
+        let s = store()
+        // A routine: three visits around 08:00.
+        _ = s.recordVisit(now: date(2026, 10, 6, hour: 8))
+        _ = s.recordVisit(now: date(2026, 10, 7, hour: 8, minute: 10))
+        _ = s.recordVisit(now: date(2026, 10, 8, hour: 7, minute: 50))
+        let usual = s.recordVisit(now: date(2026, 10, 9, hour: 8))
+        XCTAssertTrue(usual.nearUsualHour, "8:00 is the learned usual time")
+        let odd = s.recordVisit(now: date(2026, 10, 10, hour: 15))
+        XCTAssertFalse(odd.nearUsualHour, "3 PM is not your usual time (yet)")
+    }
+
+    /// Painter artifacts: the week grid and the trinket are ADDITIVE —
+    /// neutral by default, present when the memory says so.
+    func testPainterArtifactsAreNeutralByDefault() throws {
+        let engine = try makeGoldenEngine(.compass)
+        let plain = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+        let audited = AvatarSpritePainter(
+            skeleton: engine.skeleton, visualSet: engine.visualSet,
+            interiority: InteriorityTuning(sproutGrowth: 1, streakDays: 7, trinketPresent: false)
+        )
+        XCTAssertEqual(audited.shapes.count - plain.shapes.count, 7,
+                       "a 7-day streak draws the full week grid")
+
+        let prismEngine = try makeGoldenEngine(.prism)
+        let plainPrism = AvatarSpritePainter(skeleton: prismEngine.skeleton, visualSet: prismEngine.visualSet)
+        let withTrinket = AvatarSpritePainter(
+            skeleton: prismEngine.skeleton, visualSet: prismEngine.visualSet,
+            interiority: InteriorityTuning(sproutGrowth: 1, streakDays: 0, trinketPresent: true)
+        )
+        XCTAssertEqual(withTrinket.shapes.count - plainPrism.shapes.count, 1,
+                       "the found trinket adds exactly one diamond")
+    }
+
+    /// Willow's sprout growth scales the leaf — small at 0.2, the pinned
+    /// default at 1.0.
+    func testSproutGrowthScalesTheLeaf() throws {
+        let engine = try makeGoldenEngine(.willow)
+        func sproutHeight(_ growth: Float) -> Float {
+            let painter = AvatarSpritePainter(
+                skeleton: engine.skeleton, visualSet: engine.visualSet,
+                interiority: InteriorityTuning(sproutGrowth: growth, streakDays: 0, trinketPresent: false)
+            )
+            let index = try! XCTUnwrap(painter.sproutLeafShapeIndex)
+            return painter.shapes[index].height
+        }
+        let small = sproutHeight(0.2)
+        let mature = sproutHeight(1.0)
+        XCTAssertEqual(mature, 7.0, accuracy: 0.001, "growth 1.0 = the pinned sprout size")
+        XCTAssertLessThan(small, mature * 0.7, "a fresh sprout is visibly smaller")
     }
 }

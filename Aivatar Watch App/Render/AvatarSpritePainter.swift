@@ -54,6 +54,25 @@ nonisolated struct PaintedShape {
     var height: Float
 }
 
+/// Interiority tuning (A5d): the persistent traces the companion keeps —
+/// fed from CompanionMemory at context build, NOT from the engine clock
+/// (determinism: memory is an input, like the seed). Neutral by default
+/// so untuned renders (tests, previews) match the pinned look exactly.
+nonisolated struct InteriorityTuning: Sendable {
+    /// Willow's tended sprout: 0.2 (just sprouted) ... 1.0 (mature).
+    /// 1.0 = the A5a look; scales the soil pod and the sprout leaf.
+    var sproutGrowth: Float = 1
+    /// Compass's audit artifact: the week grid. 0 hides it (default);
+    /// 1-7 lights `streakDays` cells and dims the rest — order made
+    /// visible, the tidy artifact waiting for you.
+    var streakDays: Int = 0
+    /// Prism's found trinket: the day's small discovery, presented on
+    /// return. Hidden by default.
+    var trinketPresent = false
+
+    static let `default` = InteriorityTuning()
+}
+
 /// Palette token resolution (§3: ArchetypeVisualSet tokens over the shared
 /// rig). Roles in rig.json are tokens; the archetype supplies actual colors.
 nonisolated enum PaletteRole: Sendable {
@@ -112,6 +131,9 @@ nonisolated final class AvatarSpritePainter {
     private var catchlights: [(boneIndex: Int, afterSlot: Int)] = []
     private var speciesSlots = false
     private var speciesAccentColor: (r: Float, g: Float, b: Float)?
+    /// A5d interiority tuning (persistent traces): sprout growth, the
+    /// audit week grid, the found trinket. Neutral = the pinned look.
+    private let interiority: InteriorityTuning
     private(set) var shapes: [PaintedShape] = []
     private(set) var roleColors: [PaletteRole: (r: Float, g: Float, b: Float)] = [:]
     /// Prism's flicker table (v3 tell): accents swapped — a chromatic shift
@@ -144,7 +166,12 @@ nonisolated final class AvatarSpritePainter {
     private var sparkShapeIndex = 0
     private let hipsBoneIndex: Int
 
-    init(skeleton: Skeleton, visualSet: ArchetypeVisualSet) {
+    /// Interiority trace hooks (A5d, test-visible): the sprout leaf's
+    /// prebuilt shape index (Willow), for growth assertions.
+    private(set) var sproutLeafShapeIndex: Int?
+
+    init(skeleton: Skeleton, visualSet: ArchetypeVisualSet,
+         interiority: InteriorityTuning = .default) {
         let rig = skeleton.document
         var sorted = rig.slots
         sorted.sort { $0.drawOrder < $1.drawOrder }
@@ -212,6 +239,7 @@ nonisolated final class AvatarSpritePainter {
         }
         particles = [Particle](repeating: Particle(), count: Self.particlePoolSize)
 
+        self.interiority = interiority
         if visualSet.isSpecies {
             buildSpeciesDecorations(skeleton: skeleton, archetype: visualSet.archetype)
         }
@@ -301,13 +329,16 @@ nonisolated final class AvatarSpritePainter {
                    kind: "circle", bone: "hips", role: .deep, x: 22, y: 10, alpha: 0.45)
         case .willow:
             // The tended sprout floats beside it in a small soil-pod
-            // (interiority made discoverable; the plant itself grows in a
-            // later pass).
-            append(RigDocument.Shape(kind: "circle", width: 5, height: 4, bendSegments: nil),
+            // (interiority made discoverable). A5d: the sprout GROWS with
+            // attended days (CompanionMemory.sproutGrowth) — a persistent
+            // trace the user discovers on their own.
+            let s = max(0.2, min(1.4, 0.4 + 0.6 * interiority.sproutGrowth))
+            append(RigDocument.Shape(kind: "circle", width: 5 * s, height: 4 * s, bendSegments: nil),
                    kind: "circle", bone: "hips", role: .deep, x: 17, y: 9)
-            append(RigDocument.Shape(kind: "triangle", width: 4, height: 7, bendSegments: nil),
+            append(RigDocument.Shape(kind: "triangle", width: 4 * s, height: 7 * s, bendSegments: nil),
                    kind: "leaf", bone: "hips", role: .accentA, x: 17, y: 3, rotation: 0.2,
                    id: "sproutLeaf")
+            sproutLeafShapeIndex = shapes.count - 1
             // v4 reference: the weeping bush — hanging teardrop leaves
             // under the body (leaf kind rotated tip-down), yellow-lit.
             // v5: five leaves, large enough to carry the silhouette.
@@ -340,6 +371,20 @@ nonisolated final class AvatarSpritePainter {
                    kind: "patch", bone: "hips", role: .accentA, x: 7, y: 15, rotation: Float.pi / 4, alpha: 0.85)
             append(RigDocument.Shape(kind: "rect", width: 4.5, height: 4.5, bendSegments: nil),
                    kind: "patch", bone: "hips", role: .accentA, x: 0, y: 21, rotation: Float.pi / 4, alpha: 0.8)
+            // A5d interiority — the audit artifact: the week grid under
+            // the body, `streakDays` cells lit, the rest dim. Compass's
+            // love language is order; the tidy artifact waits for you.
+            if interiority.streakDays > 0 {
+                for day in 0..<7 {
+                    let lit = day < min(interiority.streakDays, 7)
+                    append(RigDocument.Shape(kind: "rect", width: 2.6, height: 2.6, bendSegments: nil),
+                           kind: "patch", bone: "hips",
+                           role: lit ? .accentA : .deep,
+                           x: Float(-10.5 + Double(day) * 3.5), y: 25,
+                           alpha: lit ? 0.85 : 0.30,
+                           id: "weekGrid")
+                }
+            }
         case .compass:
             // The interior progress grid (order token): thin cyan lines on
             // the chest, inside the "translucency". U3: precision lives in
@@ -370,6 +415,15 @@ nonisolated final class AvatarSpritePainter {
             // glowing violet (accentA). v5: sized to carry the silhouette.
             append(RigDocument.Shape(kind: "triangle", width: 7, height: 13, bendSegments: nil),
                    kind: "triangle", bone: "head", role: .accentA, x: 0, y: -36, alpha: 0.95)
+            // A5d interiority — the found trinket: the day's small
+            // discovery, presented on return the way a cat brings a
+            // thing. A cyan diamond floating beside the tilted head.
+            if interiority.trinketPresent {
+                append(RigDocument.Shape(kind: "rect", width: 5, height: 5, bendSegments: nil),
+                       kind: "patch", bone: "head", role: .accentB,
+                       x: 17, y: -10, rotation: Float.pi / 4, alpha: 0.9,
+                       id: "trinket")
+            }
         case .nimbus:
             // Reference specimen: no extra token — identity is the lavender
             // tint and the tell (the post-event pulse, engine-side A5b).
