@@ -1354,12 +1354,15 @@ final class GoldenFrameTests: XCTestCase {
         // v13 (v5b): quirk clips — pool weights changed the seeded idle
         // schedule, but the pinned frames carry no active gesture, so the
         // v12 hashes carry over unchanged.
+        // v14 (v7): pixel-design cute pass (Tools/PIXEL_DESIGN.md) — ears
+        // on every species, enlarged pupils + catchlights, face inset,
+        // so the command buffer at the golden pose changed deliberately.
         let expected: [Archetype: UInt64] = [
-            .ember: 6_003_811_012_249_022_199,
-            .willow: 12_556_598_134_123_831_722,
-            .compass: 1_736_151_592_779_275_816,
-            .prism: 12_918_640_192_026_002_639,
-            .nimbus: 6_483_730_128_731_939_307,
+            .ember: 10_797_589_159_950_752_963,
+            .willow: 11_632_248_360_311_394_863,
+            .compass: 12_846_232_288_341_441_366,
+            .prism: 329_223_719_153_816_148,
+            .nimbus: 18_338_159_615_810_752_377,
         ]
 
         var actual: [Archetype: UInt64] = [:]
@@ -1639,12 +1642,16 @@ final class PixelStageTests: XCTestCase {
         // Deliberate visual change — the pinned frame is active mode at
         // frame 0, so it now carries the dithered ramp tones, halo ring,
         // and the frame-0 mote field.
+        // v8 (v7 pixel-design cute pass, Tools/PIXEL_DESIGN.md): authored
+        // ramp tones joined the LUT (§1), edge fringes snap clean so only
+        // interior ramps dither (§2), ears + big pupils + face inset +
+        // accent-tinted halo (§3-5).
         let expected: [Archetype: UInt64] = [
-            .ember: 17_953_982_118_836_381_991,
-            .willow: 12_451_170_222_394_635_020,
-            .compass: 11_727_249_691_758_849_217,
-            .prism: 5_805_534_680_947_395_576,
-            .nimbus: 3_516_118_709_299_431_632,
+            .ember: 13_117_810_475_208_761_603,
+            .willow: 9_754_344_364_845_908_826,
+            .compass: 8_416_969_851_222_770_231,
+            .prism: 6_149_455_984_412_039_409,
+            .nimbus: 541_852_625_801_170_022,
         ]
         var actual: [Archetype: UInt64] = [:]
         for archetype in Archetype.allCases {
@@ -2307,5 +2314,80 @@ final class InteriorityTests: XCTestCase {
         let mature = sproutHeight(1.0)
         XCTAssertEqual(mature, 7.0, accuracy: 0.001, "growth 1.0 = the pinned sprout size")
         XCTAssertLessThan(small, mature * 0.7, "a fresh sprout is visibly smaller")
+    }
+}
+
+// MARK: - v7 pixel design practices (Tools/PIXEL_DESIGN.md)
+
+/// The v7 best-practice invariants: authored ramp tones in the LUT, big
+/// cute eyes, face spacing tuned per head width, and the two-ear
+/// creature cue on every species.
+final class V7PixelDesignTests: XCTestCase {
+    /// §1: the rasterizer LUT must contain the authored gradient ramp
+    /// stops (lifted top + deepened bottom per painted role) — otherwise
+    /// gradient pixels snap to whatever palette color is nearest and the
+    /// body reads as noise.
+    func testLUTContainsAuthoredRampTones() throws {
+        for archetype in Archetype.allCases {
+            let engine = try makeGoldenEngine(archetype)
+            let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+            let ramps = painter.rampTonesForRasterizer
+            XCTAssertGreaterThanOrEqual(ramps.count, 8, "\(archetype.rawValue): expected ramp stops from the painted roles")
+            let rasterizer = PixelStageRasterizer(painter: painter)
+            for tone in ramps {
+                let found = rasterizer.lutForTesting.contains {
+                    abs($0.0 - tone.0) < 0.01 && abs($0.1 - tone.1) < 0.01 && abs($0.2 - tone.2) < 0.01
+                }
+                XCTAssertTrue(found, "\(archetype.rawValue): ramp tone missing from the LUT")
+            }
+        }
+    }
+
+    /// §3: big eyes on every species — the pupil slot scale floor.
+    func testPupilsScaleUpForCuteness() {
+        for archetype in Archetype.allCases {
+            let scale = AvatarSpritePainter.speciesSlotScale(archetype: archetype, slotName: "pupilL")
+            XCTAssertEqual(scale?.w ?? 0, 1.4, accuracy: 0.001, "\(archetype.rawValue): pupil width scale")
+            XCTAssertEqual(scale?.h ?? 0, 1.45, accuracy: 0.001, "\(archetype.rawValue): pupil height scale")
+            let mirror = AvatarSpritePainter.speciesSlotScale(archetype: archetype, slotName: "pupilR")
+            XCTAssertEqual(scale?.w ?? 0, mirror?.w ?? 0, accuracy: 0.001, "pupils must stay symmetric")
+            XCTAssertEqual(scale?.h ?? 0, mirror?.h ?? 0, accuracy: 0.001, "pupils must stay symmetric")
+        }
+    }
+
+    /// §3: eye spacing follows head width — the catchlight span (the two
+    /// white eye dots) must be widest on Willow's wide dome and narrowest
+    /// on Ember's whip head.
+    func testFaceInsetFollowsHeadWidth() throws {
+        func eyeSpan(_ archetype: Archetype) throws -> Float {
+            let engine = try makeGoldenEngine(archetype)
+            engine.update(toFrame: 300)
+            let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+            painter.paint(
+                world: engine.currentWorld, pose: engine.currentPose, rest: false,
+                accentPhase: engine.activeGesturePhase, tell: engine.tell, tellPhase: engine.tellPhase
+            )
+            var xs: [Float] = []
+            for i in 0..<painter.commandCount {
+                let c = painter.commands[i]
+                if c.r > 0.98 && c.g > 0.98 && c.b > 0.98 && c.a > 0.9 { xs.append(c.tx) }
+            }
+            XCTAssertEqual(xs.count, 2, "\(archetype.rawValue): expected exactly two catchlights")
+            return abs(xs[1] - xs[0])
+        }
+        let ember = try eyeSpan(.ember)
+        let willow = try eyeSpan(.willow)
+        XCTAssertLessThan(ember, 22, "Ember's narrow flame head pulls the eyes in")
+        XCTAssertGreaterThan(willow, 38, "Willow's wide dome spreads the eyes out")
+        XCTAssertLessThan(ember, willow, "eye span must track head width")
+    }
+
+    /// §4: the creature cue — every species carries a two-ear cluster.
+    func testSpeciesCarryEars() throws {
+        for archetype in Archetype.allCases {
+            let engine = try makeGoldenEngine(archetype)
+            let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+            XCTAssertEqual(painter.earCountForTesting, 2, "\(archetype.rawValue): every species carries two ears")
+        }
     }
 }

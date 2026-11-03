@@ -112,6 +112,10 @@ nonisolated final class AvatarSpritePainter {
         let role: PaletteRole
         /// Species token color override (e.g. Ember's flame tip accent).
         let roleOverride: PaletteRole?
+        /// v7 face inset (§3, Tools/PIXEL_DESIGN.md): head-space X shift
+        /// for the eye cluster (pupils/lids/brows), tuned per head width —
+        /// 0 for every non-face slot.
+        let faceInsetX: Float
     }
 
     /// A species decoration (v3 trait tokens): a small prebuilt shape pinned
@@ -136,7 +140,7 @@ nonisolated final class AvatarSpritePainter {
     private var decorations: [Decoration] = []
     private var slotIndexByName: [String: Int] = [:]
     private var catchlightShapeIndex = 0
-    private var catchlights: [(boneIndex: Int, afterSlot: Int)] = []
+    private var catchlights: [(boneIndex: Int, afterSlot: Int, localX: Float, localY: Float)] = []
     private var speciesSlots = false
     private var speciesAccentColor: (r: Float, g: Float, b: Float)?
     /// A5d interiority tuning (persistent traces): sprout growth, the
@@ -152,6 +156,22 @@ nonisolated final class AvatarSpritePainter {
     /// render loop only reads — the renderer caches fill objects per pair.
     private var gradientPairs: [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))] = [:]
     private var flickerGradientPairs: [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))] = [:]
+
+    /// v7 (§1, Tools/PIXEL_DESIGN.md): the authored ramp stop colors —
+    /// every gradient pair's lifted top + deepened bottom — so the
+    /// rasterizer's LUT contains the FULL authored ramp (role + top +
+    /// bottom). Without these, gradient pixels snap to whatever palette
+    /// color happens to be nearest and the body reads as noise, not as
+    /// a deliberate 3-4 tone cel ramp.
+    var rampTonesForRasterizer: [(Float, Float, Float)] {
+        var tones: [(Float, Float, Float)] = []
+        tones.reserveCapacity(gradientPairs.count * 2)
+        for (_, pair) in gradientPairs {
+            tones.append(pair.top)
+            tones.append(pair.bottom)
+        }
+        return tones
+    }
 
     private var scratchTransforms: [Transform2D]
 
@@ -184,6 +204,9 @@ nonisolated final class AvatarSpritePainter {
     private var headBoneIndex = 0
     /// Test-visible: the blush alpha actually painted last frame.
     private(set) var lastBlushAlphaForTesting: Float = 0
+    /// Test-visible: ears added (§4 — every species carries a two-ear
+    /// cluster); 0 on the v1 fallback path.
+    private(set) var earCountForTesting = 0
 
     init(skeleton: Skeleton, visualSet: ArchetypeVisualSet,
          interiority: InteriorityTuning = .default) {
@@ -241,6 +264,10 @@ nonisolated final class AvatarSpritePainter {
                 roleOverride: Self.speciesRoleOverride(
                     slotName: slot.name,
                     archetype: visualSet.isSpecies ? visualSet.archetype : nil
+                ),
+                faceInsetX: Self.speciesFaceInset(
+                    archetype: visualSet.isSpecies ? visualSet.archetype : nil,
+                    slotName: slot.name
                 )
             ))
             slotIndexByName[slot.name] = slots.count - 1
@@ -315,13 +342,39 @@ nonisolated final class AvatarSpritePainter {
 
         // Eye catchlights (dead-eye guard, U2): one bright dot per pupil,
         // drawn right after the pupil slots so the lids still cover them on
-        // a blink. Pupils never shrink (small pupils read cold).
-        let catchlightSpec = RigDocument.Shape(kind: "circle", width: 2.2, height: 2.2, bendSegments: nil)
+        // a blink. Pupils never shrink (small pupils read cold). v7: the
+        // catchlight grew to ~40% of the enlarged pupil (§3 — the face is
+        // the avatar) and rides the species face inset.
+        let catchlightSpec = RigDocument.Shape(kind: "circle", width: 3.0, height: 3.0, bendSegments: nil)
         shapes.append(Self.buildShape(catchlightSpec, kind: "circle"))
         catchlightShapeIndex = shapes.count - 1
         for pupil in ["pupilL", "pupilR"] {
             guard let slotIndex = slotIndexByName[pupil] else { continue }
-            catchlights.append((slots[slotIndex].boneIndex, slotIndex))
+            let inset = slots[slotIndex].faceInsetX
+            catchlights.append((slots[slotIndex].boneIndex, slotIndex, -1.1 + inset, -1.1))
+        }
+
+        // v7 ears (§4, Tools/PIXEL_DESIGN.md): the cheapest cuteness
+        // device in pixel art — every species carries a two-ear cluster
+        // above the head, shaped per temperament, BODY-colored with the
+        // head's volumetric ramp so the ears read as anatomy, never
+        // stickers. Positions are per SIDE (lx/rx): Prism's pyramid head
+        // shears with the plan's lean, so its ears ride the two slopes at
+        // different offsets — like a tilted cat.
+        let earSpec: (kind: String, w: Float, h: Float, lx: Float, rx: Float, y: Float, rot: Float)
+        switch archetype {
+        case .ember: earSpec = ("flame", 9, 13, -10.5, 10.5, -30, 0.30)      // flame tufts on the whip head
+        case .willow: earSpec = ("leaf", 7, 12, -24, 24, -14, 0.25)          // leaf ears on the wide dome
+        case .compass: earSpec = ("triangle", 10, 13, -10, 10, -25, 0.45)    // crystal facets on the gem slope
+        case .prism: earSpec = ("triangle", 10, 14, -5.5, 12, -21, 0.25)     // twin spikes on the sheared apex
+        case .nimbus: earSpec = ("circle", 11, 12, -19, 19, -24, 0)           // round cloud nubs
+        }
+        for (side, x) in [(Float(-1), earSpec.lx), (Float(1), earSpec.rx)] {
+            append(RigDocument.Shape(kind: earSpec.kind, width: earSpec.w, height: earSpec.h, bendSegments: nil),
+                   kind: earSpec.kind, bone: "head", role: .bodyLight,
+                   x: x, y: earSpec.y, rotation: side * earSpec.rot,
+                   id: "ear")
+            earCountForTesting += 1
         }
 
         switch archetype {
@@ -500,8 +553,35 @@ nonisolated final class AvatarSpritePainter {
             }
         case "jaw":
             return archetype == .willow ? (1.50, 0.60) : nil
+        case "pupilL", "pupilR":
+            // v7 cuteness floor (§3, Tools/PIXEL_DESIGN.md): big round
+            // eyes on every species — the face is the avatar.
+            return (1.4, 1.45)
         default:
             return nil
+        }
+    }
+
+    /// v7 face inset (§3, Tools/PIXEL_DESIGN.md): eye-cluster spacing
+    /// tuned per head width. Positive d pulls the cluster toward the
+    /// center line (narrow heads: Ember's flame, Compass's gem); negative
+    /// spreads it out (wide heads: Willow's dome, Nimbus's cloud). Fixed
+    /// spacing across radically different head plans reads as a bug, not
+    /// a style — this is the pixel-art "tune the face to the shape" rule.
+    static func speciesFaceInset(archetype: Archetype?, slotName: String) -> Float {
+        guard let archetype else { return 0 }
+        let d: Float
+        switch archetype {
+        case .ember: d = 3.5
+        case .willow: d = -8
+        case .compass: d = 1.5
+        case .prism: d = 2.0
+        case .nimbus: d = -4
+        }
+        switch slotName {
+        case "pupilL", "lidL", "browL": return d
+        case "pupilR", "lidR", "browR": return -d
+        default: return 0
         }
     }
 
@@ -651,9 +731,11 @@ nonisolated final class AvatarSpritePainter {
                 colors[.glow] = parse(glow)
             }
             // v6 derived stage/face tones (never authored per archetype):
-            // blush pulls accentA 30% toward rose; halo is the rim light
-            // sunk toward black (a contour that still reads on OLED black);
-            // motes sink the accent deeper for background dust.
+            // blush pulls accentA 30% toward rose. v7 (§5,
+            // Tools/PIXEL_DESIGN.md): the halo is ACCENT-tinted (not a
+            // neutral gray) so the contour belongs to the palette family —
+            // Ember glows amber, Compass cyan, Prism pink. Motes sink the
+            // accent deeper for background dust.
             let accentAColor = colors[.accentA] ?? bodyLight
             colors[.blush] = (
                 accentAColor.0 * 0.7 + 0.30,
@@ -661,9 +743,9 @@ nonisolated final class AvatarSpritePainter {
                 accentAColor.2 * 0.7 + 0.165
             )
             colors[.halo] = (
-                Self.rimLight.0 * 0.42,
-                Self.rimLight.1 * 0.42,
-                Self.rimLight.2 * 0.42
+                accentAColor.0 * 0.40,
+                accentAColor.1 * 0.40,
+                accentAColor.2 * 0.40
             )
             colors[.mote] = (
                 accentAColor.0 * 0.30,
@@ -690,9 +772,10 @@ nonisolated final class AvatarSpritePainter {
             .face: face,
             .restDim: dimmed(primary),
         ]
-        // v6 derived tones on the v1 fallback path, same recipes.
+        // v6/v7 derived tones on the v1 fallback path, same recipes
+        // (halo tinted with the primary — no accent on this path).
         colors[.blush] = (primary.0 * 0.7 + 0.30, primary.1 * 0.7 + 0.12, primary.2 * 0.7 + 0.165)
-        colors[.halo] = (Self.rimLight.0 * 0.42, Self.rimLight.1 * 0.42, Self.rimLight.2 * 0.42)
+        colors[.halo] = (primary.0 * 0.40, primary.1 * 0.40, primary.2 * 0.40)
         colors[.mote] = (primary.0 * 0.30, primary.1 * 0.30, primary.2 * 0.30)
         return colors
     }
@@ -1044,8 +1127,12 @@ nonisolated final class AvatarSpritePainter {
                 // local center point (0, offsetY).
                 let offX = shape.offsetsY[i] * t.c
                 let offY = shape.offsetsY[i] * t.d
-                command.tx = t.tx + offX
-                command.ty = t.ty + offY
+                // v7 face inset (§3): head-space shift of the eye cluster,
+                // applied through the bone transform so it rides breathing
+                // tilt and gaze rotation like the rest of the face.
+                let insetX = slot.faceInsetX
+                command.tx = t.tx + offX + insetX * t.a
+                command.ty = t.ty + offY + insetX * t.b
                 command.rotation = atan2(t.b, t.a) + (slices > 1 ? bend * shape.bendFractions[i] : 0)
                 command.scaleX = sqrt(t.a * t.a + t.b * t.b)
                 command.scaleY = sqrt(t.c * t.c + t.d * t.d)
@@ -1138,8 +1225,8 @@ nonisolated final class AvatarSpritePainter {
                         boneIndex: catchlight.boneIndex,
                         shapeIndex: catchlightShapeIndex,
                         role: .catchlight,
-                        localX: -1.1,
-                        localY: -1.1,
+                        localX: catchlight.localX,
+                        localY: catchlight.localY,
                         rotation: 0,
                         alpha: 1,
                         world: world
@@ -1234,9 +1321,11 @@ nonisolated final class AvatarSpritePainter {
                 break
             }
         }
-        // The sprout leaf takes foliage gradient depth; every other token
-        // (patches, grid, glow, catchlight) stays flat matte by design.
-        let pair = decoration.id == "sproutLeaf" ? pairs[decoration.role] : nil
+        // The sprout leaf and the v7 ears take foliage/anatomy gradient
+        // depth; every other token (patches, grid, glow, catchlight)
+        // stays flat matte by design.
+        let pair = (decoration.id == "sproutLeaf" || decoration.id == "ear")
+            ? pairs[decoration.role] : nil
         emitDecoration(
             boneIndex: decoration.boneIndex,
             shapeIndex: decoration.shapeIndex,

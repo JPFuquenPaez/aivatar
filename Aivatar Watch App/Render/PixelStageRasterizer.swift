@@ -85,6 +85,15 @@ nonisolated final class PixelStageRasterizer {
                 colors.append(color)
             }
         }
+        // v7 (§1, Tools/PIXEL_DESIGN.md): the authored ramp stops join the
+        // LUT — gradient pixels then quantize to the authored 3-4 tone
+        // cel ramps (role + lifted top + deepened bottom) instead of
+        // snapping to whatever palette color happens to be nearest.
+        for tone in painter.rampTonesForRasterizer {
+            if !colors.contains(where: { $0.0 == tone.0 && $0.1 == tone.1 && $0.2 == tone.2 }) {
+                colors.append(tone)
+            }
+        }
         if !colors.contains(where: { $0.0 >= 0.999 && $0.1 >= 0.999 && $0.2 >= 0.999 }) {
             colors.append((1, 1, 1))
         }
@@ -259,7 +268,12 @@ nonisolated final class PixelStageRasterizer {
                 }
             }
             var chosen = bestColor
-            if secondDist > bestDist + 1 {
+            // v7 edge-clean dithering (§2, Tools/PIXEL_DESIGN.md): only
+            // FULLY-covered interior pixels may dither between the two
+            // nearest ramp tones (the classic hi-bit cel texture).
+            // Antialiased shape boundaries snap clean to the nearest tone
+            // — a dithered fringe reads as noise, not as pixel art.
+            if a >= 250, secondDist > bestDist + 1 {
                 // How far between the tones the pixel sits: 0 = exact
                 // match (flat — never dithers), -> 1 = equidistant.
                 let t = bestDist / secondDist
