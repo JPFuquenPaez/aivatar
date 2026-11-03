@@ -76,25 +76,17 @@ nonisolated struct InteriorityTuning: Sendable {
 /// Palette token resolution (§3: ArchetypeVisualSet tokens over the shared
 /// rig). Roles in rig.json are tokens; the archetype supplies actual colors.
 nonisolated enum PaletteRole: Sendable {
-    case primary
-    case primaryDim
-    case deep
-    case face
-    case restDim
-    // v3 species roles (A5a): tint -> token -> tell.
-    case bodyLight   // light upper mass (head middle puff, chest top)
-    case accentA     // trait token A
-    case accentB     // trait token B
-    case glow        // interior glow (Ember embers)
-    case catchlight  // the single bright eye catchlight (dead-eye guard)
-    // v6 stage tones (rasterizer-only, never painted as shapes): the 1-px
-    // silhouette halo (sticker contour on the black stage) and the ambient
-    // background motes. Both must live in the LUT so the snap test holds.
-    case halo
+    case primary     // the ONE body accent hue (flat — no gradient, Mistral DNA)
+    case primaryDim  // v1 fallback path only
+    case deep        // v1 fallback path only
+    case face        // ink: eyes/mouth/brows + beak/nose anchors
+    case restDim     // rest LOD dim
+    case accentA     // transient accent: spark particles + flicker tell swap
+    case accentB     // flicker tell swap target
+    case catchlight  // white eye catchlight (dead-eye guard)
+    case paper       // white negative-space details (muzzle, tail tip)
+    // v9 stage tone (rasterizer-only): the ambient background motes.
     case mote
-    /// v6 blush cheeks (warm/joy beat) — accentA pulled 30% toward a warm
-    /// rose so the blush reads warm on every archetype hue.
-    case blush
 }
 
 /// Converts rig + pose + visual set into the per-frame sprite command list.
@@ -114,8 +106,10 @@ nonisolated final class AvatarSpritePainter {
         let roleOverride: PaletteRole?
         /// v7 face inset (§3, Tools/PIXEL_DESIGN.md): head-space X shift
         /// for the eye cluster (pupils/lids/brows), tuned per head width —
-        /// 0 for every non-face slot.
+        /// 0 for every non-face slot. v9 adds faceInsetY (frog's dome eyes
+        /// sit ON TOP of the head, so the whole eye cluster shifts up).
         let faceInsetX: Float
+        let faceInsetY: Float
     }
 
     /// A species decoration (v3 trait tokens): a small prebuilt shape pinned
@@ -198,15 +192,11 @@ nonisolated final class AvatarSpritePainter {
     /// prebuilt shape index (Willow), for growth assertions.
     private(set) var sproutLeafShapeIndex: Int?
 
-    /// v6 face-beat shapes: the blush cheek pair, pinned to the head bone
-    /// and alpha-driven per frame from the pose's warm/joy weights.
-    private var blushShapeIndex = 0
+    /// v9 test-visible: the anchor decoration ids of this animal plan
+    /// (ears/domes/beak/fin/casque...) — the identity anchors per the
+    /// refactor brief.
+    private(set) var anchorDecorationIDsForTesting: [String] = []
     private var headBoneIndex = 0
-    /// Test-visible: the blush alpha actually painted last frame.
-    private(set) var lastBlushAlphaForTesting: Float = 0
-    /// Test-visible: ears added (§4 — every species carries a two-ear
-    /// cluster); 0 on the v1 fallback path.
-    private(set) var earCountForTesting = 0
 
     init(skeleton: Skeleton, visualSet: ArchetypeVisualSet,
          interiority: InteriorityTuning = .default) {
@@ -230,45 +220,50 @@ nonisolated final class AvatarSpritePainter {
             ? ["upperArmL", "upperArmR", "forearmL", "forearmR", "handL", "handR"]
             : []
 
+        // v9 animal icons (Tools/PIXEL_DESIGN.md v3): species archetypes
+        // paint from an AnimalPlan — the frozen rig slots are re-purposed
+        // per animal (kind + scale + role), and hidden slots (scale <= 0)
+        // paint nothing, keeping each animal to 3-5 solid shapes + face.
+        let plan = visualSet.isSpecies ? Self.animalPlan(visualSet.archetype) : nil
         for slot in sorted {
             guard let boneIndex = skeleton.boneIndex(slot.bone) else { continue }
             if armBones.contains(slot.bone) { continue }
+            let archetype = visualSet.isSpecies ? visualSet.archetype : nil
+            if let plan, let animal = plan.slots[slot.name] {
+                if animal.w <= 0 || animal.h <= 0 { continue }  // hidden part
+                let spec = RigDocument.Shape(
+                    kind: slot.shape.kind,
+                    width: slot.shape.width * animal.w,
+                    height: slot.shape.height * animal.h,
+                    bendSegments: slot.shape.bendSegments
+                )
+                shapes.append(Self.buildShape(spec, kind: animal.kind))
+                slots.append(Slot(
+                    name: slot.name,
+                    boneIndex: boneIndex,
+                    shapeIndex: shapes.count - 1,
+                    role: animal.role ?? Self.resolveRole(slot.paletteRole),
+                    roleOverride: nil,
+                    faceInsetX: Self.speciesFaceInset(archetype: archetype, slotName: slot.name),
+                    faceInsetY: Self.speciesFaceInsetY(archetype: archetype, slotName: slot.name)
+                ))
+                slotIndexByName[slot.name] = slots.count - 1
+                continue
+            }
             let kind = Self.resolvedKind(
                 slotName: slot.name,
                 defaultKind: slot.shape.kind,
-                style: visualSet.shapeLanguage,
-                species: visualSet.isSpecies ? visualSet.archetype : nil
+                style: visualSet.shapeLanguage
             )
-            // v5 body plans (§11.2, reference icons): proportions carry the
-            // silhouette — the slot specs are re-scaled per archetype so
-            // the five read as different CREATURES, not recolors (the
-            // assessment finding: same rig + same proportions = IoU 0.74+).
-            var spec = slot.shape
-            if let scale = Self.speciesSlotScale(
-                archetype: visualSet.isSpecies ? visualSet.archetype : nil,
-                slotName: slot.name
-            ) {
-                spec = RigDocument.Shape(
-                    kind: spec.kind,
-                    width: spec.width * scale.w,
-                    height: spec.height * scale.h,
-                    bendSegments: spec.bendSegments
-                )
-            }
-            shapes.append(Self.buildShape(spec, kind: kind))
+            shapes.append(Self.buildShape(slot.shape, kind: kind))
             slots.append(Slot(
                 name: slot.name,
                 boneIndex: boneIndex,
                 shapeIndex: shapes.count - 1,
                 role: Self.resolveRole(slot.paletteRole),
-                roleOverride: Self.speciesRoleOverride(
-                    slotName: slot.name,
-                    archetype: visualSet.isSpecies ? visualSet.archetype : nil
-                ),
-                faceInsetX: Self.speciesFaceInset(
-                    archetype: visualSet.isSpecies ? visualSet.archetype : nil,
-                    slotName: slot.name
-                )
+                roleOverride: nil,
+                faceInsetX: 0,
+                faceInsetY: 0
             ))
             slotIndexByName[slot.name] = slots.count - 1
         }
@@ -282,46 +277,31 @@ nonisolated final class AvatarSpritePainter {
         particles = [Particle](repeating: Particle(), count: Self.particlePoolSize)
 
         self.interiority = interiority
-        if visualSet.isSpecies {
-            buildSpeciesDecorations(skeleton: skeleton, archetype: visualSet.archetype)
+        if let plan, visualSet.isSpecies {
+            buildAnimalDecorations(skeleton: skeleton, plan: plan, archetype: visualSet.archetype)
         }
-        // v6 face-beat shapes (blush cheeks), built for every visual set.
-        buildFaceBeatShapes(skeleton: skeleton)
 
         roleColors = Self.resolveColors(visualSet: visualSet)
-        // Prism's flicker table: accents swap — the chromatic tell, built
-        // once (no per-frame allocation; selected by flag in paint()).
+        // v9 flat (Mistral DNA): NO gradient stops — every shape is one
+        // solid LUT color. The flicker table swaps the body hue with the
+        // archetype's accentB for the chromatic tell (Prism).
+        gradientPairs = [:]
+        flickerGradientPairs = [:]
         flickerColors = roleColors
-        if let accentA = roleColors[.accentA] {
-            flickerColors[.accentB] = accentA
+        if let primary = roleColors[.primary], let accentB = roleColors[.accentB] {
+            flickerColors[.primary] = accentB
+            flickerColors[.accentB] = primary
         }
-        if let accentB = roleColors[.accentB] {
-            flickerColors[.accentA] = accentB
-        }
-        // Species sparks (Ember's tell) fly in the trait-token color, not
-        // the near-black face accent.
+        // Species sparks (Ember's tell) fly in the trait-token color.
         if visualSet.isSpecies {
             speciesAccentColor = roleColors[.accentA]
         }
-        // Volumetric gradient stops per role (static set -> the renderer's
-        // fill-object cache is fully warm after the first frame).
-        gradientPairs = Self.buildGradientPairs(roleColors)
-        flickerGradientPairs = Self.buildGradientPairs(flickerColors)
     }
 
-    /// v6 face-beat shapes: one soft ellipse for the blush cheeks. The pair
-    /// is emitted twice per frame at mirrored local offsets in paint().
-    private func buildFaceBeatShapes(skeleton: Skeleton) {
-        headBoneIndex = skeleton.boneIndex("head") ?? 0
-        let blushSpec = RigDocument.Shape(kind: "circle", width: 7.5, height: 4.6, bendSegments: nil)
-        blushShapeIndex = shapes.count
-        shapes.append(Self.buildShape(blushSpec, kind: "circle"))
-    }
-
-    /// v3 trait tokens per archetype (§6 v2: tint -> ONE token -> tell).
-    /// Decorations are bone-pinned prebuilt shapes drawn at fixed local
-    /// offsets; all colors come from the species palette roles.
-    private func buildSpeciesDecorations(skeleton: Skeleton, archetype: Archetype) {
+    /// v9 animal decorations: the identity anchors (ears, eye domes,
+    /// beak, fins, casque...) from the plan, then the catchlights, then
+    /// the A5d interiority traces (sprout / week grid / trinket).
+    private func buildAnimalDecorations(skeleton: Skeleton, plan: AnimalPlan, archetype: Archetype) {
         func append(_ spec: RigDocument.Shape, kind: String, bone: String,
                     role: PaletteRole, x: Float, y: Float, rotation: Float = 0,
                     alpha: Float = 1, afterSlot: String? = nil, id: String? = nil) {
@@ -338,13 +318,14 @@ nonisolated final class AvatarSpritePainter {
                 afterSlotName: afterSlot,
                 id: id
             ))
+            if let id { anchorDecorationIDsForTesting.append(id) }
         }
 
-        // Eye catchlights (dead-eye guard, U2): one bright dot per pupil,
+        headBoneIndex = skeleton.boneIndex("head") ?? 0
+
+        // Eye catchlights (dead-eye guard, U2): one white dot per pupil,
         // drawn right after the pupil slots so the lids still cover them on
-        // a blink. Pupils never shrink (small pupils read cold). v7: the
-        // catchlight grew to ~40% of the enlarged pupil (§3 — the face is
-        // the avatar) and rides the species face inset.
+        // a blink. Same eye style across the whole set (grid discipline).
         let catchlightSpec = RigDocument.Shape(kind: "circle", width: 3.0, height: 3.0, bendSegments: nil)
         shapes.append(Self.buildShape(catchlightSpec, kind: "circle"))
         catchlightShapeIndex = shapes.count - 1
@@ -354,155 +335,198 @@ nonisolated final class AvatarSpritePainter {
             catchlights.append((slots[slotIndex].boneIndex, slotIndex, -1.1 + inset, -1.1))
         }
 
-        // v8 ears (§1, Tools/PIXEL_DESIGN.md v2): the creature cue — every
-        // species carries a two-ear cluster above the round head, shaped
-        // per temperament, BODY-colored with the head's volumetric ramp so
-        // the ears read as anatomy, never stickers. Slight asymmetry (the
-        // right ear a touch taller/less rotated) — perfect symmetry reads
-        // mechanical. Positions are per side and tuned to each head's
-        // scaled dome top.
-        let earSpec: (kind: String, w: Float, h: Float, lx: Float, rx: Float, y: Float, rot: Float)
-        switch archetype {
-        // y is sunk ~4 units into the dome so the ear base rasterizes as
-        // a SOLID overlap (a sub-pixel contact leaves a black seam and the
-        // ear reads as a floating sticker — connectivity test catches it).
-        case .ember: earSpec = ("flame", 9, 12, -17, 17, -22, 0.30)     // flame tufts
-        case .willow: earSpec = ("leaf", 7, 11, -22, 22, -18, 0.25)     // leaf ears
-        case .compass: earSpec = ("triangle", 9, 12, -16, 16, -23, 0.40) // crystal facets
-        case .prism: earSpec = ("triangle", 9, 13, -16, 18, -21, 0.30)  // twin spikes
-        case .nimbus: earSpec = ("circle", 10, 11, -19, 19, -20, 0)     // cloud nubs
-        }
-        for (side, x) in [(Float(-1), earSpec.lx), (Float(1), earSpec.rx)] {
-            let h = side < 0 ? earSpec.h : earSpec.h * 1.12      // asymmetry
-            let rot = side * earSpec.rot * (side < 0 ? 1.0 : 0.8)
-            append(RigDocument.Shape(kind: earSpec.kind, width: earSpec.w, height: h, bendSegments: nil),
-                   kind: earSpec.kind, bone: "head", role: .primary,
-                   x: x, y: earSpec.y, rotation: rot,
-                   id: "ear")
-            earCountForTesting += 1
+        for deco in plan.decorations {
+            append(RigDocument.Shape(kind: deco.kind, width: deco.w, height: deco.h, bendSegments: nil),
+                   kind: deco.kind, bone: deco.bone, role: deco.role,
+                   x: deco.x, y: deco.y, rotation: deco.rot, id: deco.id)
         }
 
-        // v8 épuré details (§0.4: details last, only if they survive at
-        // display size): the clutter of the radical-plan era (smoke
-        // plumes, hanging leaf rows, crystal clusters, sub-pixel grid
-        // lines, head arrows) is removed — a sprite pixel is ~2.7 rig
-        // units, so anything thinner than ~3 units is noise. What remains:
-        // ONE focal accent per species + the interiority traces.
+        // A5d interiority traces (persistent, off by default except the sprout).
         switch archetype {
-        case .ember:
-            // One interior ember glow (the single focal accent on the
-            // body); the flame identity rides the antenna tip (slot kind).
-            append(RigDocument.Shape(kind: "circle", width: 12, height: 7.5, bendSegments: nil),
-                   kind: "circle", bone: "chest", role: .glow, x: 0, y: -2, alpha: 0.7)
+        
         case .willow:
-            // The tended sprout floats beside it in a small soil-pod
-            // (interiority made discoverable). A5d: the sprout GROWS with
-            // attended days (CompanionMemory.sproutGrowth) — a persistent
-            // trace the user discovers on their own.
             let s = max(0.2, min(1.4, 0.4 + 0.6 * interiority.sproutGrowth))
             append(RigDocument.Shape(kind: "circle", width: 5 * s, height: 4 * s, bendSegments: nil),
-                   kind: "circle", bone: "hips", role: .deep, x: 17, y: 9)
+                   kind: "circle", bone: "hips", role: .face, x: 17, y: 9)
             append(RigDocument.Shape(kind: "triangle", width: 4 * s, height: 7 * s, bendSegments: nil),
                    kind: "leaf", bone: "hips", role: .accentA, x: 17, y: 3, rotation: 0.2,
                    id: "sproutLeaf")
             sproutLeafShapeIndex = shapes.count - 1
         case .compass:
-            // The order token as ONE chunky diamond emblem on the chest
-            // (the old 1.2-unit grid lines were sub-pixel noise). The
-            // approval tick still flashes it (id "grid").
-            append(RigDocument.Shape(kind: "rect", width: 6.5, height: 6.5, bendSegments: nil),
-                   kind: "patch", bone: "chest", role: .accentA, x: 0, y: 0,
-                   rotation: Float.pi / 4, alpha: 0.9,
-                   id: "grid")
-            // A5d interiority — the audit artifact: the week grid under
-            // the body, `streakDays` cells lit, the rest dim. Compass's
-            // love language is order; the tidy artifact waits for you.
             if interiority.streakDays > 0 {
                 for day in 0..<7 {
                     let lit = day < min(interiority.streakDays, 7)
                     append(RigDocument.Shape(kind: "rect", width: 2.6, height: 2.6, bendSegments: nil),
                            kind: "patch", bone: "hips",
-                           role: lit ? .accentA : .deep,
+                           role: lit ? .accentA : .face,
                            x: Float(-10.5 + Double(day) * 3.5), y: 25,
                            alpha: lit ? 0.85 : 0.30,
                            id: "weekGrid")
                 }
             }
         case .prism:
-            // ONE sticker patch — the accent lands on a single focal item
-            // (magenta body / cyan patch = Prism's color recall). Chunky:
-            // at 3.0 rig units per sprite pixel an 8-unit patch is ~2.7 px
-            // and mostly antialiased fringe — 10 units keeps a solid core.
-            append(RigDocument.Shape(kind: "rect", width: 10, height: 10, bendSegments: nil),
-                   kind: "patch", bone: "chest", role: .accentB, x: -4, y: 0, rotation: 0.1)
-            // A5d interiority — the found trinket: the day's small
-            // discovery, presented on return the way a cat brings a
-            // thing. A cyan diamond floating beside the head.
             if interiority.trinketPresent {
                 append(RigDocument.Shape(kind: "rect", width: 5, height: 5, bendSegments: nil),
                        kind: "patch", bone: "head", role: .accentB,
                        x: 17, y: -10, rotation: Float.pi / 4, alpha: 0.9,
                        id: "trinket")
             }
-        case .nimbus:
-            // Reference specimen: no extra token — identity is the lavender
-            // tint and the tell (the post-event pulse, engine-side A5b).
+        default:
             break
         }
     }
 
-    /// v8 épuré chibi proportions (§0/§2, Tools/PIXEL_DESIGN.md v2): ONE
-    /// body plan for all five archetypes — a big round head (chibi: the
-    /// head carries the expression) over a single pear torso. The old v5
-    /// radical plans (flame/gem/pyramid heads) failed the silhouette-first
-    /// test at display size: five abstract blobs instead of five
-    /// creatures. Per-species variance is now small (±10% head width) so
-    /// silhouettes still separate slightly; identity carries on tint +
-    /// protrusion (antenna tip) + face.
-    static func speciesSlotScale(archetype: Archetype?, slotName: String) -> (w: Float, h: Float)? {
-        guard let archetype else { return nil }
-        switch slotName {
-        case "head":
-            switch archetype {
-            case .ember: return (1.22, 1.10)
-            case .willow: return (1.40, 1.00)
-            case .compass: return (1.26, 1.20)
-            case .prism: return (1.30, 1.12)
-            case .nimbus: return (1.34, 1.08)
-            }
-        case "torsoChest":
-            // One pear body: wide low base, tapering up into the head.
-            return (0.95, 0.80)
-        case "torsoUpper":
-            return (1.05, 0.85)
-        case "torsoLower":
-            return (1.14, 0.90)
-        case "jaw":
-            return (1.0, 0.7)
-        case "pupilL", "pupilR":
-            // v7 cuteness floor (§5, Tools/PIXEL_DESIGN.md): big round
-            // eyes on every species — the face is the avatar.
-            return (1.4, 1.45)
-        default:
-            return nil
-        }
+    // MARK: - v9 AnimalPlan (one reduced animal per category)
+
+    /// v9 (Tools/PIXEL_DESIGN.md v3): one simplified animal per archetype,
+    /// built from 3-5 flat solid shapes on the frozen rig slots plus the
+    /// shared face rig. `w`/`h` <= 0 hides a slot entirely (the animal has
+    /// no such part). Roles: body = .primary (the one accent hue), ink
+    /// details = .face, white negative space = .paper.
+    struct AnimalSlot {
+        var kind: String
+        var w: Float
+        var h: Float
+        var role: PaletteRole?
+    }
+    struct AnimalDeco {
+        var kind: String
+        var w: Float
+        var h: Float
+        var bone: String
+        var x: Float
+        var y: Float
+        var rot: Float
+        var role: PaletteRole
+        var id: String?
+    }
+    struct AnimalPlan {
+        var slots: [String: AnimalSlot]
+        var decorations: [AnimalDeco]
     }
 
-    /// v7 face inset (§3, Tools/PIXEL_DESIGN.md): eye-cluster spacing
-    /// tuned per head width. Positive d pulls the cluster toward the
-    /// center line (narrow heads: Ember's flame, Compass's gem); negative
-    /// spreads it out (wide heads: Willow's dome, Nimbus's cloud). Fixed
-    /// spacing across radically different head plans reads as a bug, not
-    /// a style — this is the pixel-art "tune the face to the shape" rule.
+    /// The five animals (category -> anchor): Ember = fox (land/fire:
+    /// pointed ears + snout), Willow = frog (amphibian: dome eyes on top),
+    /// Compass = fish (water: tail fin + dorsal), Nimbus = bird (air:
+    /// beak + single wing), Prism = chameleon (reptile: casque + curled
+    /// tail). Slot base sizes come from rig.json (frozen schema).
+    static func animalPlan(_ archetype: Archetype) -> AnimalPlan {
+        // Common face rig: pupils 1.4x (big cute eyes), everything else
+        // per animal below. Face slots keep the rig kinds.
+        var slots: [String: AnimalSlot] = [
+            "pupilL": AnimalSlot(kind: "pupil", w: 1.4, h: 1.45, role: .face),
+            "pupilR": AnimalSlot(kind: "pupil", w: 1.4, h: 1.45, role: .face),
+            "lidL": AnimalSlot(kind: "rect", w: 1.0, h: 1.0, role: .face),
+            "lidR": AnimalSlot(kind: "rect", w: 1.0, h: 1.0, role: .face),
+            "browL": AnimalSlot(kind: "rect", w: 1.0, h: 1.0, role: .face),
+            "browR": AnimalSlot(kind: "rect", w: 1.0, h: 1.0, role: .face),
+            "mouth": AnimalSlot(kind: "rect", w: 1.0, h: 1.0, role: .face),
+        ]
+        var decos: [AnimalDeco] = []
+        switch archetype {
+        case .ember:
+            // FOX (land/fire): pear body, round head, white muzzle + ink
+            // nose, two ear triangles, big tail with white tip.
+            slots["torsoChest"] = AnimalSlot(kind: "puff", w: 1.15, h: 1.0, role: .primary)
+            slots["torsoUpper"] = AnimalSlot(kind: "puff", w: 0.95, h: 0.75, role: .primary)
+            slots["torsoLower"] = AnimalSlot(kind: "puff", w: 1.05, h: 0.8, role: .primary)
+            slots["head"] = AnimalSlot(kind: "circle", w: 1.12, h: 1.02, role: .primary)
+            slots["jaw"] = AnimalSlot(kind: "circle", w: 0.8, h: 0.9, role: .paper)
+            slots["appendageA"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageA2"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageB"] = AnimalSlot(kind: "circle", w: 2.2, h: 1.6, role: .primary)
+            slots["appendageB2"] = AnimalSlot(kind: "circle", w: 1.3, h: 1.0, role: .paper)
+            decos = [
+                AnimalDeco(kind: "triangle", w: 11, h: 15, bone: "head", x: -16, y: -19, rot: 0.25, role: .primary, id: "ear"),
+                AnimalDeco(kind: "triangle", w: 11, h: 15, bone: "head", x: 16, y: -19, rot: -0.22, role: .primary, id: "ear"),
+                AnimalDeco(kind: "triangle", w: 4.5, h: 4, bone: "head", x: 0, y: 17, rot: Float.pi, role: .face, id: "nose"),
+            ]
+        case .willow:
+            // FROG (amphibian): wide squat body, wide head, two dome eyes
+            // ON TOP (the eye cluster shifts up via faceInsetY), feet nubs.
+            slots["torsoChest"] = AnimalSlot(kind: "puff", w: 1.55, h: 0.75, role: .primary)
+            slots["torsoUpper"] = AnimalSlot(kind: "puff", w: 1.3, h: 0.6, role: .primary)
+            slots["torsoLower"] = AnimalSlot(kind: "puff", w: 1.2, h: 0.55, role: .primary)
+            slots["head"] = AnimalSlot(kind: "circle", w: 1.5, h: 0.7, role: .primary)
+            slots["jaw"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageA"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageA2"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageB"] = AnimalSlot(kind: "circle", w: 0, h: 0, role: nil)
+            slots["appendageB2"] = AnimalSlot(kind: "circle", w: 0, h: 0, role: nil)
+            decos = [
+                AnimalDeco(kind: "circle", w: 11, h: 11, bone: "head", x: -19, y: -17, rot: 0, role: .primary, id: "eyeDome"),
+                AnimalDeco(kind: "circle", w: 11, h: 11, bone: "head", x: 19, y: -17, rot: 0, role: .primary, id: "eyeDome"),
+                AnimalDeco(kind: "circle", w: 8, h: 4, bone: "hips", x: -12, y: 13, rot: 0, role: .primary, id: "foot"),
+                AnimalDeco(kind: "circle", w: 8, h: 4, bone: "hips", x: 12, y: 13, rot: 0, role: .primary, id: "foot"),
+            ]
+        case .compass:
+            // FISH (water): one big oval body, tail-fin triangle at the
+            // base, dorsal fin on top, two pectoral fins at the sides.
+            slots["torsoChest"] = AnimalSlot(kind: "circle", w: 1.5, h: 1.15, role: .primary)
+            slots["torsoUpper"] = AnimalSlot(kind: "puff", w: 1.2, h: 0.8, role: .primary)
+            slots["torsoLower"] = AnimalSlot(kind: "puff", w: 1.3, h: 0.85, role: .primary)
+            slots["head"] = AnimalSlot(kind: "circle", w: 1.0, h: 0.9, role: .primary)
+            slots["jaw"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["mouth"] = AnimalSlot(kind: "circle", w: 0.45, h: 0.45, role: .face)
+            slots["appendageA"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageA2"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageB"] = AnimalSlot(kind: "triangle", w: 2.6, h: 2.2, role: .primary)
+            slots["appendageB2"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            decos = [
+                AnimalDeco(kind: "triangle", w: 8, h: 9, bone: "head", x: 0, y: -20, rot: 0, role: .primary, id: "dorsalFin"),
+                AnimalDeco(kind: "triangle", w: 7, h: 4.5, bone: "chest", x: -21, y: 2, rot: 0.5, role: .primary, id: "fin"),
+                AnimalDeco(kind: "triangle", w: 7, h: 4.5, bone: "chest", x: 21, y: 2, rot: -0.5, role: .primary, id: "fin"),
+            ]
+        case .nimbus:
+            // BIRD (air): round body + head, ink beak, ONE swept wing on
+            // the left (asymmetry), tail feathers, two ink feet.
+            slots["torsoChest"] = AnimalSlot(kind: "puff", w: 1.0, h: 0.95, role: .primary)
+            slots["torsoUpper"] = AnimalSlot(kind: "puff", w: 0.9, h: 0.7, role: .primary)
+            slots["torsoLower"] = AnimalSlot(kind: "puff", w: 1.0, h: 0.75, role: .primary)
+            slots["head"] = AnimalSlot(kind: "circle", w: 1.15, h: 1.05, role: .primary)
+            slots["jaw"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageA"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageA2"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageB"] = AnimalSlot(kind: "triangle", w: 2.4, h: 2.0, role: .primary)
+            slots["appendageB2"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            decos = [
+                AnimalDeco(kind: "triangle", w: 7, h: 6, bone: "head", x: 0, y: 10, rot: Float.pi, role: .face, id: "beak"),
+                AnimalDeco(kind: "leaf", w: 16, h: 9, bone: "chest", x: -18, y: -2, rot: 0.5, role: .primary, id: "wing"),
+                AnimalDeco(kind: "rect", w: 4, h: 3.5, bone: "hips", x: -6, y: 15, rot: 0, role: .face, id: "foot"),
+                AnimalDeco(kind: "rect", w: 4, h: 3.5, bone: "hips", x: 6, y: 15, rot: 0, role: .face, id: "foot"),
+            ]
+        case .prism:
+            // CHAMELEON (reptile): body + head, casque crest on the head,
+            // curled tail (stem + ball), two stub legs.
+            slots["torsoChest"] = AnimalSlot(kind: "puff", w: 1.05, h: 1.05, role: .primary)
+            slots["torsoUpper"] = AnimalSlot(kind: "puff", w: 0.95, h: 0.75, role: .primary)
+            slots["torsoLower"] = AnimalSlot(kind: "puff", w: 1.05, h: 0.8, role: .primary)
+            slots["head"] = AnimalSlot(kind: "circle", w: 1.05, h: 0.95, role: .primary)
+            slots["jaw"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageA"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageA2"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageB"] = AnimalSlot(kind: "capsule", w: 0.9, h: 1.2, role: .primary)
+            slots["appendageB2"] = AnimalSlot(kind: "circle", w: 1.9, h: 1.9, role: .primary)
+            decos = [
+                AnimalDeco(kind: "triangle", w: 9, h: 13, bone: "head", x: 0, y: -21, rot: 0.15, role: .primary, id: "casque"),
+                AnimalDeco(kind: "rect", w: 5, h: 8, bone: "hips", x: -10, y: 10, rot: 0, role: .primary, id: "leg"),
+                AnimalDeco(kind: "rect", w: 5, h: 8, bone: "hips", x: 10, y: 10, rot: 0, role: .primary, id: "leg"),
+            ]
+        }
+        return AnimalPlan(slots: slots, decorations: decos)
+    }
+
+    /// v7/v9 face inset: eye-cluster spacing + vertical shift per animal
+    /// (frog's domes sit on top of the head). Left slots get +d, right -d.
     static func speciesFaceInset(archetype: Archetype?, slotName: String) -> Float {
         guard let archetype else { return 0 }
         let d: Float
         switch archetype {
-        case .ember: d = 3.5
-        case .willow: d = -8
-        case .compass: d = 1.5
-        case .prism: d = 2.0
-        case .nimbus: d = -4
+        case .ember: d = 2.0      // fox: close-set
+        case .willow: d = -6.0    // frog: wide-set domes
+        case .compass: d = 3.0    // fish: close-set
+        case .nimbus: d = 2.5     // bird
+        case .prism: d = 1.0      // chameleon
         }
         switch slotName {
         case "pupilL", "lidL", "browL": return d
@@ -511,83 +535,36 @@ nonisolated final class AvatarSpritePainter {
         }
     }
 
-    /// Shape-language geometry overrides (§5): the shared rig's default part
-    /// shapes are re-authored per archetype family. With `species` non-nil
-    /// (v3 unified cloud-species), every archetype shares one anatomy — the
-    /// 3-puff cloud head, stacked puff masses, wisp antenna — and only the
-    /// token slots (antenna tip, tail wisps) vary per temperament.
-    private static func resolvedKind(slotName: String, defaultKind: String,
-                                      style: ShapeLanguage, species: Archetype?) -> String {
-        guard let species else {
-            switch slotName {
-            case "head":
-                switch style {
-                case .angularClean: return "square"
-                case .softCloud: return "blob"
-                default: return defaultKind
-                }
-            case "appendageA", "appendageA2", "appendageB", "appendageB2":
-                switch style {
-                case .roundSparks, .crystalMix: return "triangle"
-                case .droopingLeaf: return "leaf"
-                case .softCloud: return "circle"
-                case .angularClean: return "rect"
-                }
-            default:
-                return defaultKind
-            }
-        }
-
-        // v8 épuré shared anatomy (Tools/PIXEL_DESIGN.md v2 §1): every
-        // species is the same chibi creature — round 3-puff cloud head,
-        // one pear torso of puffs, wisp antenna — differing ONLY in the
-        // antenna tip (the one memorable protrusion) and tail wisps.
+    /// v9 vertical face inset: only the frog rides its eyes up into the
+    /// domes; every other animal keeps the standard face line.
+    static func speciesFaceInsetY(archetype: Archetype?, slotName: String) -> Float {
+        guard archetype == .willow else { return 0 }
         switch slotName {
-        case "head":
-            return "blob"
-        case "torsoLower", "torsoUpper", "torsoChest":
-            return "puff"
-        case "jaw":
-            return "puff"                        // chin puff
-        case "appendageA":
-            return "capsule"                     // wisp-antenna stem
-        case "appendageA2":
-            // Antenna tip = the archetype's one sharp accent, exactly one:
-            // Ember flame, Willow leaf, Compass plumb spike, Prism
-            // triangle, Nimbus round nub.
-            switch species {
-            case .ember: return "flame"
-            case .willow: return "leaf"
-            case .compass: return "triangle"
-            case .prism: return "triangle"
-            default: return "circle"
-            }
-        case "appendageB", "appendageB2":
-            // Tail wisps: hanging leaf-wisps for Willow, round wisps
-            // otherwise.
-            return species == .willow ? "leaf" : "circle"
-        case "pupilL", "pupilR":
-            return "pupil"                        // large matte pupils (U2)
-        default:
-            return defaultKind
+        case "pupilL", "pupilR", "lidL", "lidR", "browL", "browR": return -13
+        default: return 0
         }
     }
 
-    /// Species slot color overrides: token slots take trait-token colors
-    /// instead of the body-mass roles.
-    private static func speciesRoleOverride(slotName: String, archetype: Archetype?) -> PaletteRole? {
-        guard let archetype else { return nil }
+    /// Shape-language geometry overrides (§5) — v1 fallback path only;
+    /// species archetypes are authored by `animalPlan` instead.
+    private static func resolvedKind(slotName: String, defaultKind: String,
+                                      style: ShapeLanguage) -> String {
         switch slotName {
-        case "appendageA2":
-            switch archetype {
-            case .ember, .willow, .prism: return .accentA
-            case .compass: return .accentB       // brushed-silver plumb tip
-            default: return .bodyLight
+        case "head":
+            switch style {
+            case .angularClean: return "square"
+            case .softCloud: return "blob"
+            default: return defaultKind
             }
-        case "appendageB", "appendageB2":
-            return archetype == .willow ? .accentA : nil
+        case "appendageA", "appendageA2", "appendageB", "appendageB2":
+            switch style {
+            case .roundSparks, .crystalMix: return "triangle"
+            case .droopingLeaf: return "leaf"
+            case .softCloud: return "circle"
+            case .angularClean: return "rect"
+            }
         default:
-            return nil
+            return defaultKind
         }
     }
 
@@ -617,133 +594,49 @@ nonisolated final class AvatarSpritePainter {
         // Rest LOD: everything dimmed toward pure black (§6).
         func dimmed(_ c: (Float, Float, Float)) -> (Float, Float, Float) { (c.0 * 0.22, c.1 * 0.22, c.2 * 0.22) }
 
-        // v3 species palette (A5a): tint roles from the profile's
-        // speciesTokens; roles absent from the stack fall back to the v1
-        // palette so a v1 profile still renders (schema v2 is additive).
+        // v9 flat icon palette (Mistral DNA, Tools/PIXEL_DESIGN.md v3):
+        // ONE body accent + ink face + white (catchlight/paper) +
+        // transient accents (sparks/flicker) + stage mote. No gradients,
+        // no glow, no second body shade — flat solid shapes only.
         if let species = visualSet.species {
-            let bodyLight = parse(species.bodyLight)
-            let bodyMid = parse(species.bodyMid)
-            let shadow = parse(species.shadow)
-            let face = parse(species.face)
+            let body = parse(species.bodyLight)
             var colors: [PaletteRole: (Float, Float, Float)] = [
-                .bodyLight: bodyLight,
-                .primary: bodyLight,
-                .primaryDim: bodyMid,
-                .deep: shadow,
-                .face: face,
-                .accentA: parse(species.accentA),
-                .restDim: dimmed(bodyLight),
+                .primary: body,
+                .face: parse(species.face),
                 .catchlight: (1, 1, 1),
+                .paper: (1, 1, 1),
+                .accentA: parse(species.accentA),
+                .restDim: dimmed(body),
+                .mote: (body.0 * 0.30, body.1 * 0.30, body.2 * 0.30),
             ]
             if let accentB = species.accentB {
                 colors[.accentB] = parse(accentB)
             }
-            if let glow = species.glow {
-                colors[.glow] = parse(glow)
-            }
-            // v6 derived stage/face tones (never authored per archetype):
-            // blush pulls accentA 30% toward rose. v7 (§5,
-            // Tools/PIXEL_DESIGN.md): the halo is ACCENT-tinted (not a
-            // neutral gray) so the contour belongs to the palette family —
-            // Ember glows amber, Compass cyan, Prism pink. Motes sink the
-            // accent deeper for background dust.
-            let accentAColor = colors[.accentA] ?? bodyLight
-            colors[.blush] = (
-                accentAColor.0 * 0.7 + 0.30,
-                accentAColor.1 * 0.7 + 0.12,
-                accentAColor.2 * 0.7 + 0.165
-            )
-            colors[.halo] = (
-                accentAColor.0 * 0.40,
-                accentAColor.1 * 0.40,
-                accentAColor.2 * 0.40
-            )
-            colors[.mote] = (
-                accentAColor.0 * 0.30,
-                accentAColor.1 * 0.30,
-                accentAColor.2 * 0.30
-            )
             return colors
         }
 
         let primary = parse(visualSet.primaryHex)
         let deep = parse(visualSet.deepHex)
         let face = parse(visualSet.faceAccentHex)
-        // primaryDim: primary mixed toward deep.
         let dim = (
             primary.0 * 0.62 + deep.0 * 0.38,
             primary.1 * 0.62 + deep.1 * 0.38,
             primary.2 * 0.62 + deep.2 * 0.38
         )
-
-        var colors: [PaletteRole: (Float, Float, Float)] = [
+        return [
             .primary: primary,
             .primaryDim: dim,
             .deep: deep,
             .face: face,
             .restDim: dimmed(primary),
+            .mote: (primary.0 * 0.30, primary.1 * 0.30, primary.2 * 0.30),
         ]
-        // v6/v7 derived tones on the v1 fallback path, same recipes
-        // (halo tinted with the primary — no accent on this path).
-        colors[.blush] = (primary.0 * 0.7 + 0.30, primary.1 * 0.7 + 0.12, primary.2 * 0.7 + 0.165)
-        colors[.halo] = (primary.0 * 0.40, primary.1 * 0.40, primary.2 * 0.40)
-        colors[.mote] = (primary.0 * 0.30, primary.1 * 0.30, primary.2 * 0.30)
-        return colors
     }
 
-    /// v3 volumetric shading: gradient stop pairs per role — the top stop is
-    /// the role color lifted toward white (the key light above), the bottom
-    /// stop is the role color deepened toward the shadow tone. Face accents
-    /// (eyes/brows/lids/mouth) stay FLAT matte (audit finding 4: no glossy
-    /// eyes); catchlights and the rest LOD stay flat. All pairs are static
-    /// so the renderer/rasterizer cache their fill objects once.
-    /// Species rim-light color (§6 v2: "faint silver rim light" shared by
-    /// all five archetypes). Slightly cool neutral silver, translucent in
-    /// the paint loop so it reads as a highlight on the mass, not a sticker.
+    /// Rim-light constants for the v1 blob fallback path only (the v9
+    /// animal icons are flat and never use them).
     static let rimLight: (Float, Float, Float) = (0.92, 0.94, 1.0)
-    /// Rim-light opacity: enough to read at 205x251 as a lit edge, low
-    /// enough to stay inside the matte stylization level (U1).
     static let rimLightAlpha: Float = 0.85
-
-    private static func buildGradientPairs(
-        _ colors: [PaletteRole: (r: Float, g: Float, b: Float)]
-    ) -> [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))] {
-        let shadow = colors[.deep] ?? (0, 0, 0)
-        var pairs: [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))] = [:]
-        for (role, c) in colors {
-            switch role {
-            case .primary:
-                // v8 épuré (§3, Tools/PIXEL_DESIGN.md v2): the ONE shaded
-                // material — base + highlight + shadow = 3 tones, a single
-                // top→bottom ramp (one light direction, top-left; no pillow
-                // shading). Every other role stays FLAT so the whole active
-                // palette fits the 6-12 color budget.
-                break
-            default:
-                continue
-            }
-            let top = (
-                c.0 + (1 - c.0) * 0.22,
-                c.1 + (1 - c.1) * 0.22,
-                c.2 + (1 - c.2) * 0.22
-            )
-            let deep = (
-                c.0 * 0.62 + shadow.0 * 0.38,
-                c.1 * 0.62 + shadow.1 * 0.38,
-                c.2 * 0.62 + shadow.2 * 0.38
-            )
-            // Bounce light (fake SSS): light enters the mass, scatters, and
-            // exits from the underside — the 2D equivalent is a bottom stop
-            // lifted off pure shadow back toward the lit tone.
-            let bottom = (
-                deep.0 + (top.0 - deep.0) * 0.12,
-                deep.1 + (top.1 - deep.1) * 0.12,
-                deep.2 + (top.2 - deep.2) * 0.12
-            )
-            pairs[role] = (top, bottom)
-        }
-        return pairs
-    }
 
     private static func buildShape(_ shape: RigDocument.Shape, kind: String) -> PaintedShape {
         let w = CGFloat(shape.width)
@@ -950,12 +843,14 @@ nonisolated final class AvatarSpritePainter {
                 // local center point (0, offsetY).
                 let offX = shape.offsetsY[i] * t.c
                 let offY = shape.offsetsY[i] * t.d
-                // v7 face inset (§3): head-space shift of the eye cluster,
+                // v7/v9 face inset (§3): head-space shift of the eye cluster
+                // (X spacing per animal + Y for the frog's top domes),
                 // applied through the bone transform so it rides breathing
                 // tilt and gaze rotation like the rest of the face.
                 let insetX = slot.faceInsetX
-                command.tx = t.tx + offX + insetX * t.a
-                command.ty = t.ty + offY + insetX * t.b
+                let insetY = slot.faceInsetY
+                command.tx = t.tx + offX + insetX * t.a + insetY * t.c
+                command.ty = t.ty + offY + insetX * t.b + insetY * t.d
                 command.rotation = atan2(t.b, t.a) + (slices > 1 ? bend * shape.bendFractions[i] : 0)
                 command.scaleX = sqrt(t.a * t.a + t.b * t.b)
                 command.scaleY = sqrt(t.c * t.c + t.d * t.d)
@@ -1068,42 +963,8 @@ nonisolated final class AvatarSpritePainter {
                                tell: tell, tellPhase: tellPhase)
             }
         }
-        // v6 face beats: blush cheeks bloom with warm/joy. At weight 0 no
-        // command is emitted, so event-free golden frames stay identical.
-        if !rest {
-            paintFaceBeats(world: world, pose: pose, colors: colors)
-        }
         if !rest {
             stepAndPaintParticles(world: world, accentPhase: accentPhase)
-        }
-    }
-
-    /// v6 face beats (pixel-mascot expressiveness): the blush cheeks bloom
-    /// on warm/joy — two soft accent-rose ellipses beside the mouth. Alpha
-    /// comes from the pose's expression weights (blended, never swapped);
-    /// below the emission floor nothing is drawn.
-    private func paintFaceBeats(
-        world: [Transform2D],
-        pose: AvatarPose,
-        colors: [PaletteRole: (r: Float, g: Float, b: Float)]
-    ) {
-        let warm = pose.expression(.warm)
-        let joy = pose.expression(.joy)
-        let alpha = min(1, warm * 0.55 + joy * 0.45) * 0.85
-        lastBlushAlphaForTesting = alpha
-        guard alpha > 0.02 else { return }
-        for side: Float in [-1, 1] {
-            emitDecoration(
-                boneIndex: headBoneIndex,
-                shapeIndex: blushShapeIndex,
-                role: .blush,
-                localX: side * 9.8,
-                localY: 8.0,
-                rotation: 0,
-                alpha: alpha,
-                world: world,
-                colors: colors
-            )
         }
     }
 

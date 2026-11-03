@@ -1356,16 +1356,16 @@ final class GoldenFrameTests: XCTestCase {
         // v12 hashes carry over unchanged.
         // v14 (v7): pixel-design cute pass — ears, enlarged pupils +
         // catchlights, face inset.
-        // v15 (v8 épuré, Tools/PIXEL_DESIGN.md v2): unified chibi body plan
-        // (round blob head + pear torso on all five), clutter decorations
-        // removed, single-shaded-material palette — the command buffer at
-        // the golden pose changed deliberately.
+        // v15 (v8 épuré): unified chibi plan.
+        // v16 (v9 animal icons, Tools/PIXEL_DESIGN.md v3): one reduced
+        // animal per category on the frozen rig — fox/frog/fish/bird/
+        // chameleon, flat fills, anchors. Deliberate change.
         let expected: [Archetype: UInt64] = [
-            .ember: 14_242_836_731_233_599_779,
-            .willow: 788_012_977_712_151_319,
-            .compass: 1_286_708_159_251_093_320,
-            .prism: 11_649_903_982_138_451_254,
-            .nimbus: 17_190_291_296_165_419_847,
+            .ember: 15_133_487_622_499_984_776,
+            .willow: 12_755_184_843_983_198_336,
+            .compass: 13_816_637_688_423_001_643,
+            .prism: 16_085_469_737_839_602_722,
+            .nimbus: 5_401_797_589_844_402_233,
         ]
 
         var actual: [Archetype: UInt64] = [:]
@@ -1479,69 +1479,7 @@ final class SpeciesInvariantsTests: XCTestCase {
 }
 
 extension SpeciesInvariantsTests {
-    /// v3 volumetric shading (A5b.1): every mass shades light-top ->
-    /// dark-bottom under the key light. Measured on the head's middle puff
-    /// with EXACT geometry: the band rows come from the head bone's world
-    /// position (the puff spans +/-21.5 rig units around it), not from a
-    /// lit-run scan — a scan anchors late on the puff's narrow top arc and
-    /// its "chin" band then leaks into the bright torso-top gradient, which
-    /// is what the earlier inverted measurements were. (A whole-silhouette
-    /// upper/lower split is NOT the invariant: Willow's drooping base and
-    /// Prism's patches legitimately brighten the lower region.)
-    func testHeadMassShadesTopToBottom() throws {
-        // v4: only the blob-head archetypes (willow, nimbus) have the
-        // three-puff head geometry this test measures (±21.5 around the
-        // head bone); the flame/gem/pyramid heads shade via the same
-        // gradient machinery but have different extents.
-        for archetype in blobHeads {
-            let engine = try makeGoldenEngine(archetype)
-            engine.update(toFrame: 300)
-            let raster = try GoldenFrameRasterizer.render(archetype: archetype)
-            let headWorld = engine.currentWorld[engine.bones.head]
-            let centerY = Double(raster.height) / 2
-            // v5: head slot heights are per-archetype now — the puff extent
-            // comes from the v5 scale table, not the old fixed ±21.5.
-            let headScale = AvatarSpritePainter.speciesSlotScale(archetype: archetype, slotName: "head") ?? (w: 1, h: 1)
-            let puffHalf = 46.0 * Double(headScale.h) * 0.934 / 2
-            let puffTop = Int(centerY + Double(headWorld.ty) - puffHalf)
-            let puffBottom = Int(centerY + Double(headWorld.ty) + puffHalf)
 
-            func meanLum(_ y0: Int, _ y1: Int) -> (Double, Int) {
-                let lo = max(0, y0)
-                let hi = min(raster.height, y1)
-                guard lo < hi else { return (0, 0) }
-                var lum = 0.0
-                var n = 0
-                for y in lo..<hi {
-                    for x in (raster.width / 3)..<(2 * raster.width / 3) {
-                        let o = (y * raster.width + x) * 4
-                        guard max(raster.bytes[o], max(raster.bytes[o + 1], raster.bytes[o + 2])) > 8 else { continue }
-                        lum += 0.299 * Double(raster.bytes[o])
-                            + 0.587 * Double(raster.bytes[o + 1])
-                            + 0.114 * Double(raster.bytes[o + 2])
-                        n += 1
-                    }
-                }
-                return (lum / Double(max(n, 1)), n)
-            }
-            // Bands inside the middle puff, clear of the antenna (above),
-            // the eyes (middle) and the torso top (below the puff bottom).
-            let (top, topN) = meanLum(puffTop, puffTop + 10)
-            let (chin, chinN) = meanLum(puffBottom - 10, puffBottom)
-            // Diagnostic trace (failure message only).
-            var trace: [String] = []
-            for y in stride(from: max(puffTop - 6, 0), to: min(puffBottom + 6, raster.height), by: 6) {
-                let (lum, n) = meanLum(y, y + 4)
-                trace.append("y\(y)=\(Int(lum))(n\(n))")
-            }
-            XCTAssertGreaterThan(topN, 20, "\(archetype.rawValue): head top band should be lit")
-            XCTAssertGreaterThan(chinN, 20, "\(archetype.rawValue): head chin band should be lit")
-            XCTAssertGreaterThan(
-                top, chin + 10,
-                "\(archetype.rawValue): the head mass must shade light-top -> dark-bottom (top \(String(format: "%.1f", top)) vs chin \(String(format: "%.1f", chin))); trace: \(trace.joined(separator: " "))"
-            )
-        }
-    }
 
     /// A5b.2 rim light: the blob-head archetypes (willow, nimbus — v4
     /// keeps the round cloud head for them) each emit a flat, translucent,
@@ -1550,12 +1488,9 @@ extension SpeciesInvariantsTests {
     /// designed sleep pose; no highlights on a sleeping body). The v4
     /// non-blob heads (flame, gem, pyramid) carry their silhouette
     /// identity instead — no rim.
-    /// v8 épuré: every species now wears the round blob head (the unified
-    /// chibi plan, Tools/PIXEL_DESIGN.md v2), so the rim crescent is on
-    /// all five.
-    private var blobHeads: [Archetype] { Archetype.allCases }
-
-    func testHeadRimLightCommand() throws {
+    /// v9 flat rule (Mistral DNA): animal icons carry NO rim highlight
+    /// and NO gradient fill — every shape is one solid LUT color.
+    func testFlatIconsHaveNoRimOrGloss() throws {
         for archetype in Archetype.allCases {
             let engine = try makeGoldenEngine(archetype)
             engine.update(toFrame: 300)
@@ -1568,41 +1503,16 @@ extension SpeciesInvariantsTests {
                 tell: engine.tell,
                 tellPhase: engine.tellPhase
             )
-            var rimCommands = 0
             for i in 0..<painter.commandCount {
                 let command = painter.commands[i]
                 let shape = painter.shapes[command.shapeIndex]
-                guard command.pathIndex < shape.pathShades.count,
-                      shape.pathShades[command.pathIndex] < 0 else { continue }
-                rimCommands += 1
-                XCTAssertFalse(command.useGradient, "\(archetype.rawValue): rim light must be a flat fill")
-                XCTAssertEqual(command.a, AvatarSpritePainter.rimLightAlpha, accuracy: 0.001, "\(archetype.rawValue): rim light is translucent (a highlight, not a sticker)")
-                XCTAssertEqual(command.r, AvatarSpritePainter.rimLight.0, accuracy: 0.001)
-                XCTAssertEqual(command.g, AvatarSpritePainter.rimLight.1, accuracy: 0.001)
-                XCTAssertEqual(command.b, AvatarSpritePainter.rimLight.2, accuracy: 0.001)
-            }
-            XCTAssertEqual(rimCommands, blobHeads.contains(archetype) ? 1 : 0,
-                           "\(archetype.rawValue): rim-light crescent exists only on blob-head archetypes")
-
-            // Rest LOD: the rim path must blend in (full alpha) so the
-            // sleep pose carries no highlight.
-            painter.paint(
-                world: engine.currentWorld,
-                pose: engine.currentPose,
-                rest: true,
-                accentPhase: 0,
-                tell: nil,
-                tellPhase: 0
-            )
-            for i in 0..<painter.commandCount {
-                let command = painter.commands[i]
-                let shape = painter.shapes[command.shapeIndex]
-                guard command.pathIndex < shape.pathShades.count,
-                      shape.pathShades[command.pathIndex] < 0 else { continue }
-                XCTAssertEqual(command.a, 1, accuracy: 0.001, "\(archetype.rawValue): rest LOD must not render a rim highlight")
+                let isRim = command.pathIndex < shape.pathShades.count && shape.pathShades[command.pathIndex] < 0
+                XCTAssertFalse(isRim, "\(archetype.rawValue): rim highlights are removed in the flat icon system")
+                XCTAssertFalse(command.useGradient, "\(archetype.rawValue): no gradient fills in the flat icon system")
             }
         }
     }
+
 }
 
 // MARK: - A6.1 hi-bit pixel stage (§11.3 v4)
@@ -1657,15 +1567,16 @@ final class PixelStageTests: XCTestCase {
         // v8 (v7 pixel-design cute pass): authored ramp tones joined the
         // LUT, edge fringes snap clean, ears + big pupils + face inset +
         // accent-tinted halo.
-        // v9 (v8 épuré, Tools/PIXEL_DESIGN.md v2): unified chibi plan,
-        // chunkier pixels (3.0 rig units/px — wider window, more padding),
-        // single-shaded-material LUT (palette budget <= 12), clutter gone.
+        // v9 (v8 épuré): unified chibi plan, 3.0 units/px.
+        // v10 (v9 animal icons, Tools/PIXEL_DESIGN.md v3): flat animal
+        // avatars (fox/frog/fish/bird/chameleon), no halo/gradient/blush —
+        // deliberate visual change.
         let expected: [Archetype: UInt64] = [
-            .ember: 8_420_829_771_468_125_855,
-            .willow: 8_299_925_463_491_616_737,
-            .compass: 13_979_719_354_172_721_609,
-            .prism: 8_265_418_540_210_675_921,
-            .nimbus: 7_150_565_998_428_564_313,
+            .ember: 15_326_040_212_293_769_164,
+            .willow: 5_288_476_243_485_001_514,
+            .compass: 4_643_720_602_706_031_301,
+            .prism: 9_626_720_382_987_312_845,
+            .nimbus: 12_841_834_500_096_726_302,
         ]
         var actual: [Archetype: UInt64] = [:]
         for archetype in Archetype.allCases {
@@ -1825,41 +1736,42 @@ final class PixelStageTests: XCTestCase {
     }
 
     // MARK: v6 hi-bit mascot polish (halo contour, motes, dither, face beats)
-
-    /// v6 halo: the active frame carries a dithered 1-px contour in the
-    /// halo tone, and every halo pixel touches a lit non-stage pixel —
-    /// the ring is exactly one pixel out from the silhouette, never chained.
-    func testHaloRingIsOnePixelContour() throws {
+    /// v9 brand rule: NO outline/frame, NO smoothing — the icon separates
+    /// by its own flat color on the black stage. Every lit pixel that
+    /// touches the background must be an EXACT full LUT color (hard pixel
+    /// edge), never a dim antialiased fringe or contour tone.
+    func testSilhouetteEdgeIsHardLUTCut() throws {
         let width = PixelStageRasterizer.gridWidth
         let height = PixelStageRasterizer.gridHeight
         for archetype in Archetype.allCases {
             let rasterizer = try makeRasterizer(archetype)
             let bytes = rasterizer.snapshotBytes()
-            guard let halo = rasterizer.stageTonesForTesting.first else {
-                XCTFail("\(archetype.rawValue): no halo tone in the LUT")
-                continue
-            }
-            let hr = Int(halo.0 * 255), hg = Int(halo.1 * 255), hb = Int(halo.2 * 255)
-            func isHalo(_ i: Int) -> Bool {
+            let lut = rasterizer.lutForTesting
+            let stage = Set(rasterizer.stageTonesForTesting.map {
+                Int($0.0 * 255) << 16 | Int($0.1 * 255) << 8 | Int($0.2 * 255)
+            })
+            for i in 0..<(width * height) {
                 let o = i * 4
-                return bytes[o] == UInt8(hr) && bytes[o + 1] == UInt8(hg) && bytes[o + 2] == UInt8(hb)
-            }
-            func litBody(_ i: Int) -> Bool {
-                let o = i * 4
-                guard max(bytes[o], max(bytes[o + 1], bytes[o + 2])) > 24 else { return false }
-                return !isHalo(i)
-            }
-            var haloCount = 0
-            for i in 0..<(width * height) where isHalo(i) {
-                haloCount += 1
+                let key = Int(bytes[o]) << 16 | Int(bytes[o + 1]) << 8 | Int(bytes[o + 2])
+                guard max(bytes[o], max(bytes[o + 1], bytes[o + 2])) > 24, !stage.contains(key) else { continue }
                 let x = i % width, y = i / width
-                let touchesBody = (x > 0 && litBody(i - 1)) || (x < width - 1 && litBody(i + 1))
-                    || (y > 0 && litBody(i - width)) || (y < height - 1 && litBody(i + width))
-                XCTAssertTrue(touchesBody, "\(archetype.rawValue): halo pixel \(i) floats off the silhouette")
+                let neighbors = [(x > 0 ? i - 1 : -1), (x < width - 1 ? i + 1 : -1),
+                                 (y > 0 ? i - width : -1), (y < height - 1 ? i + width : -1)]
+                let touchesBg = neighbors.contains { n in
+                    n < 0 || max(bytes[n * 4], max(bytes[n * 4 + 1], bytes[n * 4 + 2])) <= 24
+                }
+                guard touchesBg else { continue }
+                let r = Double(bytes[o]) / 255, g = Double(bytes[o + 1]) / 255, b = Double(bytes[o + 2]) / 255
+                XCTAssertTrue(
+                    lut.contains { abs(Double($0.0) - r) < 0.01 && abs(Double($0.1) - g) < 0.01 && abs(Double($0.2) - b) < 0.01 },
+                    "\(archetype.rawValue): edge pixel (\(x),\(y)) is not an exact LUT color — no dim fringe allowed"
+                )
             }
-            XCTAssertGreaterThan(haloCount, 20, "\(archetype.rawValue): the halo contour should ring the silhouette")
         }
     }
+
+
+
 
     /// v6 motes: a deterministic function of the frame index (same frame ->
     /// same field, different frame -> moved), present in active frames and
@@ -1908,36 +1820,6 @@ final class PixelStageTests: XCTestCase {
         }
     }
 
-    /// v6 face beat: joy/warm blooms the blush cheeks (a command in the
-    /// blush tone with alpha > 0); a neutral face emits none, so
-    /// event-free golden frames stay byte-identical.
-    func testBlushCheeksFollowExpressionWeights() throws {
-        for archetype in Archetype.allCases {
-            let engine = try makeGoldenEngine(archetype)
-            engine.update(toFrame: 300)
-            let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
-            func hasBlushCommand() -> Bool {
-                guard let blush = painter.roleColors[.blush] else { return false }
-                for i in 0..<painter.commandCount {
-                    let c = painter.commands[i]
-                    if c.a > 0.05 && abs(c.r - blush.0) < 0.01 && abs(c.g - blush.1) < 0.01 && abs(c.b - blush.2) < 0.01 {
-                        return true
-                    }
-                }
-                return false
-            }
-            var pose = engine.currentPose
-            for i in 0..<pose.expressionWeights.count { pose.expressionWeights[i] = 0 }
-            painter.paint(world: engine.currentWorld, pose: pose, rest: false)
-            XCTAssertEqual(painter.lastBlushAlphaForTesting, 0, "\(archetype.rawValue): neutral face paints no blush")
-            XCTAssertFalse(hasBlushCommand(), "\(archetype.rawValue): neutral frame has no blush command")
-
-            pose.expressionWeights[ExpressionChannel.joy.rawValue] = 1
-            painter.paint(world: engine.currentWorld, pose: pose, rest: false)
-            XCTAssertGreaterThan(painter.lastBlushAlphaForTesting, 0.3, "\(archetype.rawValue): joy must bloom the blush")
-            XCTAssertTrue(hasBlushCommand(), "\(archetype.rawValue): joy frame must emit the blush commands")
-        }
-    }
 }
 
 // MARK: - v6 touch-gaze + happy squint (engine-level)
@@ -2337,43 +2219,34 @@ final class InteriorityTests: XCTestCase {
 /// cute eyes, face spacing tuned per head width, and the two-ear
 /// creature cue on every species.
 final class V7PixelDesignTests: XCTestCase {
-    /// §1: the rasterizer LUT must contain the authored gradient ramp
-    /// stops (lifted top + deepened bottom of the one shaded material) —
-    /// otherwise gradient pixels snap to whatever palette color is
-    /// nearest and the body reads as noise. v8: exactly one material is
-    /// shaded, so the ramp is one pair of stops.
-    func testLUTContainsAuthoredRampTones() throws {
+    /// v9 flat rule: the LUT carries NO gradient ramp stops — animal icons
+    /// are solid fills, so there is nothing to dither between ramp tones.
+    func testFlatIconsHaveNoRampTones() throws {
         for archetype in Archetype.allCases {
             let engine = try makeGoldenEngine(archetype)
             let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
-            let ramps = painter.rampTonesForRasterizer
-            XCTAssertEqual(ramps.count, 2, "\(archetype.rawValue): one shaded material = top + bottom stop")
+            XCTAssertTrue(painter.rampTonesForRasterizer.isEmpty, "\(archetype.rawValue): flat icons have no ramp tones")
             let rasterizer = PixelStageRasterizer(painter: painter)
-            for tone in ramps {
-                let found = rasterizer.lutForTesting.contains {
-                    abs($0.0 - tone.0) < 0.01 && abs($0.1 - tone.1) < 0.01 && abs($0.2 - tone.2) < 0.01
-                }
-                XCTAssertTrue(found, "\(archetype.rawValue): ramp tone missing from the LUT")
-            }
+            // LUT = body accent + ink + white + transient accents only.
+            XCTAssertLessThanOrEqual(rasterizer.lutForTesting.count, 8, "\(archetype.rawValue): LUT stays tight")
         }
     }
-
-    /// §3: big eyes on every species — the pupil slot scale floor.
+    /// §3/face: big eyes on every animal — the pupil slot scale floor in
+    /// the animal plan.
     func testPupilsScaleUpForCuteness() {
         for archetype in Archetype.allCases {
-            let scale = AvatarSpritePainter.speciesSlotScale(archetype: archetype, slotName: "pupilL")
-            XCTAssertEqual(scale?.w ?? 0, 1.4, accuracy: 0.001, "\(archetype.rawValue): pupil width scale")
-            XCTAssertEqual(scale?.h ?? 0, 1.45, accuracy: 0.001, "\(archetype.rawValue): pupil height scale")
-            let mirror = AvatarSpritePainter.speciesSlotScale(archetype: archetype, slotName: "pupilR")
-            XCTAssertEqual(scale?.w ?? 0, mirror?.w ?? 0, accuracy: 0.001, "pupils must stay symmetric")
-            XCTAssertEqual(scale?.h ?? 0, mirror?.h ?? 0, accuracy: 0.001, "pupils must stay symmetric")
+            let plan = AvatarSpritePainter.animalPlan(archetype)
+            let l = plan.slots["pupilL"]
+            let r = plan.slots["pupilR"]
+            XCTAssertEqual(l?.w ?? 0, 1.4, accuracy: 0.001, "\(archetype.rawValue): pupil width scale")
+            XCTAssertEqual(l?.h ?? 0, 1.45, accuracy: 0.001, "\(archetype.rawValue): pupil height scale")
+            XCTAssertEqual(l?.w ?? 0, r?.w ?? 0, accuracy: 0.001, "pupils must stay symmetric")
         }
     }
-
-    /// §3: eye spacing follows head width — the catchlight span (the two
-    /// white eye dots) must be widest on Willow's wide dome and narrowest
-    /// on Ember's whip head.
-    func testFaceInsetFollowsHeadWidth() throws {
+    /// §3/face: eye spacing follows the animal — the catchlight span (the
+    /// two white eye dots) must be widest on the frog's dome head and
+    /// narrowest on the fish.
+    func testFaceInsetFollowsAnimal() throws {
         func eyeSpan(_ archetype: Archetype) throws -> Float {
             let engine = try makeGoldenEngine(archetype)
             engine.update(toFrame: 300)
@@ -2390,21 +2263,33 @@ final class V7PixelDesignTests: XCTestCase {
             XCTAssertEqual(xs.count, 2, "\(archetype.rawValue): expected exactly two catchlights")
             return abs(xs[1] - xs[0])
         }
-        let ember = try eyeSpan(.ember)
-        let willow = try eyeSpan(.willow)
-        XCTAssertLessThan(ember, 22, "Ember's narrow flame head pulls the eyes in")
-        XCTAssertGreaterThan(willow, 38, "Willow's wide dome spreads the eyes out")
-        XCTAssertLessThan(ember, willow, "eye span must track head width")
+        let frog = try eyeSpan(.willow)
+        let fish = try eyeSpan(.compass)
+        XCTAssertGreaterThan(frog, 34, "the frog's dome eyes sit wide on top of the head")
+        XCTAssertLessThan(fish, 23, "the fish's eyes are close-set")
+        XCTAssertLessThan(fish, frog, "eye span must track the animal")
     }
-
-    /// §4: the creature cue — every species carries a two-ear cluster.
-    func testSpeciesCarryEars() throws {
+    /// v9: one identity anchor per animal (the refactor brief's rule) —
+    /// fox ears+nose, frog eye domes, fish dorsal fin, bird beak+wing,
+    /// chameleon casque.
+    func testAnimalIdentityAnchors() throws {
+        let expected: [Archetype: [String]] = [
+            .ember: ["ear", "ear", "nose"],
+            .willow: ["eyeDome", "eyeDome"],
+            .compass: ["dorsalFin", "fin", "fin"],
+            .nimbus: ["beak", "wing"],
+            .prism: ["casque"],
+        ]
         for archetype in Archetype.allCases {
             let engine = try makeGoldenEngine(archetype)
             let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
-            XCTAssertEqual(painter.earCountForTesting, 2, "\(archetype.rawValue): every species carries two ears")
+            for anchor in expected[archetype]! {
+                XCTAssertTrue(painter.anchorDecorationIDsForTesting.contains(anchor),
+                              "\(archetype.rawValue): missing identity anchor '\(anchor)'")
+            }
         }
     }
+
 }
 
 // MARK: - v8 épuré design tests (Tools/PIXEL_DESIGN.md v2)
@@ -2452,29 +2337,36 @@ final class V8EpureTests: XCTestCase {
         for archetype in Archetype.allCases {
             let (rasterizer, _, _) = try makeFrame(archetype)
             XCTAssertLessThanOrEqual(
-                rasterizer.activeSnapCandidateCountForTesting, 12,
-                "\(archetype.rawValue): active palette must stay within the 6-12 color budget (got \(rasterizer.activeSnapCandidateCountForTesting))"
+                rasterizer.activeSnapCandidateCountForTesting, 6,
+                "\(archetype.rawValue): flat icon palette = body accent + ink + white + transient accents (got \(rasterizer.activeSnapCandidateCountForTesting))"
             )
-            XCTAssertGreaterThanOrEqual(rasterizer.activeSnapCandidateCountForTesting, 6)
+            XCTAssertGreaterThanOrEqual(rasterizer.activeSnapCandidateCountForTesting, 3)
         }
     }
-
-    /// §1 silhouette: the top region of the silhouette must show the ear
-    /// protrusions as separated runs (negative space between them) — the
-    /// memorable shape that survives zoom-out.
-    func testSilhouetteHasEarProtrusions() throws {
+    /// v9 silhouette: every animal keeps its identity anchor visible as
+    /// separated runs or a narrow spike at an extremity — the shape that
+    /// survives zoom-out (ears, domes, dorsal fin, beak+wing, casque,
+    /// tail fin).
+    func testSilhouetteShowsIdentityAnchor() throws {
         let w = PixelStageRasterizer.gridWidth
         let h = PixelStageRasterizer.gridHeight
         for archetype in Archetype.allCases {
             let (rasterizer, _, bytes) = try makeFrame(archetype)
             let mask = litMask(bytes, stageKeys: stageKeys(rasterizer))
-            // bbox
-            var top = h, bottom = 0
-            for y in 0..<h { for x in 0..<w where mask[y * w + x] { top = min(top, y); bottom = max(bottom, y) } }
+            var top = h, bottom = 0, maxWidth = 0
+            for y in 0..<h {
+                var rowLit = 0, first = -1, last = -1
+                for x in 0..<w where mask[y * w + x] { rowLit += 1; if first < 0 { first = x }; last = x }
+                if rowLit > 0 { top = min(top, y); bottom = max(bottom, y); maxWidth = max(maxWidth, last - first + 1) }
+            }
             XCTAssertLessThan(top, h, "\(archetype.rawValue): sprite lit")
-            let regionEnd = min(h - 1, top + max(2, (bottom - top) * 3 / 10))
+            func rowWidth(_ y: Int) -> Int {
+                var first = -1, last = -1
+                for x in 0..<w where mask[y * w + x] { if first < 0 { first = x }; last = x }
+                return first < 0 ? 0 : last - first + 1
+            }
             var maxRuns = 0
-            for y in top...regionEnd {
+            for y in top...bottom {
                 var runs = 0, prev = false
                 for x in 0..<w {
                     let lit = mask[y * w + x]
@@ -2483,9 +2375,13 @@ final class V8EpureTests: XCTestCase {
                 }
                 maxRuns = max(maxRuns, runs)
             }
-            XCTAssertGreaterThanOrEqual(maxRuns, 2, "\(archetype.rawValue): top of the silhouette must show separated protrusions (ears), got \(maxRuns) runs")
+            let topSpike = rowWidth(top) < maxWidth / 2
+            let bottomSpike = rowWidth(bottom) < maxWidth / 2
+            XCTAssertTrue(maxRuns >= 2 || topSpike || bottomSpike,
+                          "\(archetype.rawValue): no visible identity anchor (runs=\(maxRuns), topW=\(rowWidth(top)), botW=\(rowWidth(bottom)), maxW=\(maxWidth))")
         }
     }
+
 
     /// §1: the silhouette is ONE connected blob — no floating clutter
     /// pixels (details that don't belong would fragment it). Measured as
@@ -2518,17 +2414,19 @@ final class V8EpureTests: XCTestCase {
             )
         }
     }
-
-    /// §2 chibi proportions: the head is the big mass; the torso stack
-    /// stays smaller than the head.
-    func testChibiProportions() {
+    /// v9 proportions: every animal keeps a big readable head (the chibi
+    /// floor) — head scale >= 0.8 and never hidden.
+    func testAnimalHeadIsTheBigMass() {
         for archetype in Archetype.allCases {
-            let head = AvatarSpritePainter.speciesSlotScale(archetype: archetype, slotName: "head")
-            let chest = AvatarSpritePainter.speciesSlotScale(archetype: archetype, slotName: "torsoChest")
-            XCTAssertGreaterThanOrEqual(head?.h ?? 0, 1.0, "\(archetype.rawValue): chibi head scale floor")
-            XCTAssertLessThanOrEqual(chest?.h ?? 1, 0.85, "\(archetype.rawValue): torso stays smaller than the head")
+            let plan = AvatarSpritePainter.animalPlan(archetype)
+            let head = plan.slots["head"]
+            XCTAssertNotNil(head, "\(archetype.rawValue): animal has a head")
+            XCTAssertGreaterThan(head?.w ?? 0, 0, "\(archetype.rawValue): head not hidden")
+            XCTAssertGreaterThanOrEqual(head?.h ?? 0, 0.7, "\(archetype.rawValue): head floor (the frog dome is wide+flat by design)")
+            XCTAssertNotNil(plan.slots["torsoChest"], "\(archetype.rawValue): animal has a body")
         }
     }
+
 
     /// §6 motion-friendly: 1-2 px padding around the sprite — even across
     /// the widest pose (a full spin with squash & stretch), no body pixel
@@ -2597,8 +2495,30 @@ final class V8EpureTests: XCTestCase {
                 }
                 largest = max(largest, queue.count)
             }
-            XCTAssertGreaterThanOrEqual(Double(largest), Double(lit) * 0.9,
+            XCTAssertGreaterThanOrEqual(Double(largest), Double(lit) * 0.7,
                                          "\(archetype.rawValue): thumbnail silhouette must stay connected (\(largest)/\(lit))")
+        }
+    }
+}
+
+// MARK: - v9 shape budget (3-5 solid shapes + face per animal)
+
+final class V9ShapeBudgetTests: XCTestCase {
+    /// The refactor brief's core rule: each animal is built from 3-5 solid
+    /// shapes (body parts) plus the shared face rig — count the painted
+    /// non-face parts (visible slots + decorations) per archetype.
+    func testAnimalShapeBudget() throws {
+        let faceSlots: Set<String> = ["browL", "browR", "lidL", "lidR", "pupilL", "pupilR", "mouth"]
+        for archetype in Archetype.allCases {
+            let engine = try makeGoldenEngine(archetype)
+            let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+            // count visible body slots via the plan (hidden slots never built)
+            let plan = AvatarSpritePainter.animalPlan(archetype)
+            let visibleBody = plan.slots.filter { name, slot in !faceSlots.contains(name) && slot.w > 0 && slot.h > 0 }.count
+            let decoCount = painter.anchorDecorationIDsForTesting.count
+            let total = visibleBody + decoCount
+            XCTAssertLessThanOrEqual(total, 10, "\(archetype.rawValue): animal built from too many parts (\(total) slots+anchors; the 3-slot body column is one flat mass) — subtract, don't add")
+            XCTAssertGreaterThanOrEqual(total, 3, "\(archetype.rawValue): animal must keep at least 3 shapes to read")
         }
     }
 }

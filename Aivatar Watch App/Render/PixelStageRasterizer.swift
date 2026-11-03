@@ -41,12 +41,12 @@ nonisolated final class PixelStageRasterizer {
     /// Pixel indices per LUT color, reused across frames (no allocation
     /// in the steady state; rebuilt contents only).
     private var pixelsByColor: [[Int]]
-    /// v6 LUT bucket indices for the post-snap stage passes (halo dilation,
-    /// ambient motes) — nil if the painter supplied no such tone.
-    private let haloBucket: Int?
+    /// v9 LUT bucket for the post-snap ambient-mote pass — nil if the
+    /// painter supplied no mote tone. (The v6-8 silhouette halo is GONE:
+    /// the icon brand rules forbid outlines/frames.)
     private let moteBucket: Int?
-    /// v6 test hook: the stage tones (halo, mote) as LUT colors, so palette
-    /// assertions can measure the BODY tones without the contour/dust.
+    /// v9 test hook: the stage tones (motes) as LUT colors, so palette and
+    /// silhouette assertions measure the AVATAR without the dust.
     let stageTonesForTesting: [(Float, Float, Float)]
     /// v6 Bayer 4x4 ordered-dither thresholds, normalized to (0, 1).
     private static let bayer4: [[Float]] = [
@@ -113,11 +113,10 @@ nonisolated final class PixelStageRasterizer {
         // muddy dark pixels across the face (the A6.1 bug). Rest frames
         // snap with the full LUT so restDim stays exact (the sleep pose
         // is all restDim + face).
-        // v6: the active-frame snap candidates exclude every STAGE tone —
-        // restDim (the old face-mud fix), plus halo and mote, which exist
-        // only for the post-snap passes and must never be picked as a paint
-        // color (a body pixel dithering toward halo would smear gray).
-        let stageTones: [(Float, Float, Float)] = [.restDim, .halo, .mote]
+        // v9: the active-frame snap candidates exclude every STAGE tone —
+        // restDim (the old face-mud fix) and mote, which exist only for the
+        // post-snap passes and must never be picked as a paint color.
+        let stageTones: [(Float, Float, Float)] = [.restDim, .mote]
             .compactMap { painter.roleColors[$0] }
         activeSnapLUT = colors.filter { c in
             !stageTones.contains { $0.0 == c.0 && $0.1 == c.1 && $0.2 == c.2 }
@@ -131,9 +130,8 @@ nonisolated final class PixelStageRasterizer {
             guard let c = painter.roleColors[role] else { return nil }
             return lutLocal.firstIndex { $0.0 == c.0 && $0.1 == c.1 && $0.2 == c.2 }
         }
-        haloBucket = bucket(of: .halo)
         moteBucket = bucket(of: .mote)
-        stageTonesForTesting = [.halo, .mote].compactMap { painter.roleColors[$0] }
+        stageTonesForTesting = [.mote].compactMap { painter.roleColors[$0] }
         var moteRng = SeededRandom(0x90_7E_5E_ED)
         moteBaseX = (0..<Self.moteCount).map { _ in Int(moteRng.nextFloat() * Float(Self.gridWidth)) }
         moteBaseY = (0..<Self.moteCount).map { _ in Int(moteRng.nextFloat() * Float(Self.gridHeight)) }
@@ -213,12 +211,10 @@ nonisolated final class PixelStageRasterizer {
         }
 
         snapToLUT(rest: rest)
-        // v6 stage passes, after the snap so they are written as exact LUT
-        // tones: the 1-px silhouette halo, then the drifting ambient motes.
-        // Active mode only — the rest LOD keeps the stage sunk near-black
-        // (OLED power + the dim-sleep aesthetic), no contour, no dust.
+        // v9 stage pass, after the snap so motes are written as an exact LUT
+        // tone: the drifting ambient dust. Active mode only — the rest LOD
+        // keeps the stage sunk near-black (OLED power + dim-sleep).
         if !rest {
-            applyHalo()
             applyMotes(frame: frame)
         }
     }
@@ -294,45 +290,6 @@ nonisolated final class PixelStageRasterizer {
         }
     }
 
-    /// v6 halo: a 1-px dilation of the silhouette into the background,
-    /// filled with the dim `halo` LUT tone — the pixel-mascot sticker
-    /// contour (on the OLED black stage the outline must be LIGHT to
-    /// read). The ring is Bayer-dithered at ~45% density so it reads as a
-    /// dashed hi-bit contour, not a solid gray outline, and stays well
-    /// under the body tones in pixel count. Collected against the snapped
-    /// state first, then written, so the pass dilates exactly one pixel
-    /// and never chains.
-    private func applyHalo() {
-        guard let data = context.data, let haloBucket else { return }
-        let haloColor = lut[haloBucket]
-        let bytes = data.assumingMemoryBound(to: UInt8.self)
-        let width = Self.gridWidth
-        let height = Self.gridHeight
-        let count = width * height
-        var haloPixels: [Int] = []
-        haloPixels.reserveCapacity(160)
-        func lit(_ i: Int) -> Bool {
-            let o = i * 4
-            return Int(bytes[o]) + Int(bytes[o + 1]) + Int(bytes[o + 2]) > 24
-        }
-        for i in 0..<count {
-            let o = i * 4
-            guard Int(bytes[o]) + Int(bytes[o + 1]) + Int(bytes[o + 2]) <= 24 else { continue }
-            let x = i % width, y = i / width
-            let neighborLit = (x > 0 && lit(i - 1)) || (x < width - 1 && lit(i + 1))
-                || (y > 0 && lit(i - width)) || (y < height - 1 && lit(i + width))
-            guard neighborLit else { continue }
-            if Self.bayer4[y % 4][x % 4] <= 0.45 { haloPixels.append(i) }
-        }
-        for i in haloPixels {
-            let o = i * 4
-            bytes[o] = UInt8(haloColor.0 * 255)
-            bytes[o + 1] = UInt8(haloColor.1 * 255)
-            bytes[o + 2] = UInt8(haloColor.2 * 255)
-            bytes[o + 3] = 255
-        }
-        pixelsByColor[haloBucket].append(contentsOf: haloPixels)
-    }
 
     /// v6 ambient motes: a sparse field of dim accent-colored dust drifting
     /// slowly upward and twinkling, so the stage itself feels alive between

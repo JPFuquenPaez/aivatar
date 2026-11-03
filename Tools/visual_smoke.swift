@@ -41,8 +41,8 @@ func analyze(path: String) -> (coverage: Double, regionBright: Int, centroidX: D
     var brightR = 0.0, brightG = 0.0, brightB = 0.0, brightCount = 0.0
     var regionBright = 0
     var regionSumX = 0.0
-    // v3 token probes: Prism's identity is its sticker patches (magenta +
-    // cyan), not its white body — count pixels in each patch family.
+    // v9 token probes: count pixels in the magenta / cyan families (kept
+    // for the failure line; the palette gates below are avg-based).
     var magentaPx = 0
     var cyanPx = 0
     // Avatar band: excludes status-bar time (top right) and name text (bottom).
@@ -73,17 +73,15 @@ func analyze(path: String) -> (coverage: Double, regionBright: Int, centroidX: D
     return (coverage, regionBright, centroidX, avg, magentaPx, cyanPx)
 }
 
-// v3: identity is the tint + token stack. The four tint-bodied archetypes
-// are checked by family; Prism's white body carries no family, so its gate
-// is the sticker patches themselves (magenta + cyan must both be present).
+// v9 animal icons: identity is the tint — every archetype body carries its
+// ONE flat accent hue (Prism = magenta; the cyan accentB only swaps in
+// transiently during the flicker tell, so it is not an idle-frame gate).
 let paletteChecks: [(name: String, desc: String,
                      check: (Double, Double, Double, Int, Int) -> Bool)] = [
     ("ember", "warm (R>B)", { r, g, b, _, _ in r > b }),
     ("willow", "green (G>B)", { r, g, b, _, _ in g > b }),
     ("compass", "cool (B>R)", { r, g, b, _, _ in b > r }),
-    ("prism", "patches (magenta+cyan present)", { _, _, _, magenta, cyan in
-        magenta > 100 && cyan > 100
-    }),
+    ("prism", "magenta (R>G, B>G)", { r, g, b, _, _ in r > g && b > g }),
     ("nimbus", "lavender (B>G)", { r, g, b, _, _ in b > g }),
 ]
 

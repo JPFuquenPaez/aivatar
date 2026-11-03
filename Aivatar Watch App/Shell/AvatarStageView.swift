@@ -248,10 +248,11 @@ struct AvatarStageView: View {
     }
 
     private var accessibilityText: String {
+        let kind = "your \(archetype.animalName) companion"
         if isResting {
-            return "\(stageName), your companion, is resting"
+            return "\(stageName), \(kind), is resting"
         }
-        return "\(stageName), your companion, is calm"
+        return "\(stageName), \(kind), is calm"
     }
 }
 

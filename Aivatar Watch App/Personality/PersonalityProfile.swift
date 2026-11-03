@@ -15,6 +15,18 @@ nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
         }
     }
 
+    /// v9 animal icon: one reduced animal per category
+    /// (Tools/PIXEL_DESIGN.md v3) — used in the accessibility label.
+    var animalName: String {
+        switch self {
+        case .ember: return "fox"      // land/fire
+        case .willow: return "frog"    // amphibian
+        case .compass: return "fish"   // water
+        case .prism: return "chameleon" // reptile
+        case .nimbus: return "bird"    // air
+        }
+    }
+
     /// A5c farewell beat (U9 — peak-end rule): the wrist-drop goodbye is
     /// ONE soft micro-gesture, never a guilt gesture. Small clips only —
     /// no anticipation wind-up, no squash: the session ends warm.
