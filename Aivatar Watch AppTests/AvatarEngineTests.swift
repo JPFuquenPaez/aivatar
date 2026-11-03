@@ -612,6 +612,46 @@ final class AvatarEngineTests: XCTestCase {
         }
     }
 
+    func testEveryArchetypeHasADistinctAnimalIdentity() throws {
+        // v10: the personality IS the animal (Tools/PIXEL_DESIGN.md v3) —
+        // every companion presents a distinct animal with likable-pole copy,
+        // and the derived prose forms stay consistent.
+        var names: Set<String> = []
+        var elements: Set<String> = []
+        for archetype in Archetype.allCases {
+            XCTAssertFalse(archetype.animal.name.isEmpty, "\(archetype.rawValue): animal name")
+            XCTAssertFalse(archetype.animal.element.isEmpty, "\(archetype.rawValue): animal element")
+            XCTAssertFalse(archetype.animal.temperament.isEmpty, "\(archetype.rawValue): temperament copy")
+            XCTAssertEqual(archetype.animalName, archetype.animal.name.lowercased())
+            XCTAssertEqual(archetype.tagline, archetype.animal.temperament)
+            XCTAssertEqual(archetype.fullName, "\(archetype.displayName) the \(archetype.animalName)")
+            names.insert(archetype.animal.name)
+            elements.insert(archetype.animal.element)
+        }
+        XCTAssertEqual(names.count, Archetype.allCases.count, "each companion must be a distinct animal")
+        XCTAssertEqual(elements.count, Archetype.allCases.count, "each companion must own its category")
+    }
+
+    func testCompanionPickerIconsRender() throws {
+        // The v10 picker shows the real avatar as a static pixel icon
+        // (Render/CompanionIcon): every animal must rasterize to a lit,
+        // grid-sized icon at the pinned frame, and build a CGImage.
+        let w = PixelStageRasterizer.gridWidth
+        let h = PixelStageRasterizer.gridHeight
+        for archetype in Archetype.allCases {
+            let bytes = CompanionIcon.snapshotBytes(for: archetype)
+            XCTAssertEqual(bytes.count, w * h * 4, "\(archetype.rawValue): icon snapshot size")
+            let lit = stride(from: 0, to: bytes.count, by: 4).filter { i in
+                max(bytes[i], max(bytes[i + 1], bytes[i + 2])) > 24
+            }.count
+            XCTAssertGreaterThan(lit, 200, "\(archetype.rawValue): picker icon must be visibly lit (\(lit) px)")
+            let cg = CompanionIcon.cgImage(for: archetype)
+            XCTAssertNotNil(cg, "\(archetype.rawValue): picker icon CGImage")
+            XCTAssertEqual(cg?.width, w)
+            XCTAssertEqual(cg?.height, h)
+        }
+    }
+
     // MARK: A5b — v3 motion grammar (gaze policy, blink grammar, settle, tells)
 
     func testLockGazeStaysNearTheUser() throws {

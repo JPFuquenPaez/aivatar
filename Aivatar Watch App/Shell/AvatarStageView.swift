@@ -16,8 +16,12 @@ struct AvatarStageView: View {
     /// archetype display name once the ceremony completes.
     @AppStorage("companionName") private var companionName = ""
     @AppStorage("namingCompleted") private var namingCompleted = false
+    /// v10 onboarding: the companion picker runs once, before the naming
+    /// ceremony (choose the animal, then name it).
+    @AppStorage("companionPickerCompleted") private var pickerCompleted = false
     @State private var context: AvatarRenderContext?
     @State private var isResting = false
+    @State private var showPicker = false
     @State private var showNaming = false
     /// "It noticed" (§10.5.5): timestamp when the app left the active
     /// phase; a return after a long absence gets a soft noticed-nod.
@@ -205,11 +209,19 @@ struct AvatarStageView: View {
             }
             .onAppear {
                 isResting = isLuminanceReduced
-                // A5c naming ceremony (first-run only — the ceremony never
-                // nags; it can be re-run from Settings). CI/smoke launches
-                // pass an -archetype override and skip the sheet: the
-                // ceremony belongs to real users, not capture loops.
-                if launchOverride == nil && !namingCompleted {
+                // First-run onboarding (real users only — CI/smoke launches
+                // pass an -archetype override and skip the sheets): choose a
+                // companion first (v10 picker), then the A5c naming ceremony.
+                // The ceremony never nags; both re-open from Settings.
+                if launchOverride == nil && !namingCompleted && !pickerCompleted {
+                    showPicker = true
+                } else if launchOverride == nil && !namingCompleted {
+                    showNaming = true
+                }
+            }
+            // Dismissing the picker without choosing still leads to naming.
+            .onChange(of: showPicker) { visible in
+                if !visible, launchOverride == nil, !pickerCompleted, !namingCompleted {
                     showNaming = true
                 }
             }
@@ -225,6 +237,14 @@ struct AvatarStageView: View {
                     wentToBackgroundAt = nil
                 } else if phase == .background {
                     wentToBackgroundAt = Date()
+                }
+            }
+            .sheet(isPresented: $showPicker) {
+                NavigationStack {
+                    CompanionPickerView {
+                        showPicker = false
+                        if !namingCompleted { showNaming = true }
+                    }
                 }
             }
             .sheet(isPresented: $showNaming) {

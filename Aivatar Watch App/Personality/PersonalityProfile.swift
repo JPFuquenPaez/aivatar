@@ -15,17 +15,30 @@ nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
         }
     }
 
-    /// v9 animal icon: one reduced animal per category
-    /// (Tools/PIXEL_DESIGN.md v3) — used in the accessibility label.
-    var animalName: String {
+    /// v10: the animal identity (Tools/PIXEL_DESIGN.md v3) — the personality
+    /// IS the animal. The codename above stays the persisted key (storage,
+    /// seed anchor, profile id); the animal is the presented identity in the
+    /// companion picker, the naming ceremony, and the accessibility label.
+    var animal: CompanionAnimal {
         switch self {
-        case .ember: return "fox"      // land/fire
-        case .willow: return "frog"    // amphibian
-        case .compass: return "fish"   // water
-        case .prism: return "chameleon" // reptile
-        case .nimbus: return "bird"    // air
+        case .ember:   return CompanionAnimal(name: "Fox", element: "land & fire",
+                                               temperament: "Playful and warm — always up for a hello")
+        case .willow:  return CompanionAnimal(name: "Frog", element: "amphibian",
+                                               temperament: "Gentle and patient — a calm presence by your side")
+        case .compass: return CompanionAnimal(name: "Fish", element: "water",
+                                               temperament: "Steady and precise — keeps its word")
+        case .prism:   return CompanionAnimal(name: "Chameleon", element: "reptile",
+                                               temperament: "Curious and playful — a new color for every idea")
+        case .nimbus:  return CompanionAnimal(name: "Bird", element: "air",
+                                               temperament: "Attentive and quick — notices everything first")
         }
     }
+
+    /// Lowercase animal name for prose ("your fox companion").
+    var animalName: String { animal.name.lowercased() }
+
+    /// "Ember the fox" — the presented full identity.
+    var fullName: String { "\(displayName) the \(animalName)" }
 
     /// A5c farewell beat (U9 — peak-end rule): the wrist-drop goodbye is
     /// ONE soft micro-gesture, never a guilt gesture. Small clips only —
@@ -40,18 +53,10 @@ nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
         }
     }
 
-    /// One-line likable-pole blurb for the personality picker (§5: every
+    /// One-line likable-pole blurb for the companion picker (§5: every
     /// archetype anchors a likable pole — sensitivity reads as responsive,
-    /// never as anxious).
-    var tagline: String {
-        switch self {
-        case .ember: return "Warm and social, always up for a hello"
-        case .willow: return "Gentle and patient, a calm presence"
-        case .compass: return "Steady and precise, keeps its word"
-        case .prism: return "Curious and playful, full of ideas"
-        case .nimbus: return "Attentive and responsive, quietly alert"
-        }
-    }
+    /// never as anxious). v10: the copy is the animal's temperament.
+    var tagline: String { animal.temperament }
 
     /// The archetype's signature quirk clip (§5 quirks), performed on
     /// long-press (§9 tap/crown/haptic dialogue). Ember's quirk is big, so
@@ -67,6 +72,20 @@ nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
         case .nimbus: return .shiver       // "reactive micro-startles"
         }
     }
+}
+
+/// The animal a companion archetype presents as (v10, Tools/PIXEL_DESIGN.md
+/// v3): one reduced animal per category — fox (land/fire), frog (amphibian),
+/// fish (water), bird (air), chameleon (reptile). `temperament` is the
+/// likable-pole copy shown in the companion picker (§5 guardrail: no
+/// companion reads as a negative trait).
+nonisolated struct CompanionAnimal: Sendable, Equatable, Codable {
+    /// "Fox" — the headline in the picker.
+    var name: String
+    /// The animal's category/element ("land & fire").
+    var element: String
+    /// One-line likable-pole temperament.
+    var temperament: String
 }
 
 /// Big Five trait vector, 0...1 per trait (§5).
@@ -121,24 +140,26 @@ nonisolated struct SilhouetteWeights: Codable, Sendable, Equatable {
 
 // MARK: - Schema v2 (A5a: unified cloud-species, additive)
 
-/// Species tint + token stack (v3: tint -> one trait token -> eye/motion
-/// grammar -> tell). The silhouette is constant across all five archetypes;
-/// identity rests on these tokens, never on anatomy.
+/// Species tint + token stack (schema-frozen at assetVersion 2.0.0).
+/// v9/v10 reality (Tools/PIXEL_DESIGN.md v3): each archetype is one flat
+/// animal icon — `bodyLight` is the ONE body hue, `face` the ink, and
+/// accentA/accentB are the transient tell accents (sparks / flicker swap).
+/// `bodyMid`, `shadow` and `glow` are legacy v3-v8 fields: kept in the
+/// frozen schema, unused by the flat painter.
 nonisolated struct SpeciesTokens: Codable, Sendable, Equatable {
-    /// Light upper body mass (head middle puff, chest top).
+    /// The ONE flat body hue of the animal icon.
     var bodyLight: String
-    /// Mid body mass (side puffs, lower masses, antenna).
+    /// Legacy v3-v8 mid body mass — frozen, unused by the v9 flat painter.
     var bodyMid: String
-    /// Deep shade (tail wisps, undersides).
+    /// Legacy v3-v8 deep shade — frozen, unused by the v9 flat painter.
     var shadow: String
-    /// Near-black eye/mouth/brow accent (v3: large matte eyes).
+    /// Ink: eyes/mouth/brows + beak/nose anchors.
     var face: String
-    /// Trait token color A (Ember flame, Willow leaf, Compass grid,
-    /// Prism patch A).
+    /// Transient accent A: spark particles (Ember) + flicker tell source.
     var accentA: String
-    /// Trait token color B (Ember amber rim, Prism patch B).
+    /// Transient accent B: the flicker tell's swap target (Prism).
     var accentB: String?
-    /// Interior glow (Ember embers; optional).
+    /// Legacy v3-v8 interior glow — frozen, unused by the v9 flat painter.
     var glow: String?
 }
 

@@ -19,7 +19,7 @@ struct NamingCeremonyView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
-                Text(archetype.displayName)
+                Text(archetype.fullName)
                     .font(.headline)
                 Text("Give your companion a name. Named things are kept things.")
                     .font(.footnote)

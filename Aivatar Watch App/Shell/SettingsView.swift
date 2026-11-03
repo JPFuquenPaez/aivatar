@@ -33,15 +33,15 @@ struct SettingsView: View {
                     }
                     .accessibilityLabel("Name, currently \(stageName)")
                     NavigationLink {
-                        ArchetypePickerView()
+                        CompanionPickerView()
                     } label: {
                         HStack {
-                            Text("Personality")
+                            Text("Companion")
                             Spacer()
-                            Text(archetype.displayName)
+                            Text(archetype.animal.name)
                                 .foregroundStyle(.secondary)
                         }
-                        .accessibilityLabel("Personality, currently \(archetype.displayName)")
+                        .accessibilityLabel("Companion, currently \(archetype.fullName)")
                     }
                 }
                 Section {
@@ -70,43 +70,4 @@ struct SettingsView: View {
     }
 }
 
-/// Companion personality picker (§5 one avatar per personality, §9 pushed
-/// settings section). Every archetype is presented at its likable pole —
-/// no row reads as a negative trait. Rows are standard List buttons
-/// (44 pt+ targets, VoiceOver-labeled, text styles only).
-private struct ArchetypePickerView: View {
-    @AppStorage(ArchetypeSelection.storageKey) private var selection: Archetype = .ember
 
-    var body: some View {
-        List {
-            Section {
-                ForEach(Archetype.allCases, id: \.self) { archetype in
-                    Button {
-                        selection = archetype
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(archetype.displayName)
-                                Text(archetype.tagline)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if archetype == selection {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.tint)
-                            }
-                        }
-                        .accessibilityElement(children: .combine)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(archetype == selection ? .isSelected : [])
-                }
-            } footer: {
-                Text("Your companion remembers your choice.")
-                    .font(.footnote)
-            }
-        }
-        .navigationTitle("Personality")
-    }
-}
