@@ -1,4 +1,4 @@
-# Pixel-avatar design practices (the standing checklist, v3 — animal icons)
+# Pixel-avatar design practices (the standing checklist, v4 — quiet stage)
 
 The standing rule for every visual pass: **design in this order —
 silhouette → proportions → palette → details → animation — and design for
@@ -68,13 +68,24 @@ the icon separates from the black stage by its own solid color.
 - Verify: `testPaletteBudget`, `testPixelPalettesAreVivid`,
   `testTintSeparatesArchetypes`.
 
-## 4. Chunky pixels, hard edges, NO contour
+## 4. Chunky pixels, hard edges, NO contour, NO dither
 
 - Every lit pixel is EXACTLY a LUT color (`testPixelColorsSnapToLUT`) —
   including edge pixels: the silhouette boundary is a hard LUT cut, never
   a dim antialiased fringe (`testSilhouetteEdgeIsHardLUTCut`).
-- Icon brand rules forbid outlines/frames: no halo ring, no smoothing.
-  The icon separates by its own flat color on the OLED black stage.
+- The snap's coverage gate is 50%: a grid pixel is painted only when a
+  shape covers at least half of it, so antialiased boundaries produce
+  regular staircases with no orphan fringe pixels
+  (`testNoSpeckleOrphans` — zero isolated lit pixels anywhere).
+- NO dithering at all (v4): the flat palette gives every painted pixel
+  an exact LUT color, so ordered dither is dead weight that can only
+  create between-tone speckle. Nearest-LUT snap only.
+- Displayed scale: the 64x78 grid is drawn edge-to-edge, so one art pixel
+  is exactly `screenWidth / 64` device points (~5.7-6.2 px on current
+  cases) — the authored pixel scale is pinned by construction. (The
+  StageComposition zoom constant applies ONLY to the vector fallback.)
+- Icon brand rules forbid outlines/frames and smoothing. The icon
+  separates by its own flat color on the OLED black stage.
 - No "doubles" (thick L-shaped diagonal clusters), no single-pixel-thin
   details (Derek Yu's chunky-pixels rule), no automatic AA.
 - Verify: golden hash pins.
@@ -95,12 +106,19 @@ the icon separates from the black stage by its own solid color.
   tested across the widest pose (a full spin), not just idle.
 - Verify: `testSpritePaddingAcrossWidestPose`.
 
-## 7. Stage and life
+## 7. Stage and life — the silence budget
 
-- Sparse frame-driven mote field (dim accent dust) — the ONLY stage
-  addition. Deterministic in the frame index, absent in the rest LOD
-  (OLED power). The stage is a scene, not a void.
-- Verify: `testMotesAreDeterministicFrameDrivenAndRestFree`.
+- Sparse frame-driven mote field — at most THREE dim (22% body) motes,
+  drifting slowly — the ONLY stage addition; punctuation, not weather.
+  Deterministic in the frame index, absent in the rest LOD (OLED power).
+- Motion budget (v4): life floor = breathing + blinks + gaze + posture
+  wander (always on); expressive motion = idle gestures + tells
+  (scheduled, rare); NO tremor on the head — the focal point must be
+  still between blinks and gaze shifts. Mean changed non-stage pixels per
+  idle frame is pinned by `testIdleMotionEnergyBudget` so a future
+  "alive" pass cannot silently turn the companion into jitter.
+- Verify: `testMotesAreDeterministicFrameDrivenAndRestFree`,
+  `testIdleMotionEnergyBudget`.
 
 ## Review workflow for any visual change
 

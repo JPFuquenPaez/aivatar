@@ -12,9 +12,11 @@ import os
 /// avatar to ~52% of screen height with dead space below it. These constants
 /// zoom past the canvas padding and center on the *content* instead.
 fileprivate enum StageComposition {
-    /// Zoom over the base canvas fit. 1.18 puts the ~140-unit content at
-    /// ~66% of screen height on 44-46 mm devices, leaving headroom above
-    /// for gesture peaks (raised wave arm ~+10 units) and the clock.
+    /// Zoom over the base canvas fit. VECTOR-FALLBACK ONLY (§8 paintCommands
+    /// and debugImage): the default hi-bit stage draws the 64x78 pixel grid
+    /// edge-to-edge, so each art pixel is exactly `screenWidth / 64` device
+    /// points (~5.7-6.2 px on current cases) — the authored pixel scale is
+    /// pinned by construction there, not by this constant.
     static let zoom: CGFloat = 1.18
     /// Rest-pose content center in rig coordinates, relative to the canvas
     /// center (origin): 35.5 units above it (measured from the golden

@@ -48,17 +48,10 @@ nonisolated final class PixelStageRasterizer {
     /// v9 test hook: the stage tones (motes) as LUT colors, so palette and
     /// silhouette assertions measure the AVATAR without the dust.
     let stageTonesForTesting: [(Float, Float, Float)]
-    /// v6 Bayer 4x4 ordered-dither thresholds, normalized to (0, 1).
-    private static let bayer4: [[Float]] = [
-        [0, 8, 2, 10],
-        [12, 4, 14, 6],
-        [3, 11, 1, 9],
-        [15, 7, 13, 5],
-    ].map { $0.map { ($0 + 0.5) / 16 } }
-    /// v6 ambient motes: fixed pseudo-random rest positions (one seeded
-    /// draw at init), drifted purely as a function of the frame index, so
-    /// the field is deterministic for a given frame and allocates nothing.
-    private static let moteCount = 7
+    /// v11 quiet stage (PIXEL_DESIGN.md v4): the ambient-mote field is
+    /// capped at THREE dim, slow motes — the stage must stay quiet so the
+    /// companion is the only moving focal story.
+    private static let moteCount = 3
     private let moteBaseX: [Int]
     private let moteBaseY: [Int]
 
@@ -219,18 +212,20 @@ nonisolated final class PixelStageRasterizer {
         }
     }
 
-    /// Snaps every lit grid pixel to a snap-candidate color (background
-    /// stays pure black). v6: pixels that fall BETWEEN two LUT tones —
-    /// gradient ramps and antialiased edges — are resolved by Bayer 4x4
-    /// ordered dithering between the two nearest candidates instead of a
-    /// hard nearest pick, the classic hi-bit texture (flat areas, where
-    /// the nearest candidate is exact, never dither). Every written pixel
-    /// is still exactly one LUT color, so the snap invariant holds.
+    /// Snaps every sufficiently-covered grid pixel to the NEAREST snap-
+    /// candidate color (background stays pure black). v11 quiet stage
+    /// (PIXEL_DESIGN.md v4): the v6 Bayer-ordered dither is REMOVED —
+    /// under the v9 flat palette every painted pixel is already an exact
+    /// LUT color, so there is nothing to dither between, and stray
+    /// between-tone speckle (the Nimbus pulse overlay) contradicts the
+    /// brand rule that the frame is hard LUT cuts. Coverage gate: a grid
+    /// pixel must be at least half covered (alpha >= 128) to be painted
+    /// at all, so vector-antialiased boundaries produce regular
+    /// staircases with no orphan fringe pixels.
     private func snapToLUT(rest: Bool) {
         let candidates = rest ? lut : activeSnapLUT
         guard let data = context.data else { return }
         let bytes = data.assumingMemoryBound(to: UInt8.self)
-        let width = Self.gridWidth
         let count = Self.gridWidth * Self.gridHeight
         for bucket in pixelsByColor.indices {
             pixelsByColor[bucket].removeAll(keepingCapacity: true)
@@ -240,46 +235,34 @@ nonisolated final class PixelStageRasterizer {
             let a = bytes[o + 3]
             // Background stays PURE BLACK (§2 OLED power strategy): the
             // raster's black clear would otherwise snap to the darkest
-            // LUT color and paint the whole stage with it.
-            if a < 96 || Int(bytes[o]) + Int(bytes[o + 1]) + Int(bytes[o + 2]) < 24 {
+            // LUT color and paint the whole stage with it. v11: the
+            // coverage gate is 50% (alpha >= 128) — a pixel is part of the
+            // art only when the shape covers at least half of it, so
+            // antialiased boundaries yield clean regular staircases.
+            if a < 128 || Int(bytes[o]) + Int(bytes[o + 1]) + Int(bytes[o + 2]) < 24 {
                 bytes[o] = 0; bytes[o + 1] = 0; bytes[o + 2] = 0; bytes[o + 3] = 255
                 continue
             }
-            // Unpremultiply, then find the TWO nearest candidates by RGB
-            // distance (single pass, no allocation).
+            // Unpremultiply, then snap to the NEAREST candidate (flat
+            // palette: painted colors are exact LUT matches; the nearest
+            // pick only cleans residual antialiased blends).
             let inv = 255.0 / Double(a)
             let r = min(255.0, Double(bytes[o]) * inv)
             let g = min(255.0, Double(bytes[o + 1]) * inv)
             let b = min(255.0, Double(bytes[o + 2]) * inv)
             var bestColor = candidates[0]
             var bestDist = Double.greatestFiniteMagnitude
-            var secondColor = candidates[0]
-            var secondDist = Double.greatestFiniteMagnitude
             for color in candidates {
                 let dr = r - Double(color.0) * 255
                 let dg = g - Double(color.1) * 255
                 let db = b - Double(color.2) * 255
                 let d = dr * dr + dg * dg + db * db
                 if d < bestDist {
-                    secondColor = bestColor; secondDist = bestDist
-                    bestColor = color; bestDist = d
-                } else if d < secondDist {
-                    secondColor = color; secondDist = d
+                    bestColor = color
+                    bestDist = d
                 }
             }
-            var chosen = bestColor
-            // v7 edge-clean dithering (§2, Tools/PIXEL_DESIGN.md): only
-            // FULLY-covered interior pixels may dither between the two
-            // nearest ramp tones (the classic hi-bit cel texture).
-            // Antialiased shape boundaries snap clean to the nearest tone
-            // — a dithered fringe reads as noise, not as pixel art.
-            if a >= 250, secondDist > bestDist + 1 {
-                // How far between the tones the pixel sits: 0 = exact
-                // match (flat — never dithers), -> 1 = equidistant.
-                let t = bestDist / secondDist
-                let threshold = Double(Self.bayer4[(i / width) % 4][i % 4])
-                if t > threshold { chosen = secondColor }
-            }
+            let chosen = bestColor
             bytes[o] = UInt8(chosen.0 * 255)
             bytes[o + 1] = UInt8(chosen.1 * 255)
             bytes[o + 2] = UInt8(chosen.2 * 255)
@@ -307,7 +290,9 @@ nonisolated final class PixelStageRasterizer {
             let phase = Float(m) * 2.399 // golden-angle spread
             let twinkle = 0.5 + 0.5 * sin(f * 0.045 + phase)
             guard twinkle > 0.62 else { continue }
-            let speed = 0.11 + 0.05 * Float(m % 3)
+            // v11: drift halved — the dust reads as a slow twinkle, not
+            // weather.
+            let speed = 0.05 + 0.025 * Float(m % 3)
             var y = (Float(moteBaseY[m]) - f * speed).truncatingRemainder(dividingBy: Float(height))
             if y < 0 { y += Float(height) }
             let x = moteBaseX[m]

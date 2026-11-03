@@ -607,7 +607,12 @@ nonisolated final class AvatarSpritePainter {
                 .paper: (1, 1, 1),
                 .accentA: parse(species.accentA),
                 .restDim: dimmed(body),
-                .mote: (body.0 * 0.30, body.1 * 0.30, body.2 * 0.30),
+                // v11: motes dimmer (25% of the body) — background dust,
+                // never a competing focal tone. The factor must stay AWAY
+                // from restDim's 0.22: restDim is excluded from the active
+                // snap set, and a mote tone that equals it would smuggle
+                // restDim-colored pixels into active frames.
+                .mote: (body.0 * 0.25, body.1 * 0.25, body.2 * 0.25),
             ]
             if let accentB = species.accentB {
                 colors[.accentB] = parse(accentB)
@@ -629,7 +634,7 @@ nonisolated final class AvatarSpritePainter {
             .deep: deep,
             .face: face,
             .restDim: dimmed(primary),
-            .mote: (primary.0 * 0.30, primary.1 * 0.30, primary.2 * 0.30),
+            .mote: (primary.0 * 0.25, primary.1 * 0.25, primary.2 * 0.25),
         ]
     }
 

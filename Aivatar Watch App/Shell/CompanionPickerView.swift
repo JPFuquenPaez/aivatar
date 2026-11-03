@@ -13,7 +13,9 @@ import SwiftUI
 /// chooses immediately (no Save step) with a haptic and a checkmark state.
 /// VoiceOver reads each page's art as one labeled element and the button as
 /// its own action. Used two ways: pushed from Settings (re-choosable) and as
-/// the first-run onboarding sheet (choosing completes onboarding).
+/// the one-time post-first-interaction onboarding sheet (v11: the first
+/// frame is the living stage; the ceremony follows the first tap, it never
+/// gates the stage).
 struct CompanionPickerView: View {
     /// Non-nil in first-run onboarding mode: choosing completes onboarding
     /// and the closure lets the parent dismiss the sheet (and continue to

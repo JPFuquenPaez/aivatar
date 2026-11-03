@@ -14,15 +14,24 @@ struct AvatarStageView: View {
     @AppStorage(ArchetypeSelection.storageKey) private var storedArchetype: Archetype = .ember
     /// A5c naming ceremony (§10.5.1): the user-owned name replaces the
     /// archetype display name once the ceremony completes.
+    /// A5c naming ceremony: rename access (§10.5.1).
     @AppStorage("companionName") private var companionName = ""
     @AppStorage("namingCompleted") private var namingCompleted = false
     /// v10 onboarding: the companion picker runs once, before the naming
     /// ceremony (choose the animal, then name it).
     @AppStorage("companionPickerCompleted") private var pickerCompleted = false
+    /// v11: the post-first-interaction ceremony sequence runs ONCE per
+    /// install (it must never nag on later sessions — Settings stays the
+    /// door for re-choosing and renaming).
+    @AppStorage("onboardingCeremonyShown") private var ceremonyShown = false
+    /// v11: the slow-blink ritual hint is surfaced once, after the first
+    /// touch — a hidden gesture needs one visible invitation.
+    @AppStorage("ritualHintShown") private var ritualHintShown = false
     @State private var context: AvatarRenderContext?
     @State private var isResting = false
     @State private var showPicker = false
     @State private var showNaming = false
+    @State private var showRitualHint = false
     /// "It noticed" (§10.5.5): timestamp when the app left the active
     /// phase; a return after a long absence gets a soft noticed-nod.
     @State private var wentToBackgroundAt: Date?
@@ -169,6 +178,14 @@ struct AvatarStageView: View {
                 }
                 .padding(.bottom, 8)
                 .padding(.horizontal, 12)
+                if showRitualHint {
+                    Text("Touch and hold to share a slow blink")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 34)
+                        .padding(.horizontal, 12)
+                        .transition(.opacity)
+                }
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityText)
@@ -195,11 +212,13 @@ struct AvatarStageView: View {
                         context?.engine.handleEvent(.gazeAt(x: nx, y: ny))
                         context?.engine.handleEvent(.tap)
                         HapticsChannel.shared.react(to: archetype)
+                        afterFirstInteraction()
                     }
             )
             .accessibilityAction {
                 context?.engine.handleEvent(.tap)
                 HapticsChannel.shared.react(to: archetype)
+                afterFirstInteraction()
             }
             .accessibilityAction(named: "Play signature move") {
                 performQuirk()
@@ -209,15 +228,13 @@ struct AvatarStageView: View {
             }
             .onAppear {
                 isResting = isLuminanceReduced
-                // First-run onboarding (real users only — CI/smoke launches
-                // pass an -archetype override and skip the sheets): choose a
-                // companion first (v10 picker), then the A5c naming ceremony.
-                // The ceremony never nags; both re-open from Settings.
-                if launchOverride == nil && !namingCompleted && !pickerCompleted {
-                    showPicker = true
-                } else if launchOverride == nil && !namingCompleted {
-                    showNaming = true
-                }
+                // v11 onboarding order: the first LIVING FRAME is the first
+                // impression — no sheet ever gates the stage (watch
+                // interactions are glanceable and short). The ceremonies
+                // (companion picker, then naming) ride the user's first
+                // interaction instead; both stay re-openable from Settings.
+                // CI/smoke launches pass an -archetype override and skip
+                // the sheets entirely.
             }
             // Dismissing the picker without choosing still leads to naming.
             .onChange(of: showPicker) { visible in
@@ -251,6 +268,30 @@ struct AvatarStageView: View {
                 NamingCeremonyView(archetype: archetype, isPresented: $showNaming) { _ in
                     celebrateNaming()
                 }
+            }
+        }
+    }
+
+    /// v11 onboarding order: the first frame is a living companion, never a
+    /// form. After the user's FIRST interaction (the moment of delight),
+    /// the one-time ceremony sequence follows — picker, then naming (each
+    /// skipped if already done); once the sequence has run it never
+    /// returns. After onboarding, the slow-blink ritual gets its single
+    /// visible hint.
+    private func afterFirstInteraction() {
+        if launchOverride == nil, !ceremonyShown {
+            ceremonyShown = true
+            if !pickerCompleted {
+                showPicker = true
+            } else if !namingCompleted {
+                showNaming = true
+            }
+        } else if !ritualHintShown {
+            ritualHintShown = true
+            showRitualHint = true
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 4_500_000_000)
+                showRitualHint = false
             }
         }
     }

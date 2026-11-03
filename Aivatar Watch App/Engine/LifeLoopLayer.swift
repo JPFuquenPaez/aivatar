@@ -2,8 +2,8 @@ import Foundation
 
 /// L1 — Life loops (§7).
 ///
-/// Always-on in active mode: breathing (chest scale), micro-sway, heartbeat
-/// shimmer, plus stochastic blinks and saccades from the gaze profile. All
+/// Always-on in active mode: breathing (chest scale), micro-sway, posture
+/// wander, plus stochastic blinks and saccades from the gaze profile. All
 /// stochastic triggers advance one per-frame Bernoulli draw each frame
 /// (per-tick probability `lambda * dt`), so same seed -> same behavior.
 nonisolated final class LifeLoopLayer {
@@ -65,11 +65,9 @@ nonisolated final class LifeLoopLayer {
     private var wanderTargetLeanRot: Float = 0
     private var wanderTargetLeanX: Float = 0
     private var wanderTargetTilt: Float = 0
-    private var wanderTargetBobScale: Float = 1
     private var wanderLeanRot: Float = 0
     private var wanderLeanX: Float = 0
     private var wanderTilt: Float = 0
-    private var wanderBobScale: Float = 1
     private var wanderEase: Float = 0.05
     private var wanderAmp: Float = 1
     private var wanderInterval: Int = 120
@@ -160,12 +158,12 @@ nonisolated final class LifeLoopLayer {
         pose.rotations[bones.hips] += sin(t * 0.55) * 0.035 * profile.motionProfile.amplitudeScale * driftScale
         pose.offsetsY[bones.hips] += sin(t * 1.1) * 1.6 * driftScale
 
-        // --- Heartbeat shimmer: 60 bpm pulse on the head (~0.6-unit bob),
-        //     depth modulated by the posture wander (the bob "breathes"
-        //     too — a constant-depth pulse reads mechanical).
-        let beat = t * Float.pi * 2.0 * 1.0
-        let pulse = pow(max(0, sin(beat)), 12)
-        pose.offsetsY[bones.head] -= pulse * 0.6 * wanderBobScale
+        // v11 motion budget (PIXEL_DESIGN.md v4): the heartbeat shimmer is
+        // REMOVED. It lived on the head — the focal point — where a
+        // ~0.2-art-pixel tremor reads as jitter, not life. Life on the
+        // stage is carried by breathing, sway, posture wander, gaze and
+        // blinks; the body keeps its pulse through the wander-modulated
+        // breathing depth below.
 
         // --- Posture wander (v4 "alive" pass): draw a new random posture
         //     target when the current one expires, then ease toward it.
@@ -183,14 +181,12 @@ nonisolated final class LifeLoopLayer {
             wanderTargetLeanRot = wanderRng.nextSignedFloat() * 0.030 * amp
             wanderTargetLeanX = wanderRng.nextSignedFloat() * 1.4 * amp
             wanderTargetTilt = wanderRng.nextSignedFloat() * 0.045 * amp
-            wanderTargetBobScale = 0.8 + wanderRng.nextFloat() * 0.5
         }
         wanderFramesLeft -= 1
         let ease = wanderEase
         wanderLeanRot += (wanderTargetLeanRot - wanderLeanRot) * ease
         wanderLeanX += (wanderTargetLeanX - wanderLeanX) * ease
         wanderTilt += (wanderTargetTilt - wanderTilt) * ease
-        wanderBobScale += (wanderTargetBobScale - wanderBobScale) * ease
         pose.rotations[bones.hips] += wanderLeanRot
         pose.offsetsX[bones.hips] += wanderLeanX
         pose.rotations[bones.spineLower] += wanderTilt

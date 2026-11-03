@@ -1400,12 +1400,16 @@ final class GoldenFrameTests: XCTestCase {
         // v16 (v9 animal icons, Tools/PIXEL_DESIGN.md v3): one reduced
         // animal per category on the frozen rig — fox/frog/fish/bird/
         // chameleon, flat fills, anchors. Deliberate change.
+        // v17 (v11 quiet stage, Tools/PIXEL_DESIGN.md v4): Bayer dither
+        // removed (nearest-LUT snap behind a 50% coverage gate), the mote
+        // field cut to 3 dim slow motes, and the head heartbeat shimmer
+        // removed (no tremor on the focal point). Deliberate change.
         let expected: [Archetype: UInt64] = [
-            .ember: 15_133_487_622_499_984_776,
-            .willow: 12_755_184_843_983_198_336,
-            .compass: 13_816_637_688_423_001_643,
-            .prism: 16_085_469_737_839_602_722,
-            .nimbus: 5_401_797_589_844_402_233,
+            .ember: 11_343_544_841_071_876_746,
+            .willow: 3_264_317_429_513_848_761,
+            .compass: 5_498_149_588_919_345_428,
+            .prism: 1_683_824_048_245_186_084,
+            .nimbus: 3_060_368_153_860_514_890,
         ]
 
         var actual: [Archetype: UInt64] = [:]
@@ -1611,12 +1615,15 @@ final class PixelStageTests: XCTestCase {
         // v10 (v9 animal icons, Tools/PIXEL_DESIGN.md v3): flat animal
         // avatars (fox/frog/fish/bird/chameleon), no halo/gradient/blush —
         // deliberate visual change.
+        // v11 (v11 quiet stage, Tools/PIXEL_DESIGN.md v4): Bayer dither
+        // removed (nearest-LUT snap behind a 50% coverage gate), the mote
+        // field cut to 3 dim slow motes — deliberate visual change.
         let expected: [Archetype: UInt64] = [
-            .ember: 15_326_040_212_293_769_164,
-            .willow: 5_288_476_243_485_001_514,
-            .compass: 4_643_720_602_706_031_301,
-            .prism: 9_626_720_382_987_312_845,
-            .nimbus: 12_841_834_500_096_726_302,
+            .ember: 8_769_934_179_242_660_921,
+            .willow: 10_958_265_506_911_380_204,
+            .compass: 5_128_504_469_741_821_235,
+            .prism: 6_313_896_383_961_238_011,
+            .nimbus: 2_722_536_344_964_497_581,
         ]
         var actual: [Archetype: UInt64] = [:]
         for archetype in Archetype.allCases {
@@ -1810,8 +1817,92 @@ final class PixelStageTests: XCTestCase {
         }
     }
 
+    /// v11 speckle check: no FLOATING pixels — every lit non-stage pixel
+    /// must connect to the art through at least one lit 8-neighbor. A
+    /// pixel whose only lit 4-neighbors are absent but that touches its
+    /// shape diagonally is an authored apex (a nose or fin tip), which is
+    /// legitimate pixel-art; a pixel connected to nothing at all is
+    /// rasterizer speckle and reads as noise on OLED.
+    func testNoSpeckleOrphans() throws {
+        let width = PixelStageRasterizer.gridWidth
+        let height = PixelStageRasterizer.gridHeight
+        for archetype in Archetype.allCases {
+            let rasterizer = try makeRasterizer(archetype)
+            let bytes = rasterizer.snapshotBytes()
+            let stage = Set(rasterizer.stageTonesForTesting.map {
+                Int($0.0 * 255) << 16 | Int($0.1 * 255) << 8 | Int($0.2 * 255)
+            })
+            func lit(_ i: Int) -> Bool {
+                let o = i * 4
+                let key = Int(bytes[o]) << 16 | Int(bytes[o + 1]) << 8 | Int(bytes[o + 2])
+                return max(bytes[o], max(bytes[o + 1], bytes[o + 2])) > 24 && !stage.contains(key)
+            }
+            var floaters: [(Int, Int)] = []
+            for i in 0..<(width * height) {
+                guard lit(i) else { continue }
+                let x = i % width, y = i / width
+                var connected = false
+                for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)] {
+                    let nx = x + dx, ny = y + dy
+                    guard nx >= 0, nx < width, ny >= 0, ny < height else { continue }
+                    if lit(ny * width + nx) { connected = true; break }
+                }
+                if !connected { floaters.append((x, y)) }
+            }
+            XCTAssertTrue(floaters.isEmpty,
+                           "\(archetype.rawValue): floating speckle pixels at \(floaters) — pixels connected to nothing read as noise")
+        }
+    }
 
-
+    /// v11 motion budget: the idle stage stays QUIET — mean changed
+    /// non-stage pixels per frame over a 10 s idle window is pinned, so a
+    /// future "alive" pass cannot silently turn the companion into jitter
+    /// (breathing, gaze, blinks and scheduled gestures must stay inside
+    /// the budget; the head must carry no tremor at all).
+    func testIdleMotionEnergyBudget() throws {
+        let width = PixelStageRasterizer.gridWidth
+        let height = PixelStageRasterizer.gridHeight
+        for archetype in Archetype.allCases {
+            let engine = try makeGoldenEngine(archetype)
+            let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+            let rasterizer = PixelStageRasterizer(painter: painter)
+            let stage = Set(rasterizer.stageTonesForTesting.map {
+                Int($0.0 * 255) << 16 | Int($0.1 * 255) << 8 | Int($0.2 * 255)
+            })
+            func key(_ i: Int, _ bytes: [UInt8]) -> Int {
+                let o = i * 4
+                return Int(bytes[o]) << 16 | Int(bytes[o + 1]) << 8 | Int(bytes[o + 2])
+            }
+            var previous: [UInt8]?
+            var changed = 0
+            var frames = 0
+            for frame in 300..<600 {
+                engine.update(toFrame: frame)
+                painter.paint(
+                    world: engine.currentWorld, pose: engine.currentPose, rest: false,
+                    accentPhase: engine.activeGesturePhase, tell: engine.tell, tellPhase: engine.tellPhase
+                )
+                rasterizer.rasterize(painter: painter, frame: frame)
+                let bytes = rasterizer.snapshotBytes()
+                if let prev = previous {
+                    var delta = 0
+                    for i in 0..<(width * height) where key(i, prev) != key(i, bytes) {
+                        if !stage.contains(key(i, prev)), !stage.contains(key(i, bytes)) {
+                            delta += 1
+                        }
+                    }
+                    changed += delta
+                    frames += 1
+                }
+                previous = bytes
+            }
+            let mean = Double(changed) / Double(max(frames, 1))
+            XCTAssertLessThanOrEqual(
+                mean, 40,
+                "\(archetype.rawValue): idle motion energy too high (mean \(String(format: "%.1f", mean)) px/frame) — the stage must stay quiet"
+            )
+        }
+    }
 
     /// v6 motes: a deterministic function of the frame index (same frame ->
     /// same field, different frame -> moved), present in active frames and
