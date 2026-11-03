@@ -10,20 +10,24 @@ import CoreGraphics
 /// unchanged — this changes only the presentation layer ("pixel style
 /// changes the renderer, not the character").
 ///
-/// Grid window: the rig region visible on a canonical 184x224 pt screen
-/// under the vector stage composition (StageComposition zoom 1.18):
-/// rig x in [-87, +87], content centered 35.5 rig units above the rig
-/// origin at grid center — the pixel stage shows the same framing as the
-/// vector stage did, so composition tests carry over. The v5 bump from
-/// 51x63 to 64x78 keeps the same window (~174 x 214 rig units) and
-/// raises the detail class a step (§11.3: "more detail" than simple
-/// pixel mascots; 3-4 tone ramps and 4x3 px eyes stay legible).
+/// Grid window (v8): the rig region visible on a canonical 184x224 pt
+/// screen under the pixel stage composition — at 3.0 rig units per sprite
+/// pixel the 64x78 grid covers ~192 x 234 rig units (rig x in [-96, +96],
+/// rig y in [-152, +82] with the content centered 35.5 rig units above
+/// the rig origin at grid center), leaving 1-2 sprite px of padding
+/// around the sprite so the widest pose never clips (§6, PIXEL_DESIGN.md
+/// v2). The v5 bump from 51x63 to 64x78 kept the detail class a step above
+/// simple pixel mascots (3-4 tone ramps and 4x3 px eyes stay legible).
 nonisolated final class PixelStageRasterizer {
     static let gridWidth = 64
     static let gridHeight = 78
 
-    /// Rig units per sprite pixel (grid covers ~174 x 212 rig units).
-    private static let rigUnitsPerPixel: CGFloat = 2.72
+    /// Rig units per sprite pixel. v8: 3.0 (was 2.72) — chunkier pixels
+    /// (Derek Yu's rule: important forms get real pixel mass) AND the
+    /// wider window (192 x 234 rig units) leaves 1-2 sprite px of padding
+    /// around the sprite so the widest pose (a full spin) never clips the
+    /// grid edge (Tools/PIXEL_DESIGN.md v2 §6).
+    private static let rigUnitsPerPixel: CGFloat = 3.0
     /// Content center (rig y, relative to the rig origin) placed at the
     /// grid center — matches StageComposition.contentCenterY.
     private static let contentCenterY: CGFloat = -35.5
@@ -391,4 +395,9 @@ nonisolated final class PixelStageRasterizer {
     }
 
     var lutForTesting: [(Float, Float, Float)] { lut }
+
+    /// v8 test hook: the number of ACTIVE snap candidates — the palette
+    /// budget (Tools/PIXEL_DESIGN.md v2 §3 caps it at 12 colors; stage
+    /// tones and restDim are excluded by construction).
+    var activeSnapCandidateCountForTesting: Int { activeSnapLUT.count }
 }

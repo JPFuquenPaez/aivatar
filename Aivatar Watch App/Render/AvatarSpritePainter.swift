@@ -354,58 +354,46 @@ nonisolated final class AvatarSpritePainter {
             catchlights.append((slots[slotIndex].boneIndex, slotIndex, -1.1 + inset, -1.1))
         }
 
-        // v7 ears (§4, Tools/PIXEL_DESIGN.md): the cheapest cuteness
-        // device in pixel art — every species carries a two-ear cluster
-        // above the head, shaped per temperament, BODY-colored with the
-        // head's volumetric ramp so the ears read as anatomy, never
-        // stickers. Positions are per SIDE (lx/rx): Prism's pyramid head
-        // shears with the plan's lean, so its ears ride the two slopes at
-        // different offsets — like a tilted cat.
+        // v8 ears (§1, Tools/PIXEL_DESIGN.md v2): the creature cue — every
+        // species carries a two-ear cluster above the round head, shaped
+        // per temperament, BODY-colored with the head's volumetric ramp so
+        // the ears read as anatomy, never stickers. Slight asymmetry (the
+        // right ear a touch taller/less rotated) — perfect symmetry reads
+        // mechanical. Positions are per side and tuned to each head's
+        // scaled dome top.
         let earSpec: (kind: String, w: Float, h: Float, lx: Float, rx: Float, y: Float, rot: Float)
         switch archetype {
-        case .ember: earSpec = ("flame", 9, 13, -10.5, 10.5, -30, 0.30)      // flame tufts on the whip head
-        case .willow: earSpec = ("leaf", 7, 12, -24, 24, -14, 0.25)          // leaf ears on the wide dome
-        case .compass: earSpec = ("triangle", 10, 13, -10, 10, -25, 0.45)    // crystal facets on the gem slope
-        case .prism: earSpec = ("triangle", 10, 14, -5.5, 12, -21, 0.25)     // twin spikes on the sheared apex
-        case .nimbus: earSpec = ("circle", 11, 12, -19, 19, -24, 0)           // round cloud nubs
+        // y is sunk ~4 units into the dome so the ear base rasterizes as
+        // a SOLID overlap (a sub-pixel contact leaves a black seam and the
+        // ear reads as a floating sticker — connectivity test catches it).
+        case .ember: earSpec = ("flame", 9, 12, -17, 17, -22, 0.30)     // flame tufts
+        case .willow: earSpec = ("leaf", 7, 11, -22, 22, -18, 0.25)     // leaf ears
+        case .compass: earSpec = ("triangle", 9, 12, -16, 16, -23, 0.40) // crystal facets
+        case .prism: earSpec = ("triangle", 9, 13, -16, 18, -21, 0.30)  // twin spikes
+        case .nimbus: earSpec = ("circle", 10, 11, -19, 19, -20, 0)     // cloud nubs
         }
         for (side, x) in [(Float(-1), earSpec.lx), (Float(1), earSpec.rx)] {
-            append(RigDocument.Shape(kind: earSpec.kind, width: earSpec.w, height: earSpec.h, bendSegments: nil),
-                   kind: earSpec.kind, bone: "head", role: .bodyLight,
-                   x: x, y: earSpec.y, rotation: side * earSpec.rot,
+            let h = side < 0 ? earSpec.h : earSpec.h * 1.12      // asymmetry
+            let rot = side * earSpec.rot * (side < 0 ? 1.0 : 0.8)
+            append(RigDocument.Shape(kind: earSpec.kind, width: earSpec.w, height: h, bendSegments: nil),
+                   kind: earSpec.kind, bone: "head", role: .primary,
+                   x: x, y: earSpec.y, rotation: rot,
                    id: "ear")
             earCountForTesting += 1
         }
 
+        // v8 épuré details (§0.4: details last, only if they survive at
+        // display size): the clutter of the radical-plan era (smoke
+        // plumes, hanging leaf rows, crystal clusters, sub-pixel grid
+        // lines, head arrows) is removed — a sprite pixel is ~2.7 rig
+        // units, so anything thinner than ~3 units is noise. What remains:
+        // ONE focal accent per species + the interiority traces.
         switch archetype {
         case .ember:
-            // Interior embers visible through the translucency: two soft
-            // glows in the lower body, capped well under 20% of body area
-            // (glow budget, v3 10.4). The flame tip is the appendageA2 slot
-            // kind; the glow is decoration.
-            append(RigDocument.Shape(kind: "circle", width: 13, height: 8, bendSegments: nil),
-                   kind: "circle", bone: "chest", role: .glow, x: 0, y: -3, alpha: 0.7)
-            append(RigDocument.Shape(kind: "circle", width: 9, height: 6, bendSegments: nil),
-                   kind: "circle", bone: "chest", role: .glow, x: 4, y: 8, alpha: 0.35)
-            // v5 flame crest (reference icon): the head flame flanked by
-            // two smaller tongues — the asymmetric 3-spike crest, exactly
-            // three sharp accents (U-guard: more reads "fire", not "friend").
-            append(RigDocument.Shape(kind: "triangle", width: 7, height: 14, bendSegments: nil),
-                   kind: "flame", bone: "head", role: .accentA, x: -6, y: -24, rotation: 0.35)
-            append(RigDocument.Shape(kind: "triangle", width: 7, height: 14, bendSegments: nil),
-                   kind: "flame", bone: "head", role: .accentA, x: 6, y: -24, rotation: -0.35)
-            // v4 reference: voluminous smoke plume at the base — wide soft
-            // shadow-tone puffs under the body (the ref's pinkish plume).
-            append(RigDocument.Shape(kind: "circle", width: 20, height: 12, bendSegments: nil),
-                   kind: "circle", bone: "hips", role: .deep, x: 0, y: 14, alpha: 0.65)
-            append(RigDocument.Shape(kind: "circle", width: 15, height: 9, bendSegments: nil),
-                   kind: "circle", bone: "hips", role: .deep, x: -13, y: 12, alpha: 0.55)
-            append(RigDocument.Shape(kind: "circle", width: 15, height: 9, bendSegments: nil),
-                   kind: "circle", bone: "hips", role: .deep, x: 13, y: 13, alpha: 0.55)
-            append(RigDocument.Shape(kind: "circle", width: 9, height: 6, bendSegments: nil),
-                   kind: "circle", bone: "hips", role: .deep, x: -22, y: 9, alpha: 0.45)
-            append(RigDocument.Shape(kind: "circle", width: 9, height: 6, bendSegments: nil),
-                   kind: "circle", bone: "hips", role: .deep, x: 22, y: 10, alpha: 0.45)
+            // One interior ember glow (the single focal accent on the
+            // body); the flame identity rides the antenna tip (slot kind).
+            append(RigDocument.Shape(kind: "circle", width: 12, height: 7.5, bendSegments: nil),
+                   kind: "circle", bone: "chest", role: .glow, x: 0, y: -2, alpha: 0.7)
         case .willow:
             // The tended sprout floats beside it in a small soil-pod
             // (interiority made discoverable). A5d: the sprout GROWS with
@@ -418,38 +406,14 @@ nonisolated final class AvatarSpritePainter {
                    kind: "leaf", bone: "hips", role: .accentA, x: 17, y: 3, rotation: 0.2,
                    id: "sproutLeaf")
             sproutLeafShapeIndex = shapes.count - 1
-            // v4 reference: the weeping bush — hanging teardrop leaves
-            // under the body (leaf kind rotated tip-down), yellow-lit.
-            // v5: five leaves, large enough to carry the silhouette.
-            for (lx, ly, rot) in [(-19.0, 13.0, 0.15), (-9.0, 17.0, 0.06),
-                                  (0.0, 19.0, 0.0), (9.0, 17.0, -0.06), (19.0, 13.0, -0.15)] {
-                append(RigDocument.Shape(kind: "triangle", width: 6.5, height: 13, bendSegments: nil),
-                       kind: "leaf", bone: "hips", role: .accentA,
-                       x: Float(lx), y: Float(ly), rotation: Float(rot + .pi))
-            }
         case .compass:
-            // The interior progress grid (order token): thin cyan lines on
-            // the chest, inside the "translucency". U3: precision lives in
-            // the grid and the timing, never in hard edges.
-            for (gx, gy) in [(-4.0, 0.0), (0.0, 0.0), (4.0, 0.0)] {
-                append(RigDocument.Shape(kind: "rect", width: 1.2, height: 13, bendSegments: nil),
-                       kind: "rect", bone: "chest", role: .accentA, x: Float(gx), y: Float(gy), alpha: 0.55,
-                       id: "grid")
-            }
-            for gy in [-5.0, 0.0, 5.0] {
-                append(RigDocument.Shape(kind: "rect", width: 11, height: 1.2, bendSegments: nil),
-                       kind: "rect", bone: "chest", role: .accentA, x: 0, y: Float(gy), alpha: 0.55,
-                       id: "grid")
-            }
-            // v4 reference: the dangling diamond crystals below the body
-            // (rounded squares rotated 45°, cyan glow). v5: a real cluster
-            // — three crystals sized to read at 205x251.
-            append(RigDocument.Shape(kind: "rect", width: 8, height: 8, bendSegments: nil),
-                   kind: "patch", bone: "hips", role: .accentA, x: -8, y: 18, rotation: Float.pi / 4, alpha: 0.9)
-            append(RigDocument.Shape(kind: "rect", width: 6, height: 6, bendSegments: nil),
-                   kind: "patch", bone: "hips", role: .accentA, x: 7, y: 15, rotation: Float.pi / 4, alpha: 0.85)
-            append(RigDocument.Shape(kind: "rect", width: 4.5, height: 4.5, bendSegments: nil),
-                   kind: "patch", bone: "hips", role: .accentA, x: 0, y: 21, rotation: Float.pi / 4, alpha: 0.8)
+            // The order token as ONE chunky diamond emblem on the chest
+            // (the old 1.2-unit grid lines were sub-pixel noise). The
+            // approval tick still flashes it (id "grid").
+            append(RigDocument.Shape(kind: "rect", width: 6.5, height: 6.5, bendSegments: nil),
+                   kind: "patch", bone: "chest", role: .accentA, x: 0, y: 0,
+                   rotation: Float.pi / 4, alpha: 0.9,
+                   id: "grid")
             // A5d interiority — the audit artifact: the week grid under
             // the body, `streakDays` cells lit, the rest dim. Compass's
             // love language is order; the tidy artifact waits for you.
@@ -464,39 +428,16 @@ nonisolated final class AvatarSpritePainter {
                            id: "weekGrid")
                 }
             }
-        case .compass:
-            // The interior progress grid (order token): thin cyan lines on
-            // the chest, inside the "translucency". U3: precision lives in
-            // the grid and the timing, never in hard edges.
-            for (gx, gy) in [(-4.0, 0.0), (0.0, 0.0), (4.0, 0.0)] {
-                append(RigDocument.Shape(kind: "rect", width: 1.2, height: 13, bendSegments: nil),
-                       kind: "rect", bone: "chest", role: .accentA, x: Float(gx), y: Float(gy), alpha: 0.55,
-                       id: "grid")
-            }
-            for gy in [-5.0, 0.0, 5.0] {
-                append(RigDocument.Shape(kind: "rect", width: 11, height: 1.2, bendSegments: nil),
-                       kind: "rect", bone: "chest", role: .accentA, x: 0, y: Float(gy), alpha: 0.55,
-                       id: "grid")
-            }
         case .prism:
-            // Sticker patches: max two, matte (v3 10.4 — the one mismatch is
-            // the wisp tips, drawn as slot kind + tip below). v5: the cyan
-            // patch is large enough to read as a duotone facet from across
-            // the room (magenta/cyan = Prism's unaided color recall).
-            append(RigDocument.Shape(kind: "rect", width: 9, height: 9, bendSegments: nil),
-                   kind: "patch", bone: "chest", role: .accentB, x: -7, y: -2, rotation: 0.1)
-            append(RigDocument.Shape(kind: "rect", width: 7, height: 7, bendSegments: nil),
-                   kind: "patch", bone: "chest", role: .accentA, x: 7, y: 3, rotation: -0.15)
-            // Mismatched wisp tips: triangle (slot) + round (decoration).
-            append(RigDocument.Shape(kind: "circle", width: 3.5, height: 3.5, bendSegments: nil),
-                   kind: "circle", bone: "appendageA2", role: .accentB, x: 3, y: -4)
-            // v4 reference: the small pointing arrow above the pyramid,
-            // glowing violet (accentA). v5: sized to carry the silhouette.
-            append(RigDocument.Shape(kind: "triangle", width: 7, height: 13, bendSegments: nil),
-                   kind: "triangle", bone: "head", role: .accentA, x: 0, y: -36, alpha: 0.95)
+            // ONE sticker patch — the accent lands on a single focal item
+            // (magenta body / cyan patch = Prism's color recall). Chunky:
+            // at 3.0 rig units per sprite pixel an 8-unit patch is ~2.7 px
+            // and mostly antialiased fringe — 10 units keeps a solid core.
+            append(RigDocument.Shape(kind: "rect", width: 10, height: 10, bendSegments: nil),
+                   kind: "patch", bone: "chest", role: .accentB, x: -4, y: 0, rotation: 0.1)
             // A5d interiority — the found trinket: the day's small
             // discovery, presented on return the way a cat brings a
-            // thing. A cyan diamond floating beside the tilted head.
+            // thing. A cyan diamond floating beside the head.
             if interiority.trinketPresent {
                 append(RigDocument.Shape(kind: "rect", width: 5, height: 5, bendSegments: nil),
                        kind: "patch", bone: "head", role: .accentB,
@@ -510,51 +451,36 @@ nonisolated final class AvatarSpritePainter {
         }
     }
 
-    /// v5 body-plan proportion table (§11.2, reference icons). No two
-    /// archetypes share a dominant mass orientation: Ember = tall
-    /// tapering flame, Willow = wide low mound, Compass = dominant gem
-    /// over a small stack, Prism = stepped pyramid, Nimbus = round wide
-    /// cloud. Head scale also sets the cuteness-floor head size per plan
-    /// (U2 holds for all five — the heads stay >= 1/3 of body height).
+    /// v8 épuré chibi proportions (§0/§2, Tools/PIXEL_DESIGN.md v2): ONE
+    /// body plan for all five archetypes — a big round head (chibi: the
+    /// head carries the expression) over a single pear torso. The old v5
+    /// radical plans (flame/gem/pyramid heads) failed the silhouette-first
+    /// test at display size: five abstract blobs instead of five
+    /// creatures. Per-species variance is now small (±10% head width) so
+    /// silhouettes still separate slightly; identity carries on tint +
+    /// protrusion (antenna tip) + face.
     static func speciesSlotScale(archetype: Archetype?, slotName: String) -> (w: Float, h: Float)? {
         guard let archetype else { return nil }
         switch slotName {
         case "head":
             switch archetype {
-            case .ember: return (0.66, 1.42)   // whip-thin tall flame head
-            case .willow: return (1.58, 0.58)   // ultra-flat wide bush dome
-            case .compass: return (1.25, 1.85)  // tall crystal gem (the creature IS the gem)
-            case .prism: return (1.32, 1.26)    // dominant layered pyramid
-            case .nimbus: return (1.22, 1.24)   // round ball reference cloud
+            case .ember: return (1.22, 1.10)
+            case .willow: return (1.40, 1.00)
+            case .compass: return (1.26, 1.20)
+            case .prism: return (1.30, 1.12)
+            case .nimbus: return (1.34, 1.08)
             }
         case "torsoChest":
-            switch archetype {
-            case .ember: return (0.74, 1.18)    // flame: widest at the chest
-            case .willow: return (1.62, 0.60)   // bush: wide sagging mass
-            case .compass: return (0.60, 0.85) // vestigial stack under the gem
-            case .prism: return (0.66, 0.85)    // spire: narrowest layer under the tilted diamond
-            case .nimbus: return (1.16, 1.06)
-            }
+            // One pear body: wide low base, tapering up into the head.
+            return (0.95, 0.80)
         case "torsoUpper":
-            switch archetype {
-            case .ember: return (0.52, 1.06)
-            case .willow: return (1.52, 0.62)
-            case .compass: return (0.55, 0.85)
-            case .prism: return (0.56, 0.85)    // spire: tapering down
-            case .nimbus: return (1.14, 1.06)
-            }
+            return (1.05, 0.85)
         case "torsoLower":
-            switch archetype {
-            case .ember: return (0.36, 0.95)     // tapers into the smoke
-            case .willow: return (1.44, 0.66)
-            case .compass: return (0.50, 0.85)
-            case .prism: return (0.46, 0.85)    // spire: tip of the taper
-            case .nimbus: return (1.10, 1.06)
-            }
+            return (1.14, 0.90)
         case "jaw":
-            return archetype == .willow ? (1.50, 0.60) : nil
+            return (1.0, 0.7)
         case "pupilL", "pupilR":
-            // v7 cuteness floor (§3, Tools/PIXEL_DESIGN.md): big round
+            // v7 cuteness floor (§5, Tools/PIXEL_DESIGN.md): big round
             // eyes on every species — the face is the avatar.
             return (1.4, 1.45)
         default:
@@ -612,48 +538,33 @@ nonisolated final class AvatarSpritePainter {
             }
         }
 
-        // v3 shared species anatomy.
+        // v8 épuré shared anatomy (Tools/PIXEL_DESIGN.md v2 §1): every
+        // species is the same chibi creature — round 3-puff cloud head,
+        // one pear torso of puffs, wisp antenna — differing ONLY in the
+        // antenna tip (the one memorable protrusion) and tail wisps.
         switch slotName {
         case "head":
-            // v4 (§11.2, reference icons): distinct body plans per
-            // archetype — the head carries the strongest silhouette cue.
-            // Ember = flame (tip up), Compass = faceted gem, Prism =
-            // layered pyramid, Willow/Nimbus keep the round cloud head
-            // (cuteness floor U2 — the wide face mass stays round).
-            switch species {
-            case .ember: return "flame"
-            case .compass: return "gemHead"
-            case .prism: return "pyramidHead"
-            default: return "blob"
-            }
+            return "blob"
         case "torsoLower", "torsoUpper", "torsoChest":
-            // Mass orientation diverges per plan (§11.2): Compass stacks
-            // chamfered squares, Willow droops wide, Prism stacks stepped
-            // trapezoid layers (the pyramid body), the rest stay puffs.
-            switch species {
-            case .compass: return "chamferPuff"
-            case .willow: return "sagPuff"
-            case .prism: return "trapezoid"
-            default: return "puff"
-            }
+            return "puff"
         case "jaw":
             return "puff"                        // chin puff
         case "appendageA":
             return "capsule"                     // wisp-antenna stem
         case "appendageA2":
             // Antenna tip = the archetype's one sharp accent, exactly one:
-            // Ember flame, Willow leaf, Compass plumb, Prism triangle,
-            // Nimbus round. (Ember's "never more than three flame tips":
-            // antenna tip + head tuft only.)
+            // Ember flame, Willow leaf, Compass plumb spike, Prism
+            // triangle, Nimbus round nub.
             switch species {
             case .ember: return "flame"
             case .willow: return "leaf"
+            case .compass: return "triangle"
             case .prism: return "triangle"
             default: return "circle"
             }
         case "appendageB", "appendageB2":
-            // Tail wisps: hanging leaf-wisps for Willow, smoke for Ember,
-            // cloud wisps otherwise.
+            // Tail wisps: hanging leaf-wisps for Willow, round wisps
+            // otherwise.
             return species == .willow ? "leaf" : "circle"
         case "pupilL", "pupilR":
             return "pupil"                        // large matte pupils (U2)
@@ -801,10 +712,15 @@ nonisolated final class AvatarSpritePainter {
         var pairs: [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))] = [:]
         for (role, c) in colors {
             switch role {
-            case .face, .catchlight, .restDim, .halo, .mote, .blush:
-                continue  // matte / flat by design (stage tones never gradient)
-            default:
+            case .primary:
+                // v8 épuré (§3, Tools/PIXEL_DESIGN.md v2): the ONE shaded
+                // material — base + highlight + shadow = 3 tones, a single
+                // top→bottom ramp (one light direction, top-left; no pillow
+                // shading). Every other role stays FLAT so the whole active
+                // palette fits the 6-12 color budget.
                 break
+            default:
+                continue
             }
             let top = (
                 c.0 + (1 - c.0) * 0.22,
@@ -850,66 +766,6 @@ nonisolated final class AvatarSpritePainter {
             offsetsY.append(centerY)
             pathHeights.append(height)
             pathShades.append(shade)
-        }
-
-        if kind == "gemHead" {
-            // Compass (v4, reference: faceted turquoise gem): a diamond
-            // head built from THREE facets back-to-front (side triangles
-            // shade 0.88, center rhombus on top shade 1.0) — the same
-            // occlusion depth cue as the cloud blob. Paths are built
-            // SLICE-RELATIVE (centered at their own slice centers — the
-            // command-origin convention; see the rim comment in "blob").
-            func poly(_ points: [(CGFloat, CGFloat)]) -> CGMutablePath {
-                let path = CGMutablePath()
-                path.move(to: CGPoint(x: points[0].0, y: points[0].1))
-                for p in points.dropFirst() { path.addLine(to: CGPoint(x: p.0, y: p.1)) }
-                path.closeSubpath()
-                return path
-            }
-            let hw = w / 2, hh = h / 2
-            let left = poly([(0, -hh), (-hw, 0), (0, hh)])
-            let right = poly([(0, -hh), (hw, 0), (0, hh)])
-            let center = poly([(0, -hh), (hw * 0.62, 0), (0, hh), (-hw * 0.62, 0)])
-            append(left, centerY: 0, height: Float(h), shade: 0.80)
-            append(right, centerY: 0, height: Float(h), shade: 0.80)
-            append(center, centerY: 0, height: Float(h), shade: 1.0)
-            bendFractions = [0, 0, 0]
-            return PaintedShape(paths: paths, offsetsY: offsetsY, bendFractions: bendFractions,
-                                pathHeights: pathHeights, pathShades: pathShades,
-                                perPathGradient: true,
-                                width: shape.width, height: shape.height)
-        }
-
-        if kind == "pyramidHead" {
-            // Prism (v4/v5, reference: layered purple pyramid): three
-            // stacked layers, shades 0.82 / 0.91 / 1.0 bottom-to-top — the
-            // layers ARE the silhouette. v5: the whole head SHEARS with
-            // the plan's lean (§11.2 tilted orientation) so the silhouette
-            // separates from every upright plan; the shear matches the
-            // trapezoid body layers (one leaning crystal, not a stack).
-            // Slice-relative (command-origin convention).
-            let lean: CGFloat = 0.20
-            func poly(_ points: [(CGFloat, CGFloat)]) -> CGMutablePath {
-                let path = CGMutablePath()
-                path.move(to: CGPoint(x: points[0].0 - lean * points[0].1, y: points[0].1))
-                for p in points.dropFirst() {
-                    path.addLine(to: CGPoint(x: p.0 - lean * p.1, y: p.1))
-                }
-                path.closeSubpath()
-                return path
-            }
-            let hw = w / 2, hh = h / 2
-            let base = poly([(-hw * 0.84, hh), (hw * 0.84, hh), (hw * 0.60, hh * 0.2), (-hw * 0.60, hh * 0.2)])
-            let mid = poly([(-hw * 0.64, hh * 0.24), (hw * 0.64, hh * 0.24), (hw * 0.34, -hh * 0.44), (-hw * 0.34, -hh * 0.44)])
-            let apex = poly([(-hw * 0.36, -hh * 0.40), (hw * 0.36, -hh * 0.40), (0, -hh)])
-            append(base, centerY: 0, height: Float(h), shade: 0.82)
-            append(mid, centerY: 0, height: Float(h), shade: 0.91)
-            append(apex, centerY: 0, height: Float(h), shade: 1.0)
-            bendFractions = [0, 0, 0]
-            return PaintedShape(paths: paths, offsetsY: offsetsY, bendFractions: bendFractions,
-                                pathHeights: pathHeights, pathShades: pathShades,
-                                perPathGradient: true,
-                                width: shape.width, height: shape.height)
         }
 
         if kind == "blob" {
@@ -1017,43 +873,6 @@ nonisolated final class AvatarSpritePainter {
                     x: -w * 0.62, y: -h * 0.46,
                     width: w * 1.24, height: h * 0.92
                 ))
-            case "sagPuff":
-                // Willow's base mass: the only cloud whose forms droop
-                // (botanical patience made physical). The ellipse's center
-                // biases down and the bottom stretches past the slot rect —
-                // the upper head stays round (U2 cuteness floor).
-                path.addEllipse(in: CGRect(
-                    x: -w * 0.66, y: -h * 0.30,
-                    width: w * 1.32, height: h * 1.18
-                ))
-            case "trapezoid":
-                // Prism spire layer (v5 plan): wider at the TOP than the
-                // bottom — the stack tapers down from under the tilted
-                // diamond like a crystal shard's tail. The path extends
-                // past the slice rect vertically (like sagPuff) so
-                // adjacent layers seal, and the whole layer SHEARS with
-                // the body plan's lean (§11.2: Prism is the tilted plan —
-                // the binary silhouette separates from Nimbus's upright
-                // puff stack even though both are centered masses).
-                let lean: CGFloat = 0.20
-                let top = rect.minY - h * 0.05
-                let bottom = rect.maxY + h * 0.05
-                func sx(_ x: CGFloat, _ y: CGFloat) -> CGFloat { x - lean * y }
-                path.move(to: CGPoint(x: sx(-w * 0.64, top), y: top))
-                path.addLine(to: CGPoint(x: sx(w * 0.64, top), y: top))
-                path.addLine(to: CGPoint(x: sx(w * 0.38, bottom), y: bottom))
-                path.addLine(to: CGPoint(x: sx(-w * 0.38, bottom), y: bottom))
-                path.closeSubpath()
-            case "chamferPuff":
-                // Compass's order token: a soft rounded chamfer — the only
-                // straight-ish edge in the family, with corner radius >= 15%
-                // of the edge so it never reads as a cut in a soft body
-                // (v3 audit finding 2).
-                let r = min(w * 1.24, h) * 0.18
-                path.addRoundedRect(
-                    in: CGRect(x: -w * 0.62, y: -h * 0.46, width: w * 1.24, height: h * 0.92),
-                    cornerWidth: r, cornerHeight: r
-                )
             case "flame":
                 // Ember's antenna tip: a symmetric curved teardrop, base
                 // low, tip up — the archetype's one sharp accent.
@@ -1103,8 +922,12 @@ nonisolated final class AvatarSpritePainter {
     func paint(world: [Transform2D], pose: AvatarPose, rest: Bool, accentPhase: Float = 0,
                tell: PersonalityTell? = nil, tellPhase: Float = 0) {
         commandCount = 0
-        let colors = (tell == .flicker && !rest) ? flickerColors : roleColors
-        let pairs = (tell == .flicker && !rest) ? flickerGradientPairs : gradientPairs
+        // v8: the flicker swap applies only while the tell is actually
+        // playing (tellPhase > 0) — Prism's accents must not be permanently
+        // swapped; the flicker is a transient chromatic shift on delight.
+        let flickering = tell == .flicker && !rest && tellPhase > 0
+        let colors = flickering ? flickerColors : roleColors
+        let pairs = flickering ? flickerGradientPairs : gradientPairs
         let pulseActive = tell == .pulse && !rest && tellPhase > 0
         for (slotIndex, slot) in slots.enumerated() {
             let t = world[slot.boneIndex]

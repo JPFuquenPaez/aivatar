@@ -135,7 +135,24 @@ nonisolated enum GestureClipLibrary {
             // seamless (§11); the crossfade holds weight 1 (endsWrapped).
             let turn = 2 * Float.pi * easeInOut(min(u / 0.9, 1))
             let settle = u > 0.9 ? sin((u - 0.9) / 0.1 * Float.pi) * over : 0
-            pose.rotations[bones.hips] += (turn + settle) * w
+            let angle = (turn + settle) * w
+            // v8: pirouette around the CHEST, not the hips. The hips pivot
+            // swept head+antenna through a radius-95 arc that clipped the
+            // grid edge on the widest pose (Tools/PIXEL_DESIGN.md v2 §6
+            // padding rule), and compensating offsets blew the per-frame
+            // continuity budget. In the chibi plan the head is most of the
+            // mass, so a chest pivot reads as a full-body spin; a small
+            // counter-twist of the upper spine (enveloped by `arc`, so it
+            // returns to exactly 0 at u = 1) keeps the base planted.
+            pose.rotations[bones.chest] += angle
+            pose.rotations[bones.spineUpper] -= 0.3 * turn * arc * w
+            // v8: tuck the head into the spin (arc-enveloped, so it is
+            // exactly 1.0 again at u = 1) — the ears/antenna sweep on the
+            // head subtree and would otherwise reach the grid edge on the
+            // widest pose (§6 padding rule).
+            let tuck = 1 - 0.25 * arc * w
+            pose.scalesX[bones.head] *= tuck
+            pose.scalesY[bones.head] *= tuck
             expressions[ExpressionChannel.wry.rawValue] = max(expressions[ExpressionChannel.wry.rawValue], arc * 0.4 * w)
 
         case .nod:

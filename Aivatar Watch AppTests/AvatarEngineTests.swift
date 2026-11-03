@@ -1354,15 +1354,18 @@ final class GoldenFrameTests: XCTestCase {
         // v13 (v5b): quirk clips — pool weights changed the seeded idle
         // schedule, but the pinned frames carry no active gesture, so the
         // v12 hashes carry over unchanged.
-        // v14 (v7): pixel-design cute pass (Tools/PIXEL_DESIGN.md) — ears
-        // on every species, enlarged pupils + catchlights, face inset,
-        // so the command buffer at the golden pose changed deliberately.
+        // v14 (v7): pixel-design cute pass — ears, enlarged pupils +
+        // catchlights, face inset.
+        // v15 (v8 épuré, Tools/PIXEL_DESIGN.md v2): unified chibi body plan
+        // (round blob head + pear torso on all five), clutter decorations
+        // removed, single-shaded-material palette — the command buffer at
+        // the golden pose changed deliberately.
         let expected: [Archetype: UInt64] = [
-            .ember: 10_797_589_159_950_752_963,
-            .willow: 11_632_248_360_311_394_863,
-            .compass: 12_846_232_288_341_441_366,
-            .prism: 329_223_719_153_816_148,
-            .nimbus: 18_338_159_615_810_752_377,
+            .ember: 14_242_836_731_233_599_779,
+            .willow: 788_012_977_712_151_319,
+            .compass: 1_286_708_159_251_093_320,
+            .prism: 11_649_903_982_138_451_254,
+            .nimbus: 17_190_291_296_165_419_847,
         ]
 
         var actual: [Archetype: UInt64] = [:]
@@ -1436,9 +1439,15 @@ final class SpeciesInvariantsTests: XCTestCase {
             for j in (i + 1)..<sorted.count {
                 let a = sorted[i], b = sorted[j]
                 let overlap = RasterBytes.iou(masks[a]!, masks[b]!)
+                // v8 épuré (Tools/PIXEL_DESIGN.md v2 §1): all five share
+                // ONE chibi silhouette; identity deliberately carries on
+                // tint (testTintSeparatesArchetypes >= 20), the antenna
+                // protrusion, and the face — plus the distinct-frame
+                // tests. This bar now only guards total silhouette
+                // collapse (the v4 recolor-of-one-body failure was 0.92+).
                 XCTAssertLessThan(
-                    overlap, 0.60,
-                    "\(a.rawValue)/\(b.rawValue) silhouettes too similar (IoU \(String(format: "%.3f", overlap)) >= 0.60) — v5 body plans must diverge radically (shadow test; the v4 0.92 bar let all five pass at ~0.75-0.83, which read as recolors of one body)"
+                    overlap, 0.93,
+                    "\(a.rawValue)/\(b.rawValue) silhouettes collapsed into one shape (IoU \(String(format: "%.3f", overlap)) >= 0.93) — the shared chibi plan must still vary per species"
                 )
             }
         }
@@ -1541,7 +1550,10 @@ extension SpeciesInvariantsTests {
     /// designed sleep pose; no highlights on a sleeping body). The v4
     /// non-blob heads (flame, gem, pyramid) carry their silhouette
     /// identity instead — no rim.
-    private var blobHeads: [Archetype] { [.willow, .nimbus] }
+    /// v8 épuré: every species now wears the round blob head (the unified
+    /// chibi plan, Tools/PIXEL_DESIGN.md v2), so the rim crescent is on
+    /// all five.
+    private var blobHeads: [Archetype] { Archetype.allCases }
 
     func testHeadRimLightCommand() throws {
         for archetype in Archetype.allCases {
@@ -1642,16 +1654,18 @@ final class PixelStageTests: XCTestCase {
         // Deliberate visual change — the pinned frame is active mode at
         // frame 0, so it now carries the dithered ramp tones, halo ring,
         // and the frame-0 mote field.
-        // v8 (v7 pixel-design cute pass, Tools/PIXEL_DESIGN.md): authored
-        // ramp tones joined the LUT (§1), edge fringes snap clean so only
-        // interior ramps dither (§2), ears + big pupils + face inset +
-        // accent-tinted halo (§3-5).
+        // v8 (v7 pixel-design cute pass): authored ramp tones joined the
+        // LUT, edge fringes snap clean, ears + big pupils + face inset +
+        // accent-tinted halo.
+        // v9 (v8 épuré, Tools/PIXEL_DESIGN.md v2): unified chibi plan,
+        // chunkier pixels (3.0 rig units/px — wider window, more padding),
+        // single-shaded-material LUT (palette budget <= 12), clutter gone.
         let expected: [Archetype: UInt64] = [
-            .ember: 13_117_810_475_208_761_603,
-            .willow: 9_754_344_364_845_908_826,
-            .compass: 8_416_969_851_222_770_231,
-            .prism: 6_149_455_984_412_039_409,
-            .nimbus: 541_852_625_801_170_022,
+            .ember: 8_420_829_771_468_125_855,
+            .willow: 8_299_925_463_491_616_737,
+            .compass: 13_979_719_354_172_721_609,
+            .prism: 8_265_418_540_210_675_921,
+            .nimbus: 7_150_565_998_428_564_313,
         ]
         var actual: [Archetype: UInt64] = [:]
         for archetype in Archetype.allCases {
@@ -2324,15 +2338,16 @@ final class InteriorityTests: XCTestCase {
 /// creature cue on every species.
 final class V7PixelDesignTests: XCTestCase {
     /// §1: the rasterizer LUT must contain the authored gradient ramp
-    /// stops (lifted top + deepened bottom per painted role) — otherwise
-    /// gradient pixels snap to whatever palette color is nearest and the
-    /// body reads as noise.
+    /// stops (lifted top + deepened bottom of the one shaded material) —
+    /// otherwise gradient pixels snap to whatever palette color is
+    /// nearest and the body reads as noise. v8: exactly one material is
+    /// shaded, so the ramp is one pair of stops.
     func testLUTContainsAuthoredRampTones() throws {
         for archetype in Archetype.allCases {
             let engine = try makeGoldenEngine(archetype)
             let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
             let ramps = painter.rampTonesForRasterizer
-            XCTAssertGreaterThanOrEqual(ramps.count, 8, "\(archetype.rawValue): expected ramp stops from the painted roles")
+            XCTAssertEqual(ramps.count, 2, "\(archetype.rawValue): one shaded material = top + bottom stop")
             let rasterizer = PixelStageRasterizer(painter: painter)
             for tone in ramps {
                 let found = rasterizer.lutForTesting.contains {
@@ -2388,6 +2403,202 @@ final class V7PixelDesignTests: XCTestCase {
             let engine = try makeGoldenEngine(archetype)
             let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
             XCTAssertEqual(painter.earCountForTesting, 2, "\(archetype.rawValue): every species carries two ears")
+        }
+    }
+}
+
+// MARK: - v8 épuré design tests (Tools/PIXEL_DESIGN.md v2)
+
+/// The v2 checklist invariants: tight palette budget, silhouette-first
+/// checks (ear protrusions with negative space, one connected blob),
+/// chibi proportions, padding across the widest pose, and thumbnail
+/// legibility.
+final class V8EpureTests: XCTestCase {
+    private func makeFrame(_ archetype: Archetype, frame: Int = 300) throws -> (PixelStageRasterizer, AvatarSpritePainter, [UInt8]) {
+        let engine = try makeGoldenEngine(archetype)
+        engine.update(toFrame: frame)
+        let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+        painter.paint(
+            world: engine.currentWorld, pose: engine.currentPose, rest: false,
+            accentPhase: engine.activeGesturePhase, tell: engine.tell, tellPhase: engine.tellPhase
+        )
+        let rasterizer = PixelStageRasterizer(painter: painter)
+        rasterizer.rasterize(painter: painter, frame: frame)
+        return (rasterizer, painter, rasterizer.snapshotBytes())
+    }
+
+    private func litMask(_ bytes: [UInt8], stageKeys: Set<Int>) -> [Bool] {
+        let w = PixelStageRasterizer.gridWidth
+        let count = w * PixelStageRasterizer.gridHeight
+        var mask = [Bool](repeating: false, count: count)
+        for i in 0..<count {
+            let o = i * 4
+            guard max(bytes[o], max(bytes[o + 1], bytes[o + 2])) > 24 else { continue }
+            let key = Int(bytes[o]) << 16 | Int(bytes[o + 1]) << 8 | Int(bytes[o + 2])
+            if stageKeys.contains(key) { continue }
+            mask[i] = true
+        }
+        return mask
+    }
+
+    private func stageKeys(_ rasterizer: PixelStageRasterizer) -> Set<Int> {
+        Set(rasterizer.stageTonesForTesting.map {
+            Int($0.0 * 255) << 16 | Int($0.1 * 255) << 8 | Int($0.2 * 255)
+        })
+    }
+
+    /// §3 palette budget: 6-12 colors per character in the active snap set.
+    func testPaletteBudget() throws {
+        for archetype in Archetype.allCases {
+            let (rasterizer, _, _) = try makeFrame(archetype)
+            XCTAssertLessThanOrEqual(
+                rasterizer.activeSnapCandidateCountForTesting, 12,
+                "\(archetype.rawValue): active palette must stay within the 6-12 color budget (got \(rasterizer.activeSnapCandidateCountForTesting))"
+            )
+            XCTAssertGreaterThanOrEqual(rasterizer.activeSnapCandidateCountForTesting, 6)
+        }
+    }
+
+    /// §1 silhouette: the top region of the silhouette must show the ear
+    /// protrusions as separated runs (negative space between them) — the
+    /// memorable shape that survives zoom-out.
+    func testSilhouetteHasEarProtrusions() throws {
+        let w = PixelStageRasterizer.gridWidth
+        let h = PixelStageRasterizer.gridHeight
+        for archetype in Archetype.allCases {
+            let (rasterizer, _, bytes) = try makeFrame(archetype)
+            let mask = litMask(bytes, stageKeys: stageKeys(rasterizer))
+            // bbox
+            var top = h, bottom = 0
+            for y in 0..<h { for x in 0..<w where mask[y * w + x] { top = min(top, y); bottom = max(bottom, y) } }
+            XCTAssertLessThan(top, h, "\(archetype.rawValue): sprite lit")
+            let regionEnd = min(h - 1, top + max(2, (bottom - top) * 3 / 10))
+            var maxRuns = 0
+            for y in top...regionEnd {
+                var runs = 0, prev = false
+                for x in 0..<w {
+                    let lit = mask[y * w + x]
+                    if lit && !prev { runs += 1 }
+                    prev = lit
+                }
+                maxRuns = max(maxRuns, runs)
+            }
+            XCTAssertGreaterThanOrEqual(maxRuns, 2, "\(archetype.rawValue): top of the silhouette must show separated protrusions (ears), got \(maxRuns) runs")
+        }
+    }
+
+    /// §1: the silhouette is ONE connected blob — no floating clutter
+    /// pixels (details that don't belong would fragment it). Measured as
+    /// the LARGEST 4-connected component covering >= 95% of lit pixels.
+    func testSilhouetteIsConnected() throws {
+        let w = PixelStageRasterizer.gridWidth
+        let h = PixelStageRasterizer.gridHeight
+        for archetype in Archetype.allCases {
+            let (rasterizer, _, bytes) = try makeFrame(archetype)
+            let mask = litMask(bytes, stageKeys: stageKeys(rasterizer))
+            let litCount = mask.filter { $0 }.count
+            var visited = [Bool](repeating: false, count: w * h)
+            var largest = 0
+            for start in 0..<(w * h) where mask[start] && !visited[start] {
+                var queue = [start]
+                visited[start] = true
+                var head = 0
+                while head < queue.count {
+                    let i = queue[head]; head += 1
+                    let x = i % w, y = i / w
+                    for n in [(x > 0 ? i - 1 : -1), (x < w - 1 ? i + 1 : -1), (y > 0 ? i - w : -1), (y < h - 1 ? i + w : -1)] where n >= 0 && mask[n] && !visited[n] {
+                        visited[n] = true; queue.append(n)
+                    }
+                }
+                largest = max(largest, queue.count)
+            }
+            XCTAssertGreaterThanOrEqual(
+                Double(largest), Double(litCount) * 0.95,
+                "\(archetype.rawValue): silhouette must be one connected shape (largest component \(largest)/\(litCount) reachable)"
+            )
+        }
+    }
+
+    /// §2 chibi proportions: the head is the big mass; the torso stack
+    /// stays smaller than the head.
+    func testChibiProportions() {
+        for archetype in Archetype.allCases {
+            let head = AvatarSpritePainter.speciesSlotScale(archetype: archetype, slotName: "head")
+            let chest = AvatarSpritePainter.speciesSlotScale(archetype: archetype, slotName: "torsoChest")
+            XCTAssertGreaterThanOrEqual(head?.h ?? 0, 1.0, "\(archetype.rawValue): chibi head scale floor")
+            XCTAssertLessThanOrEqual(chest?.h ?? 1, 0.85, "\(archetype.rawValue): torso stays smaller than the head")
+        }
+    }
+
+    /// §6 motion-friendly: 1-2 px padding around the sprite — even across
+    /// the widest pose (a full spin with squash & stretch), no body pixel
+    /// touches the grid edge.
+    func testSpritePaddingAcrossWidestPose() throws {
+        let w = PixelStageRasterizer.gridWidth
+        let h = PixelStageRasterizer.gridHeight
+        // spin = widest horizontal pose, stretch = widest vertical pose
+        for clip in ["spin", "stretch"] {
+            for archetype in Archetype.allCases {
+                let engine = try makeGoldenEngine(archetype)
+                engine.update(toFrame: 300)
+                engine.handleEvent(.gesture(name: clip))
+                let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+                let rasterizer = PixelStageRasterizer(painter: painter)
+                let keys = stageKeys(rasterizer)
+                for frame in 300...350 {
+                    engine.update(toFrame: frame)
+                    painter.paint(
+                        world: engine.currentWorld, pose: engine.currentPose, rest: false,
+                        accentPhase: engine.activeGesturePhase, tell: engine.tell, tellPhase: engine.tellPhase
+                    )
+                    rasterizer.rasterize(painter: painter, frame: frame)
+                    let bytes = rasterizer.snapshotBytes()
+                    let mask = litMask(bytes, stageKeys: keys)
+                    for i in 0..<(w * h) where mask[i] {
+                        let x = i % w, y = i / w
+                        if x == 0 || x == w - 1 || y == 0 || y == h - 1 {
+                            let o = i * 4
+                            XCTFail("\(archetype.rawValue)/\(clip): body pixel at grid edge (\(x),\(y)) frame \(frame) color=(\(bytes[o]),\(bytes[o+1]),\(bytes[o+2]))")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// §0 thumbnail legibility: downsampled 4x (16x20), the silhouette
+    /// must still read as one connected shape with real mass.
+    func testThumbnailStillReads() throws {
+        let w = PixelStageRasterizer.gridWidth
+        let h = PixelStageRasterizer.gridHeight
+        for archetype in Archetype.allCases {
+            let (rasterizer, _, bytes) = try makeFrame(archetype)
+            let mask = litMask(bytes, stageKeys: stageKeys(rasterizer))
+            let cw = w / 4, ch = h / 4
+            var coarse = [Bool](repeating: false, count: cw * ch)
+            for cy in 0..<ch { for cx in 0..<cw {
+                for dy in 0..<4 { for dx in 0..<4 where mask[(cy * 4 + dy) * w + cx * 4 + dx] { coarse[cy * cw + cx] = true } }
+            } }
+            let lit = coarse.filter { $0 }.count
+            XCTAssertGreaterThanOrEqual(lit, 40, "\(archetype.rawValue): thumbnail (16x20) must keep real mass, got \(lit) lit cells")
+            // largest connected component at thumbnail scale
+            var visited = [Bool](repeating: false, count: cw * ch)
+            var largest = 0
+            for start in 0..<(cw * ch) where coarse[start] && !visited[start] {
+                var queue = [start]
+                visited[start] = true
+                var head = 0
+                while head < queue.count {
+                    let i = queue[head]; head += 1
+                    let x = i % cw, y = i / cw
+                    for n in [(x > 0 ? i - 1 : -1), (x < cw - 1 ? i + 1 : -1), (y > 0 ? i - cw : -1), (y < ch - 1 ? i + cw : -1)] where n >= 0 && coarse[n] && !visited[n] {
+                        visited[n] = true; queue.append(n)
+                    }
+                }
+                largest = max(largest, queue.count)
+            }
+            XCTAssertGreaterThanOrEqual(Double(largest), Double(lit) * 0.9,
+                                         "\(archetype.rawValue): thumbnail silhouette must stay connected (\(largest)/\(lit))")
         }
     }
 }
