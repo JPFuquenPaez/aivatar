@@ -85,6 +85,8 @@ nonisolated final class ReactionLayer {
             return false
         case .wake, .sleep:
             return false // handled by setResting / the wake crossfade
+        case .gazeAt:
+            return false // v6: engine-level gaze poke; never a reaction clip
         case .tap, .gesture:
             break
         }

@@ -62,6 +62,13 @@ nonisolated final class AvatarEngine {
     private var tailAngle: Float = 0
     private var tailVelocity: Float = 0
 
+    // v6 touch-gaze poke: a decaying dart of the pupils + head toward the
+    // last touched point. Event-only (no RNG draws), so event-free runs
+    // stay bit-identical; at level 0 the pose write is skipped entirely.
+    private var pokeDirX: Float = 0
+    private var pokeDirY: Float = 0
+    private var pokeLevel: Float = 0
+
     // v3 motion grammar (A5b): post-clip settle residual + involuntary tells.
     /// 0 (never fully settles) ... 1 (lands exactly), from the profile.
     private let settleComplete: Float
@@ -211,6 +218,15 @@ nonisolated final class AvatarEngine {
     /// reaction layer answers taps with a weighted pick from the profile's
     /// gesture pool (per-archetype reaction variety, §5/§7).
     func handleEvent(_ event: AvatarEvent) {
+        // v6: touch-gaze is an engine-level poke, not a queued reaction —
+        // the eyes answer the finger immediately, no clip cooldown.
+        if case .gazeAt(let x, let y) = event {
+            pokeDirX = min(max(x, -1), 1)
+            pokeDirY = min(max(y, -1), 1)
+            pokeLevel = 1
+            telemetry.record(counter: "avatar.event.gazeAt", value: 1)
+            return
+        }
         pendingEvents.append(event)
         telemetry.record(counter: "avatar.event.\(event)", value: 1)
     }
@@ -248,6 +264,7 @@ nonisolated final class AvatarEngine {
         drainReactionEvents()
         reactions.step(into: &pose, frame: frame, bones: bones, expressions: &expressions)
         updateSettleAndTells(into: &pose, frame: frame, bones: bones, expressions: &expressions)
+        applyGazePoke(into: &pose, bones: bones)
 
         blendAffect(into: &expressions)
         addWakeGreeting(into: &expressions)
@@ -390,6 +407,30 @@ nonisolated final class AvatarEngine {
         tellFramesLeft = frames
         tellTriggerCount += 1
     }
+
+    /// v6 touch-gaze poke (§9 responsiveness / U8 eye contact): pupils and
+    /// head dart toward the touched point on a fast attack and a slow
+    /// release (~1.5 s at 30 fps). Level 0 means the pose is untouched
+    /// (bit-identical CI goldens); the L2 flatten later zeroes body motion
+    /// anyway, so the poke is simply invisible in static mode.
+    private func applyGazePoke(into pose: inout AvatarPose, bones: BoneMap) {
+        guard pokeLevel > 0.002 else {
+            pokeLevel = 0
+            return
+        }
+        let gx = pokeDirX * 3.4 * pokeLevel
+        let gy = pokeDirY * 2.6 * pokeLevel
+        pose.offsetsX[bones.pupilL] += gx
+        pose.offsetsX[bones.pupilR] += gx
+        pose.offsetsY[bones.pupilL] += gy
+        pose.offsetsY[bones.pupilR] += gy
+        pose.rotations[bones.neck] += gx * 0.006
+        pose.rotations[bones.head] += gx * 0.004 + gy * 0.002
+        pokeLevel *= 0.955
+    }
+
+    /// CI/testing hook: current touch-gaze poke level (0 = none).
+    var gazePokeLevelForTesting: Float { pokeLevel }
 
     private func drainReactionEvents() {
         // L3 (Phase B): each queued event is offered to the reaction layer.

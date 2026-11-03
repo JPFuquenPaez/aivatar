@@ -1634,12 +1634,17 @@ final class PixelStageTests: XCTestCase {
         // v6 (v5b): quirk clips — pool weights changed the seeded idle
         // schedule, but the pinned frames carry no active gesture, so the
         // v5 hashes carry over unchanged.
+        // v7 (v6 hi-bit mascot polish): Bayer-ordered dithering in the LUT
+        // snap + dithered 1-px halo contour + frame-driven ambient motes.
+        // Deliberate visual change — the pinned frame is active mode at
+        // frame 0, so it now carries the dithered ramp tones, halo ring,
+        // and the frame-0 mote field.
         let expected: [Archetype: UInt64] = [
-            .ember: 15_992_830_819_844_983_735,
-            .willow: 7_800_850_261_981_265_915,
-            .compass: 16_216_657_902_760_658_041,
-            .prism: 15_407_548_065_465_615_412,
-            .nimbus: 28_976_292_975_949_446,
+            .ember: 17_953_982_118_836_381_991,
+            .willow: 12_451_170_222_394_635_020,
+            .compass: 11_727_249_691_758_849_217,
+            .prism: 5_805_534_680_947_395_576,
+            .nimbus: 3_516_118_709_299_431_632,
         ]
         var actual: [Archetype: UInt64] = [:]
         for archetype in Archetype.allCases {
@@ -1700,15 +1705,23 @@ final class PixelStageTests: XCTestCase {
 
     /// v4 vivid palettes (§11.2): the DOMINANT lit color of each grid must
     /// be strongly saturated — the muted-lavender washout was the v3
-    /// sameness diagnosis.
+    /// sameness diagnosis. v6: the measurement excludes the stage tones
+    /// (the halo contour + motes) — the invariant is about the BODY tint,
+    /// and the halo ring is a uniform gray that would otherwise dominate
+    /// the histogram by construction.
     func testPixelPalettesAreVivid() throws {
         for archetype in Archetype.allCases {
-            let bytes = try makeRasterizer(archetype).snapshotBytes()
+            let rasterizer = try makeRasterizer(archetype)
+            let bytes = rasterizer.snapshotBytes()
+            let stageKeys = Set(rasterizer.stageTonesForTesting.map {
+                Int($0.0 * 255) << 16 | Int($0.1 * 255) << 8 | Int($0.2 * 255)
+            })
             var counts: [Int: Int] = [:]
             for i in 0..<(PixelStageRasterizer.gridWidth * PixelStageRasterizer.gridHeight) {
                 let o = i * 4
                 guard max(bytes[o], max(bytes[o + 1], bytes[o + 2])) > 30 else { continue }
                 let key = Int(bytes[o]) << 16 | Int(bytes[o + 1]) << 8 | Int(bytes[o + 2])
+                if stageKeys.contains(key) { continue }
                 counts[key, default: 0] += 1
             }
             let dominant = counts.max { $0.value < $1.value }!.key
@@ -1788,6 +1801,181 @@ final class PixelStageTests: XCTestCase {
                 "\(archetype.rawValue): rest grid must render dimmer than the active grid (restDim is 0.22x bodyLight; the active mean runs below full bodyLight, so the designed ratio is ~0.35-0.4 — a rest pose at active brightness fails this)"
             )
         }
+    }
+
+    // MARK: v6 hi-bit mascot polish (halo contour, motes, dither, face beats)
+
+    /// v6 halo: the active frame carries a dithered 1-px contour in the
+    /// halo tone, and every halo pixel touches a lit non-stage pixel —
+    /// the ring is exactly one pixel out from the silhouette, never chained.
+    func testHaloRingIsOnePixelContour() throws {
+        let width = PixelStageRasterizer.gridWidth
+        let height = PixelStageRasterizer.gridHeight
+        for archetype in Archetype.allCases {
+            let rasterizer = try makeRasterizer(archetype)
+            let bytes = rasterizer.snapshotBytes()
+            guard let halo = rasterizer.stageTonesForTesting.first else {
+                XCTFail("\(archetype.rawValue): no halo tone in the LUT")
+                continue
+            }
+            let hr = Int(halo.0 * 255), hg = Int(halo.1 * 255), hb = Int(halo.2 * 255)
+            func isHalo(_ i: Int) -> Bool {
+                let o = i * 4
+                return bytes[o] == UInt8(hr) && bytes[o + 1] == UInt8(hg) && bytes[o + 2] == UInt8(hb)
+            }
+            func litBody(_ i: Int) -> Bool {
+                let o = i * 4
+                guard max(bytes[o], max(bytes[o + 1], bytes[o + 2])) > 24 else { return false }
+                return !isHalo(i)
+            }
+            var haloCount = 0
+            for i in 0..<(width * height) where isHalo(i) {
+                haloCount += 1
+                let x = i % width, y = i / width
+                let touchesBody = (x > 0 && litBody(i - 1)) || (x < width - 1 && litBody(i + 1))
+                    || (y > 0 && litBody(i - width)) || (y < height - 1 && litBody(i + width))
+                XCTAssertTrue(touchesBody, "\(archetype.rawValue): halo pixel \(i) floats off the silhouette")
+            }
+            XCTAssertGreaterThan(haloCount, 20, "\(archetype.rawValue): the halo contour should ring the silhouette")
+        }
+    }
+
+    /// v6 motes: a deterministic function of the frame index (same frame ->
+    /// same field, different frame -> moved), present in active frames and
+    /// completely absent from the rest LOD (the sleep stage stays dark).
+    func testMotesAreDeterministicFrameDrivenAndRestFree() throws {
+        for archetype in Archetype.allCases {
+            let engine = try makeGoldenEngine(archetype)
+            engine.update(toFrame: 300)
+            let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+            painter.paint(
+                world: engine.currentWorld, pose: engine.currentPose, rest: false,
+                accentPhase: engine.activeGesturePhase, tell: engine.tell, tellPhase: engine.tellPhase
+            )
+            let a = PixelStageRasterizer(painter: painter)
+            a.rasterize(painter: painter, frame: 40)
+            let frame40 = a.snapshotBytes()
+            let b = PixelStageRasterizer(painter: painter)
+            b.rasterize(painter: painter, frame: 40)
+            XCTAssertEqual(frame40, b.snapshotBytes(), "\(archetype.rawValue): same frame must give the same mote field")
+            let c = PixelStageRasterizer(painter: painter)
+            c.rasterize(painter: painter, frame: 140)
+            XCTAssertNotEqual(frame40, c.snapshotBytes(), "\(archetype.rawValue): motes must drift with the frame index")
+
+            guard let mote = painter.roleColors[.mote] else { continue }
+            let mr = Int(mote.0 * 255), mg = Int(mote.1 * 255), mb = Int(mote.2 * 255)
+            func moteCount(_ bytes: [UInt8]) -> Int {
+                var n = 0
+                for i in 0..<(PixelStageRasterizer.gridWidth * PixelStageRasterizer.gridHeight) {
+                    let o = i * 4
+                    if bytes[o] == UInt8(mr) && bytes[o + 1] == UInt8(mg) && bytes[o + 2] == UInt8(mb) { n += 1 }
+                }
+                return n
+            }
+            var activeMotes = 0
+            for frame in 0..<60 {
+                let r = PixelStageRasterizer(painter: painter)
+                r.rasterize(painter: painter, frame: frame)
+                activeMotes += moteCount(r.snapshotBytes())
+            }
+            XCTAssertGreaterThan(activeMotes, 0, "\(archetype.rawValue): active frames should carry twinkling motes")
+
+            painter.paint(world: engine.currentWorld, pose: engine.currentPose, rest: true)
+            let rest = PixelStageRasterizer(painter: painter)
+            rest.rasterize(painter: painter, rest: true, frame: 40)
+            XCTAssertEqual(moteCount(rest.snapshotBytes()), 0, "\(archetype.rawValue): the rest LOD carries no motes")
+        }
+    }
+
+    /// v6 face beat: joy/warm blooms the blush cheeks (a command in the
+    /// blush tone with alpha > 0); a neutral face emits none, so
+    /// event-free golden frames stay byte-identical.
+    func testBlushCheeksFollowExpressionWeights() throws {
+        for archetype in Archetype.allCases {
+            let engine = try makeGoldenEngine(archetype)
+            engine.update(toFrame: 300)
+            let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
+            func hasBlushCommand() -> Bool {
+                guard let blush = painter.roleColors[.blush] else { return false }
+                for i in 0..<painter.commandCount {
+                    let c = painter.commands[i]
+                    if c.a > 0.05 && abs(c.r - blush.0) < 0.01 && abs(c.g - blush.1) < 0.01 && abs(c.b - blush.2) < 0.01 {
+                        return true
+                    }
+                }
+                return false
+            }
+            var pose = engine.currentPose
+            for i in 0..<pose.expressionWeights.count { pose.expressionWeights[i] = 0 }
+            painter.paint(world: engine.currentWorld, pose: pose, rest: false)
+            XCTAssertEqual(painter.lastBlushAlphaForTesting, 0, "\(archetype.rawValue): neutral face paints no blush")
+            XCTAssertFalse(hasBlushCommand(), "\(archetype.rawValue): neutral frame has no blush command")
+
+            pose.expressionWeights[ExpressionChannel.joy.rawValue] = 1
+            painter.paint(world: engine.currentWorld, pose: pose, rest: false)
+            XCTAssertGreaterThan(painter.lastBlushAlphaForTesting, 0.3, "\(archetype.rawValue): joy must bloom the blush")
+            XCTAssertTrue(hasBlushCommand(), "\(archetype.rawValue): joy frame must emit the blush commands")
+        }
+    }
+}
+
+// MARK: - v6 touch-gaze + happy squint (engine-level)
+
+/// The v6 interaction beats: a `.gazeAt` touch event darts the pupils and
+/// head toward the finger on a fast attack, then decays back to exactly
+/// zero — so an event-free reference engine re-converges bit-exactly (the
+/// CI determinism contract survives interaction). And joy closes the lids
+/// (the ^-^ happy squint) instead of opening them.
+final class V6InteractionTests: XCTestCase {
+    func testGazeAtDartsPupilsTowardTouchThenReConverges() throws {
+        let engine = try makeGoldenEngine(.ember)
+        let reference = try makeGoldenEngine(.ember)
+        engine.update(toFrame: 200)
+        reference.update(toFrame: 200)
+        let bones = BoneMap(skeleton: engine.skeleton)
+        let before = engine.currentPose.offsetsX[bones.pupilL]
+
+        engine.handleEvent(.gazeAt(x: 1, y: 0))
+        engine.update(toFrame: 201)
+        let after = engine.currentPose.offsetsX[bones.pupilL]
+        XCTAssertGreaterThan(after, before + 1.0, "pupils must dart toward a +x touch")
+        XCTAssertGreaterThan(engine.gazePokeLevelForTesting, 0.9, "fast attack on touch")
+
+        // After the poke decays to exactly 0, the pose must re-converge
+        // bit-exactly with the event-free reference (CI determinism).
+        engine.update(toFrame: 1000)
+        reference.update(toFrame: 1000)
+        XCTAssertEqual(engine.gazePokeLevelForTesting, 0, "poke must decay to exactly zero")
+        XCTAssertEqual(engine.currentPose, reference.currentPose, "a decayed poke must leave no residue")
+    }
+
+    func testGazeAtIsClampedAndNeverStartsAClip() throws {
+        let engine = try makeGoldenEngine(.willow)
+        engine.update(toFrame: 100)
+        engine.handleEvent(.gazeAt(x: 99, y: -99))
+        engine.update(toFrame: 101)
+        XCTAssertNil(engine.currentReactionClip, "gazeAt is not a reaction clip")
+        XCTAssertGreaterThan(engine.currentPose.offsetsX[BoneMap(skeleton: engine.skeleton).pupilR], 0)
+    }
+
+    func testJoySquintsLidsClosed() throws {
+        let engine = try makeGoldenEngine(.nimbus)
+        let bones = BoneMap(skeleton: engine.skeleton)
+        var expressions = [Float](repeating: 0, count: ExpressionChannel.count)
+        var pose = AvatarPose(boneCount: engine.skeleton.boneCount)
+        ExpressionMixer.apply(expressions: expressions, bones: bones, pose: &pose)
+        let neutralLid = pose.offsetsY[bones.lidL]
+
+        expressions[ExpressionChannel.joy.rawValue] = 1
+        ExpressionMixer.apply(expressions: expressions, bones: bones, pose: &pose)
+        XCTAssertGreaterThan(pose.offsetsY[bones.lidL], neutralLid + 2.5, "joy must close the lids (happy ^-^ squint)")
+
+        var expressions2 = [Float](repeating: 0, count: ExpressionChannel.count)
+        expressions2[ExpressionChannel.surprise.rawValue] = 1
+        var pose2 = AvatarPose(boneCount: engine.skeleton.boneCount)
+        ExpressionMixer.apply(expressions: expressions2, bones: bones, pose: &pose2)
+        XCTAssertLessThan(pose2.offsetsY[bones.lidL], pose.offsetsY[bones.lidL], "surprise keeps the eyes wide where joy squints them shut")
+        XCTAssertEqual(pose2.offsetsY[bones.lidL], 0, "surprise opens the lids fully (clamped at 0)")
     }
 }
 

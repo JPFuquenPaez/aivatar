@@ -87,6 +87,14 @@ nonisolated enum PaletteRole: Sendable {
     case accentB     // trait token B
     case glow        // interior glow (Ember embers)
     case catchlight  // the single bright eye catchlight (dead-eye guard)
+    // v6 stage tones (rasterizer-only, never painted as shapes): the 1-px
+    // silhouette halo (sticker contour on the black stage) and the ambient
+    // background motes. Both must live in the LUT so the snap test holds.
+    case halo
+    case mote
+    /// v6 blush cheeks (warm/joy beat) — accentA pulled 30% toward a warm
+    /// rose so the blush reads warm on every archetype hue.
+    case blush
 }
 
 /// Converts rig + pose + visual set into the per-frame sprite command list.
@@ -170,6 +178,13 @@ nonisolated final class AvatarSpritePainter {
     /// prebuilt shape index (Willow), for growth assertions.
     private(set) var sproutLeafShapeIndex: Int?
 
+    /// v6 face-beat shapes: the blush cheek pair, pinned to the head bone
+    /// and alpha-driven per frame from the pose's warm/joy weights.
+    private var blushShapeIndex = 0
+    private var headBoneIndex = 0
+    /// Test-visible: the blush alpha actually painted last frame.
+    private(set) var lastBlushAlphaForTesting: Float = 0
+
     init(skeleton: Skeleton, visualSet: ArchetypeVisualSet,
          interiority: InteriorityTuning = .default) {
         let rig = skeleton.document
@@ -243,6 +258,8 @@ nonisolated final class AvatarSpritePainter {
         if visualSet.isSpecies {
             buildSpeciesDecorations(skeleton: skeleton, archetype: visualSet.archetype)
         }
+        // v6 face-beat shapes (blush cheeks), built for every visual set.
+        buildFaceBeatShapes(skeleton: skeleton)
 
         roleColors = Self.resolveColors(visualSet: visualSet)
         // Prism's flicker table: accents swap — the chromatic tell, built
@@ -263,6 +280,15 @@ nonisolated final class AvatarSpritePainter {
         // fill-object cache is fully warm after the first frame).
         gradientPairs = Self.buildGradientPairs(roleColors)
         flickerGradientPairs = Self.buildGradientPairs(flickerColors)
+    }
+
+    /// v6 face-beat shapes: one soft ellipse for the blush cheeks. The pair
+    /// is emitted twice per frame at mirrored local offsets in paint().
+    private func buildFaceBeatShapes(skeleton: Skeleton) {
+        headBoneIndex = skeleton.boneIndex("head") ?? 0
+        let blushSpec = RigDocument.Shape(kind: "circle", width: 7.5, height: 4.6, bendSegments: nil)
+        blushShapeIndex = shapes.count
+        shapes.append(Self.buildShape(blushSpec, kind: "circle"))
     }
 
     /// v3 trait tokens per archetype (§6 v2: tint -> ONE token -> tell).
@@ -624,6 +650,26 @@ nonisolated final class AvatarSpritePainter {
             if let glow = species.glow {
                 colors[.glow] = parse(glow)
             }
+            // v6 derived stage/face tones (never authored per archetype):
+            // blush pulls accentA 30% toward rose; halo is the rim light
+            // sunk toward black (a contour that still reads on OLED black);
+            // motes sink the accent deeper for background dust.
+            let accentAColor = colors[.accentA] ?? bodyLight
+            colors[.blush] = (
+                accentAColor.0 * 0.7 + 0.30,
+                accentAColor.1 * 0.7 + 0.12,
+                accentAColor.2 * 0.7 + 0.165
+            )
+            colors[.halo] = (
+                Self.rimLight.0 * 0.42,
+                Self.rimLight.1 * 0.42,
+                Self.rimLight.2 * 0.42
+            )
+            colors[.mote] = (
+                accentAColor.0 * 0.30,
+                accentAColor.1 * 0.30,
+                accentAColor.2 * 0.30
+            )
             return colors
         }
 
@@ -637,13 +683,18 @@ nonisolated final class AvatarSpritePainter {
             primary.2 * 0.62 + deep.2 * 0.38
         )
 
-        return [
+        var colors: [PaletteRole: (Float, Float, Float)] = [
             .primary: primary,
             .primaryDim: dim,
             .deep: deep,
             .face: face,
             .restDim: dimmed(primary),
         ]
+        // v6 derived tones on the v1 fallback path, same recipes.
+        colors[.blush] = (primary.0 * 0.7 + 0.30, primary.1 * 0.7 + 0.12, primary.2 * 0.7 + 0.165)
+        colors[.halo] = (Self.rimLight.0 * 0.42, Self.rimLight.1 * 0.42, Self.rimLight.2 * 0.42)
+        colors[.mote] = (primary.0 * 0.30, primary.1 * 0.30, primary.2 * 0.30)
+        return colors
     }
 
     /// v3 volumetric shading: gradient stop pairs per role — the top stop is
@@ -667,8 +718,8 @@ nonisolated final class AvatarSpritePainter {
         var pairs: [PaletteRole: (top: (Float, Float, Float), bottom: (Float, Float, Float))] = [:]
         for (role, c) in colors {
             switch role {
-            case .face, .catchlight, .restDim:
-                continue  // matte / flat by design
+            case .face, .catchlight, .restDim, .halo, .mote, .blush:
+                continue  // matte / flat by design (stage tones never gradient)
             default:
                 break
             }
@@ -1107,8 +1158,42 @@ nonisolated final class AvatarSpritePainter {
                                tell: tell, tellPhase: tellPhase)
             }
         }
+        // v6 face beats: blush cheeks bloom with warm/joy. At weight 0 no
+        // command is emitted, so event-free golden frames stay identical.
+        if !rest {
+            paintFaceBeats(world: world, pose: pose, colors: colors)
+        }
         if !rest {
             stepAndPaintParticles(world: world, accentPhase: accentPhase)
+        }
+    }
+
+    /// v6 face beats (pixel-mascot expressiveness): the blush cheeks bloom
+    /// on warm/joy — two soft accent-rose ellipses beside the mouth. Alpha
+    /// comes from the pose's expression weights (blended, never swapped);
+    /// below the emission floor nothing is drawn.
+    private func paintFaceBeats(
+        world: [Transform2D],
+        pose: AvatarPose,
+        colors: [PaletteRole: (r: Float, g: Float, b: Float)]
+    ) {
+        let warm = pose.expression(.warm)
+        let joy = pose.expression(.joy)
+        let alpha = min(1, warm * 0.55 + joy * 0.45) * 0.85
+        lastBlushAlphaForTesting = alpha
+        guard alpha > 0.02 else { return }
+        for side: Float in [-1, 1] {
+            emitDecoration(
+                boneIndex: headBoneIndex,
+                shapeIndex: blushShapeIndex,
+                role: .blush,
+                localX: side * 9.8,
+                localY: 8.0,
+                rotation: 0,
+                alpha: alpha,
+                world: world,
+                colors: colors
+            )
         }
     }
 

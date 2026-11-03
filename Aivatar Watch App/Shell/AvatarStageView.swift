@@ -149,73 +149,88 @@ struct AvatarStageView: View {
     }
 
     private var stage: some View {
-        ZStack(alignment: .bottom) {
-            if let context {
-                CanvasAvatarRenderer(context: context)
-            } else {
-                Color.black
-            }
-            VStack(spacing: 2) {
-                Text(stageName)
-                    .font(.footnote)
-                Text(isResting ? "resting" : "is here")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.bottom, 8)
-            .padding(.horizontal, 12)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText)
-        .accessibilityHint("Double-tap to play. Touch and hold to share a slow blink.")
-        // A5c: tap sends a .tap event (pooled in-character reaction);
-        // long-press is the SLOW-BLINK RITUAL (U8 — the trust exchange:
-        // mutual gaze, then a blink you can watch happen). The signature
-        // quirk stays on the VoiceOver named action and the idle schedule.
-        .onLongPressGesture(minimumDuration: 0.5) {
-            context?.engine.handleEvent(.gesture(name: "slowBlink"))
-        }
-        .onTapGesture {
-            context?.engine.handleEvent(.tap)
-            HapticsChannel.shared.react(to: archetype)
-        }
-        .accessibilityAction {
-            context?.engine.handleEvent(.tap)
-            HapticsChannel.shared.react(to: archetype)
-        }
-        .accessibilityAction(named: "Play signature move") {
-            performQuirk()
-        }
-        .onChange(of: isLuminanceReduced) { reduced in
-            isResting = reduced
-        }
-        .onAppear {
-            isResting = isLuminanceReduced
-            // A5c naming ceremony (first-run only — the ceremony never
-            // nags; it can be re-run from Settings). CI/smoke launches
-            // pass an -archetype override and skip the sheet: the
-            // ceremony belongs to real users, not capture loops.
-            if launchOverride == nil && !namingCompleted {
-                showNaming = true
-            }
-        }
-        .onChange(of: scenePhase) { phase in
-            // "It noticed" (§10.5.5): returning after a long absence
-            // (>= 30 min — a long meeting, a workout, sleep) earns one
-            // soft noticed-nod within the U7 300 ms contingency window.
-            if phase == .active {
-                if let leftAt = wentToBackgroundAt,
-                   Date().timeIntervalSince(leftAt) >= 1800 {
-                    context?.engine.handleEvent(.gesture(name: "nod"))
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                if let context {
+                    CanvasAvatarRenderer(context: context)
+                } else {
+                    Color.black
                 }
-                wentToBackgroundAt = nil
-            } else if phase == .background {
-                wentToBackgroundAt = Date()
+                VStack(spacing: 2) {
+                    Text(stageName)
+                        .font(.footnote)
+                    Text(isResting ? "resting" : "is here")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.bottom, 8)
+                .padding(.horizontal, 12)
             }
-        }
-        .sheet(isPresented: $showNaming) {
-            NamingCeremonyView(archetype: archetype, isPresented: $showNaming) { _ in
-                celebrateNaming()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityText)
+            .accessibilityHint("Double-tap to play. Touch and hold to share a slow blink.")
+            // A5c: long-press is the SLOW-BLINK RITUAL (U8 — the trust
+            // exchange: mutual gaze, then a blink you can watch happen).
+            // The signature quirk stays on the VoiceOver named action and
+            // the idle schedule.
+            .onLongPressGesture(minimumDuration: 0.5) {
+                context?.engine.handleEvent(.gesture(name: "slowBlink"))
+            }
+            // v6 touch-gaze: a spatial tap sends the normalized touch
+            // direction so the avatar's eyes dart to the finger (§9
+            // responsiveness) before the pooled reaction plays. Competes
+            // with the long-press like a plain tap did — quick tap wins,
+            // a hold still triggers the ritual.
+            .gesture(
+                SpatialTapGesture()
+                    .onEnded { value in
+                        let size = geometry.size
+                        guard size.width > 0, size.height > 0 else { return }
+                        let nx = Float((value.location.x - size.width / 2) / (size.width / 2))
+                        let ny = Float((value.location.y - size.height / 2) / (size.height / 2))
+                        context?.engine.handleEvent(.gazeAt(x: nx, y: ny))
+                        context?.engine.handleEvent(.tap)
+                        HapticsChannel.shared.react(to: archetype)
+                    }
+            )
+            .accessibilityAction {
+                context?.engine.handleEvent(.tap)
+                HapticsChannel.shared.react(to: archetype)
+            }
+            .accessibilityAction(named: "Play signature move") {
+                performQuirk()
+            }
+            .onChange(of: isLuminanceReduced) { reduced in
+                isResting = reduced
+            }
+            .onAppear {
+                isResting = isLuminanceReduced
+                // A5c naming ceremony (first-run only — the ceremony never
+                // nags; it can be re-run from Settings). CI/smoke launches
+                // pass an -archetype override and skip the sheet: the
+                // ceremony belongs to real users, not capture loops.
+                if launchOverride == nil && !namingCompleted {
+                    showNaming = true
+                }
+            }
+            .onChange(of: scenePhase) { phase in
+                // "It noticed" (§10.5.5): returning after a long absence
+                // (>= 30 min — a long meeting, a workout, sleep) earns one
+                // soft noticed-nod within the U7 300 ms contingency window.
+                if phase == .active {
+                    if let leftAt = wentToBackgroundAt,
+                       Date().timeIntervalSince(leftAt) >= 1800 {
+                        context?.engine.handleEvent(.gesture(name: "nod"))
+                    }
+                    wentToBackgroundAt = nil
+                } else if phase == .background {
+                    wentToBackgroundAt = Date()
+                }
+            }
+            .sheet(isPresented: $showNaming) {
+                NamingCeremonyView(archetype: archetype, isPresented: $showNaming) { _ in
+                    celebrateNaming()
+                }
             }
         }
     }

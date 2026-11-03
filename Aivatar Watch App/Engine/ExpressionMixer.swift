@@ -36,7 +36,10 @@ nonisolated enum ExpressionMixer {
         pose.rotations[bones.browR] -= sad * 0.15
 
         // --- Lids: openness above the blink state; sleepy/rest close.
-        let lidClose = sleepy * 4.5 + rest * 6.0 + focus * 0.8 - surprise * 1.2 - alert * 1.0 - joy * 0.6
+        // v6 happy squint: joy CLOSES the lids from the top (~3.2 units of
+        // the 6-unit lid = a ^-^ arc over the pupils at pixel scale) —
+        // pixel-mascot happy eyes are a squint, not a wide stare.
+        let lidClose = sleepy * 4.5 + rest * 6.0 + focus * 0.8 - surprise * 1.2 - alert * 1.0 + joy * 3.2
         let lid = max(0, min(6, lidClose))
         pose.offsetsY[bones.lidL] += lid
         pose.offsetsY[bones.lidR] += lid

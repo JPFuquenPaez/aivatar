@@ -283,7 +283,9 @@ struct CanvasAvatarRenderer: View {
         // stage (paintCommands) remains the fallback LOD (debugImage and
         // any future low-cost path).
         let rasterizer = context.pixelRasterizer
-        rasterizer.rasterize(painter: context.painter, rest: false)
+        // v6: the engine frame drives the ambient-mote field (deterministic
+        // function of the frame index; the halo and snap need no frame).
+        rasterizer.rasterize(painter: context.painter, rest: false, frame: engine.clock.frame)
         rasterizer.draw(into: ctx, size: size)
         #if DEBUG
         context.debugDrawCount += 1

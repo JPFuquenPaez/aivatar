@@ -30,13 +30,33 @@ nonisolated final class PixelStageRasterizer {
 
     private let context: CGContext
     private let lut: [(Float, Float, Float)]
-    /// Snap candidates for ACTIVE frames (the LUT minus restDim — see
-    /// the init comment). Rest frames snap against the full `lut`.
+    /// Snap candidates for ACTIVE frames (the LUT minus the stage/rest
+    /// tones — see the init comment). Rest frames snap against the full `lut`.
     private let activeSnapLUT: [(Float, Float, Float)]
     private let lutColors: [Color]
     /// Pixel indices per LUT color, reused across frames (no allocation
     /// in the steady state; rebuilt contents only).
     private var pixelsByColor: [[Int]]
+    /// v6 LUT bucket indices for the post-snap stage passes (halo dilation,
+    /// ambient motes) — nil if the painter supplied no such tone.
+    private let haloBucket: Int?
+    private let moteBucket: Int?
+    /// v6 test hook: the stage tones (halo, mote) as LUT colors, so palette
+    /// assertions can measure the BODY tones without the contour/dust.
+    let stageTonesForTesting: [(Float, Float, Float)]
+    /// v6 Bayer 4x4 ordered-dither thresholds, normalized to (0, 1).
+    private static let bayer4: [[Float]] = [
+        [0, 8, 2, 10],
+        [12, 4, 14, 6],
+        [3, 11, 1, 9],
+        [15, 7, 13, 5],
+    ].map { $0.map { ($0 + 0.5) / 16 } }
+    /// v6 ambient motes: fixed pseudo-random rest positions (one seeded
+    /// draw at init), drifted purely as a function of the frame index, so
+    /// the field is deterministic for a given frame and allocates nothing.
+    private static let moteCount = 7
+    private let moteBaseX: [Int]
+    private let moteBaseY: [Int]
 
     init(painter: AvatarSpritePainter) {
         let width = Self.gridWidth
@@ -80,10 +100,30 @@ nonisolated final class PixelStageRasterizer {
         // muddy dark pixels across the face (the A6.1 bug). Rest frames
         // snap with the full LUT so restDim stays exact (the sleep pose
         // is all restDim + face).
-        let restDim = painter.roleColors[.restDim] ?? (0, 0, 0)
-        activeSnapLUT = colors.filter { !($0.0 == restDim.0 && $0.1 == restDim.1 && $0.2 == restDim.2) }
+        // v6: the active-frame snap candidates exclude every STAGE tone —
+        // restDim (the old face-mud fix), plus halo and mote, which exist
+        // only for the post-snap passes and must never be picked as a paint
+        // color (a body pixel dithering toward halo would smear gray).
+        let stageTones: [(Float, Float, Float)] = [.restDim, .halo, .mote]
+            .compactMap { painter.roleColors[$0] }
+        activeSnapLUT = colors.filter { c in
+            !stageTones.contains { $0.0 == c.0 && $0.1 == c.1 && $0.2 == c.2 }
+        }
         lutColors = colors.map { Color(.sRGB, red: Double($0.0), green: Double($0.1), blue: Double($0.2)) }
         pixelsByColor = colors.map { _ in [] }
+        // Bucket lookup over a local copy of the LUT (no self method call
+        // before the remaining stored properties are initialized).
+        let lutLocal = lut
+        func bucket(of role: PaletteRole) -> Int? {
+            guard let c = painter.roleColors[role] else { return nil }
+            return lutLocal.firstIndex { $0.0 == c.0 && $0.1 == c.1 && $0.2 == c.2 }
+        }
+        haloBucket = bucket(of: .halo)
+        moteBucket = bucket(of: .mote)
+        stageTonesForTesting = [.halo, .mote].compactMap { painter.roleColors[$0] }
+        var moteRng = SeededRandom(0x90_7E_5E_ED)
+        moteBaseX = (0..<Self.moteCount).map { _ in Int(moteRng.nextFloat() * Float(Self.gridWidth)) }
+        moteBaseY = (0..<Self.moteCount).map { _ in Int(moteRng.nextFloat() * Float(Self.gridHeight)) }
 
         // Rig space is y-down with the origin at the canvas center; flip
         // for y-up CG so buffer row 0 is the visual top (same convention
@@ -94,9 +134,11 @@ nonisolated final class PixelStageRasterizer {
 
     /// Rasterizes the painter's current command buffer into the grid and
     /// snaps pixels to the LUT. Call after painter.paint(...). `rest`
-    /// selects the snap candidates (full LUT in rest mode, restDim-free
-    /// in active mode).
-    func rasterize(painter: AvatarSpritePainter, rest: Bool = false) {
+    /// selects the snap candidates (full LUT in rest mode, stage-tone-free
+    /// in active mode). `frame` drives the v6 ambient motes (deterministic
+    /// function of the frame index); the live renderer passes the engine
+    /// clock's frame, tests may rely on the default 0.
+    func rasterize(painter: AvatarSpritePainter, rest: Bool = false, frame: Int = 0) {
         let ctx = context
         let k = 1 / Self.rigUnitsPerPixel
         let centerX = CGFloat(Self.gridWidth) / 2
@@ -158,17 +200,28 @@ nonisolated final class PixelStageRasterizer {
         }
 
         snapToLUT(rest: rest)
+        // v6 stage passes, after the snap so they are written as exact LUT
+        // tones: the 1-px silhouette halo, then the drifting ambient motes.
+        // Active mode only — the rest LOD keeps the stage sunk near-black
+        // (OLED power + the dim-sleep aesthetic), no contour, no dust.
+        if !rest {
+            applyHalo()
+            applyMotes(frame: frame)
+        }
     }
 
-    /// Snaps every lit grid pixel to the nearest snap-candidate color
-    /// (background stays pure black). Edge antialiasing from the raster
-    /// becomes the classic fat-pixel boundary instead of a blur. The
-    /// snapped color is then located in the FULL LUT for the draw-side
-    /// buckets (restDim never appears in active frames by construction).
+    /// Snaps every lit grid pixel to a snap-candidate color (background
+    /// stays pure black). v6: pixels that fall BETWEEN two LUT tones —
+    /// gradient ramps and antialiased edges — are resolved by Bayer 4x4
+    /// ordered dithering between the two nearest candidates instead of a
+    /// hard nearest pick, the classic hi-bit texture (flat areas, where
+    /// the nearest candidate is exact, never dither). Every written pixel
+    /// is still exactly one LUT color, so the snap invariant holds.
     private func snapToLUT(rest: Bool) {
         let candidates = rest ? lut : activeSnapLUT
         guard let data = context.data else { return }
         let bytes = data.assumingMemoryBound(to: UInt8.self)
+        let width = Self.gridWidth
         let count = Self.gridWidth * Self.gridHeight
         for bucket in pixelsByColor.indices {
             pixelsByColor[bucket].removeAll(keepingCapacity: true)
@@ -183,27 +236,114 @@ nonisolated final class PixelStageRasterizer {
                 bytes[o] = 0; bytes[o + 1] = 0; bytes[o + 2] = 0; bytes[o + 3] = 255
                 continue
             }
-            // Unpremultiply, then nearest-candidate by RGB distance.
+            // Unpremultiply, then find the TWO nearest candidates by RGB
+            // distance (single pass, no allocation).
             let inv = 255.0 / Double(a)
             let r = min(255.0, Double(bytes[o]) * inv)
             let g = min(255.0, Double(bytes[o + 1]) * inv)
             let b = min(255.0, Double(bytes[o + 2]) * inv)
             var bestColor = candidates[0]
             var bestDist = Double.greatestFiniteMagnitude
+            var secondColor = candidates[0]
+            var secondDist = Double.greatestFiniteMagnitude
             for color in candidates {
                 let dr = r - Double(color.0) * 255
                 let dg = g - Double(color.1) * 255
                 let db = b - Double(color.2) * 255
                 let d = dr * dr + dg * dg + db * db
-                if d < bestDist { bestDist = d; bestColor = color }
+                if d < bestDist {
+                    secondColor = bestColor; secondDist = bestDist
+                    bestColor = color; bestDist = d
+                } else if d < secondDist {
+                    secondColor = color; secondDist = d
+                }
             }
-            bytes[o] = UInt8(bestColor.0 * 255)
-            bytes[o + 1] = UInt8(bestColor.1 * 255)
-            bytes[o + 2] = UInt8(bestColor.2 * 255)
+            var chosen = bestColor
+            if secondDist > bestDist + 1 {
+                // How far between the tones the pixel sits: 0 = exact
+                // match (flat — never dithers), -> 1 = equidistant.
+                let t = bestDist / secondDist
+                let threshold = Double(Self.bayer4[(i / width) % 4][i % 4])
+                if t > threshold { chosen = secondColor }
+            }
+            bytes[o] = UInt8(chosen.0 * 255)
+            bytes[o + 1] = UInt8(chosen.1 * 255)
+            bytes[o + 2] = UInt8(chosen.2 * 255)
             bytes[o + 3] = 255
-            if let bucket = lut.firstIndex(where: { $0.0 == bestColor.0 && $0.1 == bestColor.1 && $0.2 == bestColor.2 }) {
+            if let bucket = lut.firstIndex(where: { $0.0 == chosen.0 && $0.1 == chosen.1 && $0.2 == chosen.2 }) {
                 pixelsByColor[bucket].append(i)
             }
+        }
+    }
+
+    /// v6 halo: a 1-px dilation of the silhouette into the background,
+    /// filled with the dim `halo` LUT tone — the pixel-mascot sticker
+    /// contour (on the OLED black stage the outline must be LIGHT to
+    /// read). The ring is Bayer-dithered at ~45% density so it reads as a
+    /// dashed hi-bit contour, not a solid gray outline, and stays well
+    /// under the body tones in pixel count. Collected against the snapped
+    /// state first, then written, so the pass dilates exactly one pixel
+    /// and never chains.
+    private func applyHalo() {
+        guard let data = context.data, let haloBucket else { return }
+        let haloColor = lut[haloBucket]
+        let bytes = data.assumingMemoryBound(to: UInt8.self)
+        let width = Self.gridWidth
+        let height = Self.gridHeight
+        let count = width * height
+        var haloPixels: [Int] = []
+        haloPixels.reserveCapacity(160)
+        func lit(_ i: Int) -> Bool {
+            let o = i * 4
+            return Int(bytes[o]) + Int(bytes[o + 1]) + Int(bytes[o + 2]) > 24
+        }
+        for i in 0..<count {
+            let o = i * 4
+            guard Int(bytes[o]) + Int(bytes[o + 1]) + Int(bytes[o + 2]) <= 24 else { continue }
+            let x = i % width, y = i / width
+            let neighborLit = (x > 0 && lit(i - 1)) || (x < width - 1 && lit(i + 1))
+                || (y > 0 && lit(i - width)) || (y < height - 1 && lit(i + width))
+            guard neighborLit else { continue }
+            if Self.bayer4[y % 4][x % 4] <= 0.45 { haloPixels.append(i) }
+        }
+        for i in haloPixels {
+            let o = i * 4
+            bytes[o] = UInt8(haloColor.0 * 255)
+            bytes[o + 1] = UInt8(haloColor.1 * 255)
+            bytes[o + 2] = UInt8(haloColor.2 * 255)
+            bytes[o + 3] = 255
+        }
+        pixelsByColor[haloBucket].append(contentsOf: haloPixels)
+    }
+
+    /// v6 ambient motes: a sparse field of dim accent-colored dust drifting
+    /// slowly upward and twinkling, so the stage itself feels alive between
+    /// gestures (tamagotchi-stage best practice). Positions are a pure
+    /// function of `frame` (no RNG on the frame path, no allocation beyond
+    /// the bucket append); motes land only on background pixels.
+    private func applyMotes(frame: Int) {
+        guard let data = context.data, let moteBucket else { return }
+        let moteColor = lut[moteBucket]
+        let bytes = data.assumingMemoryBound(to: UInt8.self)
+        let width = Self.gridWidth
+        let height = Self.gridHeight
+        let f = Float(frame)
+        for m in 0..<Self.moteCount {
+            let phase = Float(m) * 2.399 // golden-angle spread
+            let twinkle = 0.5 + 0.5 * sin(f * 0.045 + phase)
+            guard twinkle > 0.62 else { continue }
+            let speed = 0.11 + 0.05 * Float(m % 3)
+            var y = (Float(moteBaseY[m]) - f * speed).truncatingRemainder(dividingBy: Float(height))
+            if y < 0 { y += Float(height) }
+            let x = moteBaseX[m]
+            let i = Int(y) * width + x
+            let o = i * 4
+            guard Int(bytes[o]) + Int(bytes[o + 1]) + Int(bytes[o + 2]) <= 24 else { continue }
+            bytes[o] = UInt8(moteColor.0 * 255)
+            bytes[o + 1] = UInt8(moteColor.1 * 255)
+            bytes[o + 2] = UInt8(moteColor.2 * 255)
+            bytes[o + 3] = 255
+            pixelsByColor[moteBucket].append(i)
         }
     }
 
