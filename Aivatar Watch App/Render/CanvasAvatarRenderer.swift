@@ -207,6 +207,12 @@ struct CanvasAvatarRenderer: View {
     /// if the wrist comes back up mid-farewell.
     @State private var farewellPending = false
     @State private var farewellGeneration = 0
+    /// v12 farewell dim: the goodbye plays at full palette, then the
+    /// stage RAMPS toward the dim rest LOD as the clip completes — the
+    /// hand-off into Always On never spikes lit pixels (Apple's persistent-
+    /// display guidance: dim toward the final state, don't pop into it).
+    @State private var farewellTotalSeconds: Double = 0
+    @State private var farewellStartedAt: Date?
 
     var body: some View {
         Group {
@@ -256,6 +262,8 @@ struct CanvasAvatarRenderer: View {
             }
         }
         let seconds = Double(GestureClipLibrary.durationFrames(clip, profile: engine.profile)) / 30.0 + 0.45
+        farewellTotalSeconds = seconds
+        farewellStartedAt = Date()
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
             guard generation == farewellGeneration else { return }
@@ -289,6 +297,14 @@ struct CanvasAvatarRenderer: View {
         // function of the frame index; the halo and snap need no frame).
         rasterizer.rasterize(painter: context.painter, rest: false, frame: engine.clock.frame)
         rasterizer.draw(into: ctx, size: size)
+        // v12 farewell dim: ease the whole stage toward the near-black rest
+        // look while the goodbye finishes (0 -> ~82% black, matching the
+        // rest body's dim factor). The wipe happens here, in the live
+        // Canvas, so the rasterizer's LUT and golden frames stay untouched.
+        if farewellPending, let start = farewellStartedAt, farewellTotalSeconds > 0 {
+            let ramp = min(1, max(0, date.timeIntervalSince(start) / farewellTotalSeconds))
+            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black.opacity(0.82 * ramp)))
+        }
         #if DEBUG
         context.debugDrawCount += 1
         if context.debugDrawCount % 60 == 1 {

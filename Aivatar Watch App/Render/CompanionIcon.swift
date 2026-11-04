@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreGraphics
+import ImageIO
 
 /// Renders one static pixel icon per companion for the companion picker
 /// (Shell/CompanionPickerView). The icon is the REAL authored avatar: the
@@ -58,6 +59,20 @@ nonisolated enum CompanionIcon {
         let rasterizer = PixelStageRasterizer(painter: painter)
         rasterizer.rasterize(painter: painter, frame: iconFrame)
         return rasterizer.snapshotBytes()
+    }
+
+    /// PNG data of the rendered icon (ImageIO — no UIKit dependency), used
+    /// to publish the complication icons into the shared app-group
+    /// container (v12 presence pass).
+    static func pngData(for archetype: Archetype) -> Data? {
+        guard let cg = cgImage(for: archetype) else { return nil }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else {
+            return nil
+        }
+        CGImageDestinationAddImage(destination, cg, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return data as Data
     }
 
     private static func render(_ archetype: Archetype) -> CGImage? {

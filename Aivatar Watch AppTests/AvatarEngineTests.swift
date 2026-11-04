@@ -652,6 +652,35 @@ final class AvatarEngineTests: XCTestCase {
         }
     }
 
+    func testCompanionWidgetSnapshotRoundTrip() throws {
+        // v12 presence: the shared snapshot (AivatarShared/ — compiled into
+        // both the app and the widget extension) round-trips through any
+        // UserDefaults suite, and an empty suite reads as nil (the widget
+        // falls back to the default snapshot before the app first publishes).
+        let suiteName = "test.companionWidget.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        XCTAssertNil(CompanionWidgetState.readSnapshot(defaults: defaults))
+        let snapshot = CompanionWidgetSnapshot(archetypeRaw: "willow", name: "Puddle", streakDays: 4)
+        CompanionWidgetState.write(snapshot, defaults: defaults)
+        XCTAssertEqual(CompanionWidgetState.readSnapshot(defaults: defaults), snapshot)
+        XCTAssertEqual(CompanionWidgetState.iconURL(forArchetypeRaw: "willow", container: URL(fileURLWithPath: "/tmp/c"))?.absoluteString,
+                       "file:///tmp/c/Icons/willow.png", "icon names key off the archetype raw value")
+    }
+
+    func testCompanionWidgetIconsPublishable() throws {
+        // v12 presence: every archetype's icon exports as a real PNG —
+        // what the app writes into the shared container for the
+        // complication to render.
+        for archetype in Archetype.allCases {
+            let png = try XCTUnwrap(CompanionIcon.pngData(for: archetype),
+                                    "\(archetype.rawValue): icon PNG export")
+            XCTAssertGreaterThan(png.count, 400, "\(archetype.rawValue): icon PNG must be substantial")
+            XCTAssertEqual(png[0], 0x89, "\(archetype.rawValue): PNG magic byte")
+            XCTAssertEqual(String(decoding: png[1...3], as: UTF8.self), "PNG")
+        }
+    }
+
     // MARK: A5b — v3 motion grammar (gaze policy, blink grammar, settle, tells)
 
     func testLockGazeStaysNearTheUser() throws {

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		85E2935A307AC6A3002CF04C /* Aivatar Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 85E29359307AC6A3002CF04C /* Aivatar Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A1B0000000000000000000WA /* Aivatar Widgets.appex in Embed Widget */ = {isa = PBXBuildFile; fileRef = A1B0000000000000000000W3 /* Aivatar Widgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,6 +26,13 @@
 			remoteGlobalIDString = 85E29358307AC6A3002CF04C;
 			remoteInfo = "Aivatar Watch App";
 		};
+		A1B0000000000000000000W8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 85E2934D307AC6A2002CF04C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1B0000000000000000000W7;
+			remoteInfo = "Aivatar Widgets";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -37,12 +45,22 @@
 			);
 			name = "Embed Watch Content";
 		};
+		A1B0000000000000000000WB /* Embed Widget */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/PlugIns";
+			dstSubfolder = Product;
+			files = (
+				A1B0000000000000000000WA /* Aivatar Widgets.appex in Embed Widget */,
+			);
+			name = "Embed Widget";
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		85E29353307AC6A3002CF04C /* Aivatar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aivatar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		85E29359307AC6A3002CF04C /* Aivatar Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aivatar Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1A0000000000000000000X1 /* Aivatar Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Aivatar Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B0000000000000000000W3 /* Aivatar Widgets.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.appex; includeInIndex = 0; path = "Aivatar Widgets.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -56,10 +74,25 @@
 			path = "Aivatar Watch AppTests";
 			sourceTree = "<group>";
 		};
+		A1B0000000000000000000W1 /* Aivatar Widgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Aivatar Widgets";
+			sourceTree = "<group>";
+		};
+		A1B0000000000000000000W2 /* AivatarShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AivatarShared;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		85E29356307AC6A3002CF04C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		A1B0000000000000000000W5 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -76,6 +109,8 @@
 			isa = PBXGroup;
 			children = (
 				85E2935D307AC6A3002CF04C /* Aivatar Watch App */,
+				A1B0000000000000000000W1 /* Aivatar Widgets */,
+				A1B0000000000000000000W2 /* AivatarShared */,
 				A1A0000000000000000000X2 /* Aivatar Watch AppTests */,
 				85E29354307AC6A3002CF04C /* Products */,
 			);
@@ -87,6 +122,7 @@
 				85E29353307AC6A3002CF04C /* Aivatar.app */,
 				85E29359307AC6A3002CF04C /* Aivatar Watch App.app */,
 				A1A0000000000000000000X1 /* Aivatar Watch AppTests.xctest */,
+				A1B0000000000000000000W3 /* Aivatar Widgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -119,11 +155,16 @@
 				85E29356307AC6A3002CF04C /* Frameworks */,
 				A1A0000000000000000000XC /* Validate Avatar Assets */,
 				85E29357307AC6A3002CF04C /* Resources */,
+				A1B0000000000000000000WB /* Embed Widget */,
 			);
 			buildRules = (
 			);
+			dependencies = (
+				A1B0000000000000000000W9 /* PBXTargetDependency */,
+			);
 			fileSystemSynchronizedGroups = (
 				85E2935D307AC6A3002CF04C /* Aivatar Watch App */,
+				A1B0000000000000000000W2 /* AivatarShared */,
 			);
 			name = "Aivatar Watch App";
 			productName = "Aivatar Watch App";
@@ -151,6 +192,27 @@
 			productReference = A1A0000000000000000000X1 /* Aivatar Watch AppTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		A1B0000000000000000000W7 /* Aivatar Widgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1B0000000000000000000WC /* Build configuration list for PBXNativeTarget "Aivatar Widgets" */;
+			buildPhases = (
+				A1B0000000000000000000W4 /* Sources */,
+				A1B0000000000000000000W5 /* Frameworks */,
+				A1B0000000000000000000W6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A1B0000000000000000000W1 /* Aivatar Widgets */,
+				A1B0000000000000000000W2 /* AivatarShared */,
+			);
+			name = "Aivatar Widgets";
+			productName = "Aivatar Widgets";
+			productReference = A1B0000000000000000000W3 /* Aivatar Widgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -165,6 +227,9 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					85E29358307AC6A3002CF04C = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					A1B0000000000000000000W7 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -185,6 +250,7 @@
 			targets = (
 				85E29352307AC6A3002CF04C /* Aivatar */,
 				85E29358307AC6A3002CF04C /* Aivatar Watch App */,
+				A1B0000000000000000000W7 /* Aivatar Widgets */,
 				A1A0000000000000000000X6 /* Aivatar Watch AppTests */,
 			);
 		};
@@ -202,6 +268,11 @@
 			);
 		};
 		A1A0000000000000000000X4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		A1B0000000000000000000W6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -233,6 +304,11 @@
 			files = (
 			);
 		};
+		A1B0000000000000000000W4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -245,6 +321,11 @@
 			isa = PBXTargetDependency;
 			target = 85E29358307AC6A3002CF04C /* Aivatar Watch App */;
 			targetProxy = A1A0000000000000000000X7 /* PBXContainerItemProxy */;
+		};
+		A1B0000000000000000000W9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1B0000000000000000000W7 /* Aivatar Widgets */;
+			targetProxy = A1B0000000000000000000W8 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -368,9 +449,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Aivatar Watch App/Aivatar Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = "*.entitlements";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Aivatar;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -391,7 +474,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 9.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
 			};
 			name = Debug;
 		};
@@ -400,9 +483,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Aivatar Watch App/Aivatar Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = "*.entitlements";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Aivatar;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -424,7 +509,7 @@
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				VALIDATE_PRODUCT = YES;
-				WATCHOS_DEPLOYMENT_TARGET = 9.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
 			};
 			name = Release;
 		};
@@ -480,7 +565,7 @@
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aivatar Watch App.app/Aivatar Watch App";
-				WATCHOS_DEPLOYMENT_TARGET = 9.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
 			};
 			name = Debug;
 		};
@@ -501,7 +586,70 @@
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aivatar Watch App.app/Aivatar Watch App";
-				WATCHOS_DEPLOYMENT_TARGET = 9.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
+		A1B0000000000000000000WD /* Debug configuration for PBXNativeTarget "Aivatar Widgets" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "Aivatar Widgets/Aivatar Widgets.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					Info.plist,
+					"*.entitlements",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Aivatar Widgets/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = aivatarapp.Aivatar.watchkitapp.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		A1B0000000000000000000WE /* Release configuration for PBXNativeTarget "Aivatar Widgets" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "Aivatar Widgets/Aivatar Widgets.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					Info.plist,
+					"*.entitlements",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Aivatar Widgets/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = aivatarapp.Aivatar.watchkitapp.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
 			};
 			name = Release;
 		};
@@ -537,6 +685,14 @@
 			buildConfigurations = (
 				A1A0000000000000000000XA /* Debug configuration for PBXNativeTarget "Aivatar Watch AppTests" */,
 				A1A0000000000000000000XB /* Release configuration for PBXNativeTarget "Aivatar Watch AppTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		A1B0000000000000000000WC /* Build configuration list for PBXNativeTarget "Aivatar Widgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1B0000000000000000000WD /* Debug configuration for PBXNativeTarget "Aivatar Widgets" */,
+				A1B0000000000000000000WE /* Release configuration for PBXNativeTarget "Aivatar Widgets" */,
 			);
 			defaultConfigurationName = Release;
 		};

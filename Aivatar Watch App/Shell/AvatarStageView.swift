@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 /// AvatarStageView (§9): the stage *is* the app — full-screen avatar, face in
 /// the upper third glance zone, name/state text in text styles (never fixed
@@ -35,6 +36,9 @@ struct AvatarStageView: View {
     /// "It noticed" (§10.5.5): timestamp when the app left the active
     /// phase; a return after a long absence gets a soft noticed-nod.
     @State private var wentToBackgroundAt: Date?
+    /// v12 presence: the streak days of the visit record, republished to
+    /// the complication when the name changes.
+    @State private var lastStreakDays = 0
 
     init(archetype: Archetype? = nil) {
         launchOverride = archetype
@@ -45,13 +49,14 @@ struct AvatarStageView: View {
     }
 
     var body: some View {
-        // watchOS TabView pages vertically natively. The explicit
-        // .verticalPage style is watchOS 10+ only, and our deployment
-        // target is watchOS 9 (§2 hard constraint).
+        // watchOS 10 platform pattern (v12): the system vertical-page
+        // TabView renders the page indicator next to the Digital Crown and
+        // gives crown paging for free — stage on page 1, Settings on page 2.
         TabView {
             stage
             SettingsView(archetype: archetype)
         }
+        .tabViewStyle(.verticalPage(transitionStyle: .automatic))
         .onAppear {
             buildContextIfNeeded()
         }
@@ -91,6 +96,37 @@ struct AvatarStageView: View {
         // previous context.
         AvatarSession.shared.register(context: renderContext, archetype: archetype)
         presentInteriority(summary)
+        lastStreakDays = summary.streakDays
+        publishCompanionWidgetState(streakDays: summary.streakDays)
+    }
+
+    /// v12 presence pass: publish the companion snapshot to the shared
+    /// app group and ask WidgetKit to redraw the timeline — the watch-face
+    /// complication never polls; it refreshes when the app says so.
+    /// Also seeds the complication icon PNGs (the REAL rendered pixel
+    /// companion) once per archetype.
+    private func publishCompanionWidgetState(streakDays: Int) {
+        CompanionWidgetState.write(CompanionWidgetSnapshot(
+            archetypeRaw: archetype.rawValue,
+            name: stageName,
+            streakDays: streakDays
+        ))
+        seedCompanionWidgetIcons()
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// Renders every archetype's icon into the shared container once (the
+    /// icons only depend on the archetype; existing files are kept).
+    private func seedCompanionWidgetIcons() {
+        guard let container = CompanionWidgetState.sharedContainer() else { return }
+        let icons = container.appendingPathComponent(CompanionWidgetState.iconsDirectoryName)
+        try? FileManager.default.createDirectory(at: icons, withIntermediateDirectories: true)
+        for archetype in Archetype.allCases {
+            guard let url = CompanionWidgetState.iconURL(forArchetypeRaw: archetype.rawValue, container: container),
+                  !FileManager.default.fileExists(atPath: url.path),
+                  let png = CompanionIcon.pngData(for: archetype) else { continue }
+            try? png.write(to: url)
+        }
     }
 
     /// The visit record (A5d). The -absence launch argument (debug/E2E
@@ -298,9 +334,11 @@ struct AvatarStageView: View {
 
     /// The naming ceremony's answer: the companion celebrates its new
     /// name (§10.5.1 — the moment personalization becomes ownership).
+    /// The complication learns the new name immediately (v12 presence).
     private func celebrateNaming() {
         context?.engine.handleEvent(.gesture(name: "sparkle"))
         HapticsChannel.shared.react(to: archetype)
+        publishCompanionWidgetState(streakDays: lastStreakDays)
     }
 
     private func performQuirk() {
