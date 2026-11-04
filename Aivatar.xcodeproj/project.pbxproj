@@ -60,7 +60,7 @@
 		85E29353307AC6A3002CF04C /* Aivatar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aivatar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		85E29359307AC6A3002CF04C /* Aivatar Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aivatar Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1A0000000000000000000X1 /* Aivatar Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Aivatar Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1B0000000000000000000W3 /* Aivatar Widgets.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.appex; includeInIndex = 0; path = "Aivatar Widgets.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B0000000000000000000W3 /* Aivatar Widgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.extensionkit-extension"; path = "Aivatar Widgets.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -92,12 +92,12 @@
 			files = (
 			);
 		};
-		A1B0000000000000000000W5 /* Frameworks */ = {
+		A1A0000000000000000000X3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
 		};
-		A1A0000000000000000000X3 /* Frameworks */ = {
+		A1B0000000000000000000W5 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -201,8 +201,6 @@
 				A1B0000000000000000000W6 /* Resources */,
 			);
 			buildRules = (
-			);
-			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
 				A1B0000000000000000000W1 /* Aivatar Widgets */,

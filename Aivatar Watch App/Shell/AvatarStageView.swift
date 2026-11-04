@@ -29,6 +29,9 @@ struct AvatarStageView: View {
     /// touch — a hidden gesture needs one visible invitation.
     @AppStorage("ritualHintShown") private var ritualHintShown = false
     @State private var context: AvatarRenderContext?
+    /// v13: the authored-sprite stage's actor (the engine below stays
+    /// registered for the vector fallback and engine-side consumers).
+    @State private var director: SpriteDirector?
     @State private var isResting = false
     @State private var showPicker = false
     @State private var showNaming = false
@@ -75,9 +78,10 @@ struct AvatarStageView: View {
     }
 
     private func buildContext() {
+        guard let profile = try? PersonalityProfile.load(archetype) else { return }
         let engine = AvatarEngine(
             skeleton: try! Skeleton(document: try! RigDocument.load()),
-            profile: try! PersonalityProfile.load(archetype),
+            profile: profile,
             // Stable per-archetype seed (String.hashValue is
             // randomized per launch and must never be used here).
             seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0),
@@ -91,10 +95,17 @@ struct AvatarStageView: View {
         let summary = recordVisitForBuild()
         let renderContext = AvatarRenderContext(engine: engine, interiority: summary.tuning)
         context = renderContext
+        // v13: the stage acts through the sprite director (the engine
+        // stays registered via the session; see buildContext comments).
+        let spriteDirector = SpriteDirector(
+            profile: profile,
+            seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0)
+        )
+        director = spriteDirector
         // Phase B: notification events reach this engine via the
         // session registry (§13 port); re-registering replaces any
         // previous context.
-        AvatarSession.shared.register(context: renderContext, archetype: archetype)
+        AvatarSession.shared.register(context: renderContext, director: spriteDirector, archetype: archetype)
         presentInteriority(summary)
         lastStreakDays = summary.streakDays
         publishCompanionWidgetState(streakDays: summary.streakDays)
@@ -159,36 +170,43 @@ struct AvatarStageView: View {
     private func presentInteriority(_ summary: VisitSummary) {
         guard summary.absenceDays >= 1, let context else { return }
         let engine = context.engine
+        // v13: each beat mirrors onto the sprite director — the engine
+        // keeps the event for its own consumers, the director acts it out
+        // on the stage (the authored-sprite vocabulary).
+        func play(_ name: String) {
+            engine.handleEvent(.gesture(name: name))
+            director?.handleEvent(.gesture(name: name))
+        }
         switch archetype {
         case .ember:
             // The rehearsal: it practiced a dance while you were away —
             // now it shows you. The show improves with the rehearsal
             // level (a longer run for a practiced performer).
-            engine.handleEvent(.gesture(name: "sparkle"))
+            play("sparkle")
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 1_200_000_000)
-                engine.handleEvent(.gesture(name: "spin"))
+                play("spin")
                 if summary.rehearsalLevel >= 3 {
                     try? await Task.sleep(nanoseconds: 1_400_000_000)
-                    engine.handleEvent(.gesture(name: "bounce"))
+                    play("bounce")
                 }
             }
         case .willow:
             // It kept watering the sprout — the swaying settle says the
             // tending continued without you (the grown sprout is the trace).
-            engine.handleEvent(.gesture(name: "swayCatch"))
+            play("swayCatch")
         case .compass:
             // The audit is done: one approval tick — the week grid it
             // drew is waiting below the body.
-            engine.handleEvent(.gesture(name: "tick"))
+            play("tick")
         case .prism:
             // It found something while you were out and brought it back.
-            engine.handleEvent(.gesture(name: "doubleTake"))
+            play("doubleTake")
         case .nimbus:
             // The barometer: if this is your usual time, it started its
             // little drift BEFORE you arrived — it saw you coming.
             if summary.nearUsualHour {
-                engine.handleEvent(.gesture(name: "driftFloat"))
+                play("driftFloat")
             }
         }
     }
@@ -200,8 +218,11 @@ struct AvatarStageView: View {
     private var stage: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
-                if let context {
-                    CanvasAvatarRenderer(context: context)
+                if let director {
+                    SpriteStageRenderer(
+                        director: director,
+                        sprite: AuthoredSprites.sprite(for: archetype)
+                    )
                 } else {
                     Color.black
                 }
@@ -232,6 +253,7 @@ struct AvatarStageView: View {
             // the idle schedule.
             .onLongPressGesture(minimumDuration: 0.5) {
                 context?.engine.handleEvent(.gesture(name: "slowBlink"))
+                director?.handleEvent(.gesture(name: "slowBlink"))
             }
             // v6 touch-gaze: a spatial tap sends the normalized touch
             // direction so the avatar's eyes dart to the finger (§9
@@ -247,12 +269,15 @@ struct AvatarStageView: View {
                         let ny = Float((value.location.y - size.height / 2) / (size.height / 2))
                         context?.engine.handleEvent(.gazeAt(x: nx, y: ny))
                         context?.engine.handleEvent(.tap)
+                        director?.handleEvent(.gazeAt(x: nx, y: ny))
+                        director?.handleEvent(.tap)
                         HapticsChannel.shared.react(to: archetype)
                         afterFirstInteraction()
                     }
             )
             .accessibilityAction {
                 context?.engine.handleEvent(.tap)
+                director?.handleEvent(.tap)
                 HapticsChannel.shared.react(to: archetype)
                 afterFirstInteraction()
             }
@@ -286,6 +311,7 @@ struct AvatarStageView: View {
                     if let leftAt = wentToBackgroundAt,
                        Date().timeIntervalSince(leftAt) >= 1800 {
                         context?.engine.handleEvent(.gesture(name: "nod"))
+                        director?.handleEvent(.gesture(name: "nod"))
                     }
                     wentToBackgroundAt = nil
                 } else if phase == .background {
@@ -337,12 +363,14 @@ struct AvatarStageView: View {
     /// The complication learns the new name immediately (v12 presence).
     private func celebrateNaming() {
         context?.engine.handleEvent(.gesture(name: "sparkle"))
+        director?.handleEvent(.gesture(name: "sparkle"))
         HapticsChannel.shared.react(to: archetype)
         publishCompanionWidgetState(streakDays: lastStreakDays)
     }
 
     private func performQuirk() {
         context?.engine.handleEvent(.gesture(name: archetype.quirkGesture.rawValue))
+        director?.handleEvent(.gesture(name: archetype.quirkGesture.rawValue))
         HapticsChannel.shared.react(to: archetype)
     }
 

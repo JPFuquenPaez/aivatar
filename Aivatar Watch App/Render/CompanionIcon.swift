@@ -3,16 +3,15 @@ import CoreGraphics
 import ImageIO
 
 /// Renders one static pixel icon per companion for the companion picker
-/// (Shell/CompanionPickerView). The icon is the REAL authored avatar: the
-/// same engine -> painter -> hi-bit rasterizer path as the golden frames,
-/// painted once at a pinned frame, so the picker shows exactly what the
-/// stage shows after choosing. Static on purpose — a watch picker must be
-/// glanceable and near-zero power (five live TimelineViews would drain the
-/// battery); the live avatar appears on the stage right after the choice.
-/// Pixels are never interpolated (PIXEL_DESIGN.md §4: no smoothing).
+/// and the complication (v13: the AUTHORED sprite's idle pose — the same
+/// 20x18 grid the stage animates, so every scale shows the same companion.
+/// The icon separates by its own solid color on the OLED black stage,
+/// never by outlines, and pixels are never interpolated (PIXEL_DESIGN.md
+/// §4). Static on purpose — a watch picker must be glanceable and
+/// near-zero power; the live companion appears on the stage.
 nonisolated enum CompanionIcon {
-    /// The pinned frame every icon is painted at (the golden idle pose).
-    static let iconFrame = 300
+    /// Device pixels per art cell (the icon is 60x54 device px).
+    static let cellScale = 3
 
     /// Lock-guarded icon cache (built once per process).
     private final class Cache: @unchecked Sendable {
@@ -44,21 +43,29 @@ nonisolated enum CompanionIcon {
 
     /// The raw RGBA8 pixels of the icon (grid-sized), test-visible.
     static func snapshotBytes(for archetype: Archetype) -> [UInt8] {
-        guard let skeleton = try? Skeleton(document: RigDocument.load()),
-              let profile = try? PersonalityProfile.load(archetype) else { return [] }
-        let engine = AvatarEngine(
-            skeleton: skeleton, profile: profile,
-            seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0)
-        )
-        engine.update(toFrame: iconFrame)
-        let painter = AvatarSpritePainter(skeleton: engine.skeleton, visualSet: engine.visualSet)
-        painter.paint(
-            world: engine.currentWorld, pose: engine.currentPose, rest: false,
-            accentPhase: engine.activeGesturePhase, tell: engine.tell, tellPhase: engine.tellPhase
-        )
-        let rasterizer = PixelStageRasterizer(painter: painter)
-        rasterizer.rasterize(painter: painter, frame: iconFrame)
-        return rasterizer.snapshotBytes()
+        let sprite = AuthoredSprites.sprite(for: archetype)
+        let grid = sprite.symbols(frameID: "idle")
+        let w = CompanionSprite.gridWidth * cellScale
+        let h = CompanionSprite.gridHeight * cellScale
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        for y in 0..<CompanionSprite.gridHeight {
+            for x in 0..<CompanionSprite.gridWidth {
+                let symbol = grid[y][x]
+                guard symbol != ".",
+                      let hex = sprite.paletteHex[symbol] else { continue }
+                let rgb = CompanionSprite.hexToRGB(hex)
+                for dy in 0..<cellScale {
+                    for dx in 0..<cellScale {
+                        let i = ((y * cellScale + dy) * w + x * cellScale + dx) * 4
+                        pixels[i] = rgb.r
+                        pixels[i + 1] = rgb.g
+                        pixels[i + 2] = rgb.b
+                        pixels[i + 3] = 255
+                    }
+                }
+            }
+        }
+        return pixels
     }
 
     /// PNG data of the rendered icon (ImageIO — no UIKit dependency), used
@@ -77,8 +84,8 @@ nonisolated enum CompanionIcon {
 
     private static func render(_ archetype: Archetype) -> CGImage? {
         let bytes = snapshotBytes(for: archetype)
-        let w = PixelStageRasterizer.gridWidth
-        let h = PixelStageRasterizer.gridHeight
+        let w = CompanionSprite.gridWidth * cellScale
+        let h = CompanionSprite.gridHeight * cellScale
         guard bytes.count == w * h * 4,
               let data = CFDataCreate(kCFAllocatorDefault, bytes, bytes.count),
               let provider = CGDataProvider(data: data) else { return nil }

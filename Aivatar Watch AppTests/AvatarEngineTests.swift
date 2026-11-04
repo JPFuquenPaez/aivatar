@@ -636,8 +636,11 @@ final class AvatarEngineTests: XCTestCase {
         // The v10 picker shows the real avatar as a static pixel icon
         // (Render/CompanionIcon): every animal must rasterize to a lit,
         // grid-sized icon at the pinned frame, and build a CGImage.
-        let w = PixelStageRasterizer.gridWidth
-        let h = PixelStageRasterizer.gridHeight
+        // v13: the icon is the AUTHORED sprite's idle pose (20x18 cells
+        // at 3 device px per cell — 60x54), the same grid the stage
+        // animates; deliberate re-pin alongside the sprite path.
+        let w = CompanionSprite.gridWidth * CompanionIcon.cellScale
+        let h = CompanionSprite.gridHeight * CompanionIcon.cellScale
         for archetype in Archetype.allCases {
             let bytes = CompanionIcon.snapshotBytes(for: archetype)
             XCTAssertEqual(bytes.count, w * h * 4, "\(archetype.rawValue): icon snapshot size")
