@@ -24,6 +24,7 @@ nonisolated final class SpriteDirector {
     private static let ticksPerMinute: Float = 60.0 / 0.15
 
     private let sprite: CompanionSprite
+    private let archetype: Archetype
     private var rng: SeededRandom
     private let blinkP: Float
     private let glanceP: Float
@@ -44,7 +45,9 @@ nonisolated final class SpriteDirector {
     private(set) var resting = false
 
     init(profile: PersonalityProfile, seed: UInt64) {
-        sprite = AuthoredSprites.sprite(for: Archetype(rawValue: profile.id) ?? .ember)
+        let resolved = Archetype(rawValue: profile.id) ?? .ember
+        archetype = resolved
+        sprite = AuthoredSprites.sprite(for: resolved)
         rng = SeededRandom(seed ^ 0x51_DE_51_CE)
         blinkP = profile.gazeProfile.blinkRatePerMin / Self.ticksPerMinute
         glanceP = profile.gazeProfile.saccadeRatePerMin / Self.ticksPerMinute * 0.35
@@ -138,8 +141,45 @@ nonisolated final class SpriteDirector {
 
     /// Act vocabulary: discrete beats over frame ids.
     nonisolated enum SpriteAct: Sendable {
-        case blink, happy, quirk, look, slowBlink, farewell
+        case blink, happy, quirk, look, slowBlink, farewell, perk
     }
+
+    // MARK: - Sound presence (v14, Tools/PIXEL_DESIGN.md §7)
+
+    /// Sound-derived awareness (SoundPresenceLayer events — impure at
+    /// capture, pure at digest). Per the sonic reaction map, a startle
+    /// plays the animal's authored `perk` pose and a sustained voice plays
+    /// its personality acknowledgment. A shared act guard (2.4 s) keeps a
+    /// clap storm from ever turning the silent stage into jitter; under
+    /// Reduce Motion L2 reactions degrade to the face-readable blink.
+    private var lastSoundActTick = -100
+
+    func handleSound(_ event: SoundPresenceEvent) {
+        if resting { return }
+        if mode == .reduceMotionL2 {
+            guard tick - lastSoundActTick >= Self.soundActGapTicks else { return }
+            lastSoundActTick = tick
+            play(.blink)
+            return
+        }
+        guard tick - lastSoundActTick >= Self.soundActGapTicks else { return }
+        lastSoundActTick = tick
+        switch event {
+        case .onset:
+            play(.perk)
+        case .voiceSustained:
+            switch archetype {
+            case .ember: play(.perk)                 // ears toward your voice
+            case .willow: play(.slowBlink)           // the listening blink
+            case .compass: play(.quirk)              // the metronome answers
+            case .prism: play(.look, direction: 1)   // the turret locks on you
+            case .nimbus: play(.happy)                // the chirp
+            }
+        }
+    }
+
+    /// Minimum director ticks between sound-driven acts (2.4 s at 150 ms.)
+    static let soundActGapTicks = 16
 
     private func play(_ act: SpriteAct, direction: Int = 0) {
         if act == .blink {
@@ -160,6 +200,8 @@ nonisolated final class SpriteDirector {
             queue = [(direction < 0 ? "glanceL" : "glanceR", 4), ("idle", 1)]
         case .slowBlink:
             queue = [("idle", 3), ("blink", 6), ("idle", 2)]
+        case .perk:
+            queue = [("perk", 3), ("idle", 1)]
         case .farewell:
             queue = [("idle", 1), ("blink", 2), ("sleepy", 12)]
         }

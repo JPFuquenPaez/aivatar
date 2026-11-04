@@ -48,8 +48,9 @@ nonisolated struct CompanionSprite: Sendable, Equatable {
     /// `idle` (base), `blink`, `sleepy` (heavy lids — the always-on rest
     /// face), `happy` (closed eyes + smile), `glanceL` / `glanceR`
     /// (touch-gaze: the eye block slides one cell), `quirk` (the species'
-    /// signature involuntary move).
-    static let frameIDs = ["idle", "blink", "sleepy", "happy", "glanceL", "glanceR", "quirk"]
+    /// signature involuntary move), `perk` (the alert pose — where the
+    /// animal's "ear" is when a sound startles it).
+    static let frameIDs = ["idle", "blink", "sleepy", "happy", "glanceL", "glanceR", "quirk", "perk"]
 
     let base: [String]
     let patches: [String: [CellDiff]]
@@ -147,6 +148,7 @@ nonisolated enum AuthoredSprites {
                          CellDiff(12, 4, "B"), CellDiff(12, 5, "B"), CellDiff(13, 4, "W"), CellDiff(14, 4, "K"),
                          CellDiff(13, 5, "K"), CellDiff(14, 5, "K") ],
             "quirk": [ CellDiff(15, 9, "W"), CellDiff(16, 9, ".") ],  // tail wag
+            "perk": [ CellDiff(3, 0, "B"), CellDiff(6, 0, "B"), CellDiff(13, 0, "B"), CellDiff(16, 0, "B") ],  // ears flare
         ],
         paletteHex: [
             "B": "FF9E4A", "D": "C4621B", "K": "241206",
@@ -193,6 +195,7 @@ nonisolated enum AuthoredSprites {
                          CellDiff(11, 2, "B"), CellDiff(11, 3, "B"), CellDiff(12, 2, "W"), CellDiff(13, 2, "K"),
                          CellDiff(12, 3, "K"), CellDiff(13, 3, "K") ],
             "quirk": [ CellDiff(9, 8, "A"), CellDiff(10, 8, "A") ],  // croak sac
+            "perk": [ CellDiff(6, 5, "B"), CellDiff(13, 5, "B") ],  // the listening mouth — smile corners lift
         ],
         paletteHex: [
             "B": "55D98A", "D": "2A9C5E", "K": "0C2018",
@@ -233,6 +236,7 @@ nonisolated enum AuthoredSprites {
             "glanceR": [ CellDiff(4, 5, "B"), CellDiff(4, 6, "B"), CellDiff(5, 5, "W"), CellDiff(6, 5, "K"),
                          CellDiff(5, 6, "K"), CellDiff(6, 6, "K") ],
             "quirk": [ CellDiff(14, 3, "."), CellDiff(16, 4, "A"), CellDiff(13, 5, ".") ],  // fin flick
+            "perk": [ CellDiff(5, 1, "B"), CellDiff(8, 1, "B"), CellDiff(4, 2, "B"), CellDiff(9, 2, "B") ],  // dorsal flare
         ],
         paletteHex: [
             "B": "3E8EF7", "D": "1F5FA8", "K": "0C1524",
@@ -270,6 +274,7 @@ nonisolated enum AuthoredSprites {
             "glanceL": [ CellDiff(6, 5, "B"), CellDiff(6, 6, "B") ],  // pupil narrows left
             "glanceR": [ CellDiff(5, 5, "B"), CellDiff(5, 6, "B"), CellDiff(7, 5, "K"), CellDiff(7, 6, "K") ],
             "quirk": [ CellDiff(5, 5, "B"), CellDiff(5, 6, "B"), CellDiff(7, 5, "K"), CellDiff(7, 6, "K") ],  // turret roll
+            "perk": [ CellDiff(5, 0, "A"), CellDiff(7, 0, ".") ],  // casque tip sharpens
         ],
         paletteHex: [
             "B": "EA6FF5", "D": "9C3AA8", "K": "1A0C20",
@@ -317,6 +322,7 @@ nonisolated enum AuthoredSprites {
                          CellDiff(12, 6, "K"), CellDiff(13, 6, "K") ],
             "quirk": [ CellDiff(0, 8, "D"), CellDiff(1, 8, "D"), CellDiff(1, 10, "."), CellDiff(2, 10, "."),
                        CellDiff(2, 11, "."), CellDiff(3, 11, ".") ],  // wing flap
+            "perk": [ CellDiff(7, 1, "B"), CellDiff(10, 1, "B") ],  // crest tuft rises
         ],
         paletteHex: [
             "B": "8FA3FF", "D": "5A6ABF", "K": "101426",

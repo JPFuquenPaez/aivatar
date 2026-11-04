@@ -28,6 +28,11 @@ struct AvatarStageView: View {
     /// v11: the slow-blink ritual hint is surfaced once, after the first
     /// touch — a hidden gesture needs one visible invitation.
     @AppStorage("ritualHintShown") private var ritualHintShown = false
+    /// v14 sonic presence: the user's sound-listening preference, the
+    /// once-per-install in-context permission ask, and the live tell.
+    @AppStorage("listenForSounds") private var listenForSounds = true
+    @AppStorage("soundPermissionAsked") private var soundPermissionAsked = false
+    @State private var isListening = false
     @State private var context: AvatarRenderContext?
     /// v13: the authored-sprite stage's actor (the engine below stays
     /// registered for the vector fallback and engine-side consumers).
@@ -42,6 +47,10 @@ struct AvatarStageView: View {
     /// v12 presence: the streak days of the visit record, republished to
     /// the complication when the name changes.
     @State private var lastStreakDays = 0
+
+    /// v14 sonic presence: the one-a-lifetime creation point — state
+    /// changes surface as the on-stage listening tell.
+    @State private var soundSource: MicrophonePresenceSource?
 
     init(archetype: Archetype? = nil) {
         launchOverride = archetype
@@ -62,6 +71,12 @@ struct AvatarStageView: View {
         .tabViewStyle(.verticalPage(transitionStyle: .automatic))
         .onAppear {
             buildContextIfNeeded()
+            if soundSource == nil {
+                soundSource = MicrophonePresenceSource { active in
+                    isListening = active
+                }
+                if let director { soundSource?.bind(director: director) }
+            }
         }
         .onChange(of: archetype) { _ in
             // Companion switch: each archetype is a distinct engine
@@ -102,6 +117,7 @@ struct AvatarStageView: View {
             seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0)
         )
         director = spriteDirector
+        soundSource?.bind(director: spriteDirector)
         // Phase B: notification events reach this engine via the
         // session registry (§13 port); re-registering replaces any
         // previous context.
@@ -243,6 +259,15 @@ struct AvatarStageView: View {
                         .padding(.horizontal, 12)
                         .transition(.opacity)
                 }
+                // v14: the visible listening tell — privacy is a design
+                // surface. One quiet waveform glyph while the mic is live.
+                if isListening {
+                    Image(systemName: "waveform")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(EdgeInsets(top: 6, leading: 10, bottom: 0, trailing: 0))
+                }
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityText)
@@ -286,6 +311,8 @@ struct AvatarStageView: View {
             }
             .onChange(of: isLuminanceReduced) { reduced in
                 isResting = reduced
+                // v14: the mic NEVER runs into the Always On rest state.
+                syncSoundPresence()
             }
             .onAppear {
                 isResting = isLuminanceReduced
@@ -304,6 +331,9 @@ struct AvatarStageView: View {
                 }
             }
             .onChange(of: scenePhase) { phase in
+                // v14 sonic presence: the companion only listens where
+                // you can see it listen — active scene phase only.
+                syncSoundPresence()
                 // "It noticed" (§10.5.5): returning after a long absence
                 // (>= 30 min — a long meeting, a workout, sleep) earns one
                 // soft noticed-nod within the U7 300 ms contingency window.
@@ -340,7 +370,26 @@ struct AvatarStageView: View {
     /// skipped if already done); once the sequence has run it never
     /// returns. After onboarding, the slow-blink ritual gets its single
     /// visible hint.
+    /// v14 sonic presence lifecycle: listen only while the app is the
+    /// active scene, the stage is awake, the user opted in, and the
+    /// in-context ask has happened. Idempotent start/stop.
+    private func syncSoundPresence() {
+        guard soundPermissionAsked else { return }
+        if scenePhase == .active, !isLuminanceReduced, listenForSounds {
+            soundSource?.start()
+        } else {
+            soundSource?.stop()
+        }
+    }
+
     private func afterFirstInteraction() {
+        // v14 in-context permission ask (the notification-auth pattern):
+        // once per install, at the moment the feature matters — right
+        /// after the first living interaction.
+        if !soundPermissionAsked, listenForSounds {
+            soundPermissionAsked = true
+            soundSource?.start()
+        }
         if launchOverride == nil, !ceremonyShown {
             ceremonyShown = true
             if !pickerCompleted {
@@ -378,6 +427,9 @@ struct AvatarStageView: View {
         let kind = "your \(archetype.animalName) companion"
         if isResting {
             return "\(stageName), \(kind), is resting"
+        }
+        if isListening {
+            return "\(stageName), \(kind), is listening for sounds"
         }
         return "\(stageName), \(kind), is calm"
     }

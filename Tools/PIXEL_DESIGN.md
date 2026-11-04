@@ -118,6 +118,28 @@ reference mascot — the Mistral cat: a 16x14 logical grid, 5 colors,
   `testDirectorReduceMotionL2StaysStill`,
   `testDirectorFarewellBlinkThenSleepy`.
 
+## 7.1 Sonic presence (v14) — the companion's ears
+
+- ONE new reaction frame per animal: `perk` — the alert pose (flared
+  fox ears, the frog's listening mouth, the fish's dorsal flare, the
+  chameleon's sharpened casque tip, the bird's crest tuft), ≤ 4 cells,
+  same authored-patch rules as every other frame.
+- Sound is impure at capture, PURE at digest: the mic's RMS stream feeds
+  `SoundPresenceLayer` (50 ms ticks: ambient envelope + onset detector
+  with a 1.2 s refractory + sustained-voice detector arming from a quiet
+  baseline, 10 s refractory). Constant ambience produces ZERO events —
+  the companion reacts to change, never to loudness.
+- The director maps events to acts behind a 2.4 s guard (no clap storm
+  jitter): onset → `perk`; voice → the personality acknowledgment
+  (ember perks, willow slow-blinks, compass ticks, prism locks the
+  turret, nimbus chirps). Reduce Motion L2 degrades both to blink.
+- Privacy is a design surface: a visible waveform tell while the mic is
+  live, one in-context permission ask, mic life = stage life (never in
+  Always On, never in the background), zero audio persisted.
+- Verify: `SoundPresenceTests` — silence, utterance/refractory
+  fixtures, ambience non-events, onset budgets, the reaction map,
+  the act gap, the rest state.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,

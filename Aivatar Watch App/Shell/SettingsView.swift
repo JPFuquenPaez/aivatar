@@ -11,6 +11,10 @@ struct SettingsView: View {
 
     /// A5c naming ceremony: rename access (§10.5.1).
     @AppStorage("companionName") private var companionName = ""
+    /// v14 sonic presence: the user's listening opt-out (the in-context
+    /// permission ask is the real gate; this is the always-visible off
+    /// switch).
+    @AppStorage("listenForSounds") private var listenForSounds = true
     @State private var showNaming = false
 
     private var stageName: String {
@@ -52,6 +56,18 @@ struct SettingsView: View {
                     Text("Accessibility")
                 } footer: {
                     Text("Stops idle gestures and sway; your companion holds still and blinks.")
+                        .font(.footnote)
+                }
+                // v14 sonic presence: the opt-out lives next to the
+                // behavior it governs, with the privacy contract in the
+                // footer — no hidden recording, no background listening.
+                Section {
+                    Toggle("Listen for sounds", isOn: $listenForSounds)
+                        .accessibilityHint("Your companion reacts to your voice and claps while the app is open")
+                } header: {
+                    Text("Sounds")
+                } footer: {
+                    Text("While Aivatar is open with the stage awake, its microphone listens for your voice and claps so your companion can react. Sounds are analyzed on the watch instantly and never recorded or saved.")
                         .font(.footnote)
                 }
                 Section("About") {
