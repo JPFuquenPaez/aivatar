@@ -304,7 +304,8 @@ final class CompanionSpriteTests: XCTestCase {
         director.handleEvent(.wake)
         XCTAssertEqual(director.currentFrame, "happy", "wake greets")
         director.advance(toTick: director.tick + 10)
-        XCTAssertEqual(director.currentFrame, "idle", "back to idle after the greeting")
+        XCTAssertTrue(["idle", "breathe", "idleA", "idleB"].contains(director.currentFrame),
+                      "back to the life floor after the greeting")
     }
 
     func testDirectorDiscreteMotionEnergyBudget() throws {

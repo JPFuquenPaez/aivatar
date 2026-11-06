@@ -140,6 +140,30 @@ reference mascot — the Mistral cat: a 16x14 logical grid, 5 colors,
   fixtures, ambience non-events, onset budgets, the reaction map,
   the act gap, the rest state.
 
+## 7.2 Life 2.0 (v15/v16) — the life floor, mood, autonomy
+
+- **The floor breathes**: `breathe` (a 2-cell belly patch) alternates
+  every ~1.35 s; `idleA`/`idleB` drift variants rotate every ~8 s. The
+  companion never sits perfectly still between acts. L2 pins the floor
+  to plain idle; rest stays the single sleepy frame.
+- **Mood is the independence signal**: calm/curious/bored/lonely/playful
+  from interaction recency + rate (and sound events → curious). Lonely
+  earns a rate-capped attention poke (perk + blink at you, ≤ 1/36 s);
+  bored doubles glance-aways; playful doubles quirks. Deterministic per
+  seed; memory stays an input.
+- **Anticipation**: a quirk is always preceded by a 1-tick `perk`
+  wind-up — acts read as chosen, not random. Long unattended stretches
+  earn one `yawn` (90 s idle, 4.5 min cooldown).
+- **Autonomy**: every ~30-60 s a single dim mote (25% body tone, one
+  cell, stage-level) drifts in and the companion glances at it —
+  self-directed play with one focal story. Never under L2 or rest.
+- **Memory is visible**: interiority traces are authored overlay cells
+  on the sprite (willow's sprout, compass's week grid, prism's trinket),
+  composed with any frame inside the patch budget.
+- Verify: `Life2Tests` — breathing floor, variant rotation, L2 static,
+  mood transitions + determinism, poke/yawn rate caps, wind-up
+  invariant, mote spawn/chase/fade + duty cycle, overlay budgets.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,

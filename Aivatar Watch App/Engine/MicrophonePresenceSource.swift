@@ -56,11 +56,15 @@ final class MicrophonePresenceSource {
         case .undetermined:
             state = .requesting
             onStateChange?(false)
-            session.requestRecordPermission { [weak self] granted in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    if self.state == .requesting { self.state = .off }
-                    if granted { self.start() }
+            // The TCC callback lands on a system queue; the closure must be
+            // nonisolated, so the call goes through a nonisolated shim and
+            // the result hops back to the main actor explicitly. (Calling
+            // requestRecordPermission directly from this @MainActor method
+            // traps: the inferred closure is actor-isolated and runs off-
+            // actor — EXC_BREAKPOINT via swift_task_checkIsolatedSwift.)
+            Self.requestRecordPermission { [weak self] granted in
+                Task { @MainActor in
+                    self?.handleRecordPermission(granted)
                 }
             }
         case .denied:
@@ -69,6 +73,17 @@ final class MicrophonePresenceSource {
         @unknown default:
             state = .off
         }
+    }
+
+    private nonisolated static func requestRecordPermission(
+        _ completion: @escaping @Sendable (Bool) -> Void
+    ) {
+        AVAudioSession.sharedInstance().requestRecordPermission(completion)
+    }
+
+    private func handleRecordPermission(_ granted: Bool) {
+        if state == .requesting { state = .off }
+        if granted { start() }
     }
 
     func stop() {

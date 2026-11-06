@@ -6,6 +6,11 @@ import WidgetKit
 /// sizes), vertical-paging TabView to Settings, one VoiceOver element with a
 /// state-based label (never per-frame).
 struct AvatarStageView: View {
+    /// CI/smoke hook: -stageAwake keeps the stage on the live frame in
+    /// the simulator (which dims to Always On on idle); never set in
+    /// normal use. Same convention as the -archetype / -absence args.
+    private static let forceAwake = ProcessInfo.processInfo.arguments.contains("-stageAwake")
+
     /// Debug/CI launch-argument override (smoke tests, previews); nil in
     /// normal use, where the persisted selection wins (ArchetypeSelection).
     private let launchOverride: Archetype?
@@ -117,6 +122,9 @@ struct AvatarStageView: View {
             seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0)
         )
         director = spriteDirector
+        // v15: session memory becomes visible sprite cells (sprout /
+        // week grid / trinket) — memory is an input to the director too.
+        spriteDirector.interiority = summary.tuning
         soundSource?.bind(director: spriteDirector)
         // Phase B: notification events reach this engine via the
         // session registry (§13 port); re-registering replaces any
@@ -237,7 +245,8 @@ struct AvatarStageView: View {
                 if let director {
                     SpriteStageRenderer(
                         director: director,
-                        sprite: AuthoredSprites.sprite(for: archetype)
+                        sprite: AuthoredSprites.sprite(for: archetype),
+                        forceAwake: AvatarStageView.forceAwake
                     )
                 } else {
                     Color.black
@@ -310,7 +319,7 @@ struct AvatarStageView: View {
                 performQuirk()
             }
             .onChange(of: isLuminanceReduced) { reduced in
-                isResting = reduced
+                isResting = reduced && !Self.forceAwake
                 // v14: the mic NEVER runs into the Always On rest state.
                 syncSoundPresence()
             }

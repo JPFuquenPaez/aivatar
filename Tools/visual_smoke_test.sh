@@ -25,11 +25,6 @@ if [ -z "$UDID" ]; then
 fi
 echo "==> Device: $DEVICE ($UDID)"
 
-echo "==> Fresh boot (avoids the dimmed always-on state)"
-xcrun simctl shutdown "$UDID" 2>/dev/null || true
-xcrun simctl boot "$UDID"
-sleep 15
-
 echo "==> Building"
 cd "$ROOT"
 if ! xcodebuild -project Aivatar.xcodeproj -scheme "Aivatar Watch App" \
@@ -38,6 +33,12 @@ if ! xcodebuild -project Aivatar.xcodeproj -scheme "Aivatar Watch App" \
   echo "FAIL: build failed"
   exit 1
 fi
+
+echo "==> Fresh boot AFTER the build (the sim dims to always-on while a
+     full build runs; capturing a dimmed face is the classic false alarm)"
+xcrun simctl shutdown "$UDID" 2>/dev/null || true
+xcrun simctl boot "$UDID"
+sleep 8
 
 BUILT="$(xcodebuild -project Aivatar.xcodeproj -scheme "Aivatar Watch App" \
   -destination "platform=watchOS Simulator,id=$UDID" -showBuildSettings 2>/dev/null \
@@ -49,12 +50,17 @@ if [ -z "$BUILT" ] || [ ! -d "$APP" ]; then
 fi
 xcrun simctl install "$UDID" "$APP"
 
+# Warm-up launch: the first launch after a boot is slow to first frame;
+# capture only after the workspace is warm.
+xcrun simctl launch "$UDID" "$BUNDLE" -archetype ember -stageAwake >/dev/null 2>&1 || true
+sleep 5
+
 echo "==> Capturing all five archetypes"
 for a in ember willow compass prism nimbus; do
   xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null || true
   sleep 1
-  xcrun simctl launch "$UDID" "$BUNDLE" -archetype "$a" >/dev/null
-  sleep 4
+  xcrun simctl launch "$UDID" "$BUNDLE" -archetype "$a" -stageAwake >/dev/null
+  sleep 3
   xcrun simctl io "$UDID" screenshot "$WORK/smoke-$a.png" >/dev/null 2>&1
 done
 

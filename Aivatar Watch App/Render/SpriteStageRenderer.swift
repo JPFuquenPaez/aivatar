@@ -14,8 +14,13 @@ import WatchKit
 struct SpriteStageRenderer: View {
     let director: SpriteDirector
     let sprite: CompanionSprite
+    /// CI/smoke hook (-stageAwake): the simulator dims to Always On on
+    /// idle, which would screenshot the rest frame instead of the live
+    /// stage. Never set in normal use.
+    let forceAwake: Bool
 
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+    private var luminanceReduced: Bool { isLuminanceReduced && !forceAwake }
     @AppStorage("reduceMotionL2") private var reduceMotionL2 = false
     @State private var epoch = Date()
     /// A5c farewell beat (U9): the goodbye plays at full palette, then the
@@ -31,12 +36,16 @@ struct SpriteStageRenderer: View {
     /// Resolved active/rest palettes (symbol -> sRGB Color, built once).
     private let activeColors: [Character: Color]
     private let restColors: [Character: Color]
+    /// The self-play mote tone: 25% of the body hue — a toy, not weather.
+    private let moteColor: Color
 
-    init(director: SpriteDirector, sprite: CompanionSprite) {
+    init(director: SpriteDirector, sprite: CompanionSprite, forceAwake: Bool = false) {
         self.director = director
         self.sprite = sprite
+        self.forceAwake = forceAwake
         var active: [Character: Color] = [:]
         var rest: [Character: Color] = [:]
+        var mote = Color.black
         for (token, hex) in sprite.paletteHex {
             let rgb = CompanionSprite.hexToRGB(hex)
             active[token] = Color(.sRGB,
@@ -45,16 +54,22 @@ struct SpriteStageRenderer: View {
             let f = token == "W" ? 0.30 : 0.22
             rest[token] = Color(.sRGB,
                 red: Double(rgb.r) / 255 * f, green: Double(rgb.g) / 255 * f, blue: Double(rgb.b) / 255 * f)
+            if token == "B" {
+                mote = Color(.sRGB,
+                    red: Double(rgb.r) / 255 * 0.25, green: Double(rgb.g) / 255 * 0.25, blue: Double(rgb.b) / 255 * 0.25)
+            }
         }
         activeColors = active
         restColors = rest
+        moteColor = mote
     }
 
     var body: some View {
         Group {
-            if isLuminanceReduced && !farewellPending {
+            if luminanceReduced && !farewellPending {
                 Canvas { ctx, size in
-                    drawFrame(ctx: ctx, size: size, frameID: "sleepy", rest: true)
+                    drawFrame(ctx: ctx, size: size, frameID: "sleepy",
+                              overlay: [], rest: true, mote: nil)
                 }
             } else {
                 TimelineView(.animation(minimumInterval: SpriteDirector.tickDuration)) { timeline in
@@ -65,7 +80,7 @@ struct SpriteStageRenderer: View {
             }
         }
         .ignoresSafeArea()
-        .onChange(of: isLuminanceReduced) { reduced in
+        .onChange(of: luminanceReduced) { reduced in
             if reduced {
                 beginFarewell()
             } else {
@@ -100,15 +115,21 @@ struct SpriteStageRenderer: View {
         director.accessibilityMode = resolveAccessibilityMode()
         let elapsed = date.timeIntervalSince(epoch)
         director.advance(toTick: Int((elapsed / SpriteDirector.tickDuration).rounded(.down)))
-        drawFrame(ctx: ctx, size: size, frameID: director.currentFrame, rest: false)
+        // v15: session memory renders as authored overlay cells on whatever
+        // frame plays (sprout / week grid / trinket).
+        let overlay = sprite.interiorityDiffs(director.interiority)
+        drawFrame(ctx: ctx, size: size, frameID: director.currentFrame,
+                  overlay: overlay, rest: false, mote: director.moteCell)
         if farewellPending, let start = farewellStartedAt, farewellTotalSeconds > 0 {
             let ramp = min(1, max(0, date.timeIntervalSince(start) / farewellTotalSeconds))
             ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black.opacity(0.82 * ramp)))
         }
     }
 
-    private func drawFrame(ctx: GraphicsContext, size: CGSize, frameID: String, rest: Bool) {
-        let grid = sprite.symbols(frameID: frameID)
+    private func drawFrame(ctx: GraphicsContext, size: CGSize, frameID: String,
+                           overlay: [CompanionSprite.CellDiff], rest: Bool,
+                           mote: (x: Int, y: Int)?) {
+        let grid = sprite.symbols(frameID: frameID, overlay: overlay)
         let palette = rest ? restColors : activeColors
         // Fill-width cell: the sprite spans the screen width exactly and
         // its content center sits slightly above the vertical middle (face
@@ -129,6 +150,12 @@ struct SpriteStageRenderer: View {
             if let color = palette[symbol] {
                 ctx.fill(path, with: .color(color))
             }
+        }
+        // v16 self-play: the single drifting mote the companion chases.
+        if let mote, !rest {
+            let rect = CGRect(x: CGFloat(mote.x) * cell, y: top + CGFloat(mote.y) * cell,
+                              width: cell, height: cell)
+            ctx.fill(Path(rect), with: .color(moteColor))
         }
     }
 

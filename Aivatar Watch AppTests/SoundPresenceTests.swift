@@ -129,7 +129,9 @@ final class SoundPresenceTests: XCTestCase {
 
         let compass = try director(.compass)
         compass.handleSound(.voiceSustained)
-        XCTAssertEqual(compass.currentFrame, "quirk")
+        XCTAssertEqual(compass.currentFrame, "perk", "the tick answers with a wind-up")
+        compass.advance(toTick: compass.tick + 1)
+        XCTAssertEqual(compass.currentFrame, "quirk", "...then the metronome tick")
 
         let prism = try director(.prism)
         prism.handleSound(.voiceSustained)
