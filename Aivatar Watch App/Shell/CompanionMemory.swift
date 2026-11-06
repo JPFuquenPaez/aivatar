@@ -27,9 +27,47 @@ nonisolated struct CompanionMemory: Codable, Equatable, Sendable {
     /// Nimbus's barometer: rolling mean of the hour-of-day you return.
     var usualHourEMA: Double?
 
+    // MARK: - Schema v3 (v16, Ambient Life F1 — strictly additive, G8)
+
+    /// Bond XP (F1 ritual bonding). Monotonic — there is no decay path.
+    var bondXP: Int = 0
+    /// Ring buffer of the last 20 hashed life events (F2/F5 plumbing).
+    var lifeLog: [LifeLogEntry] = []
+    /// Calendar day index of the last daily-presence award (once-per-day gate).
+    var lastPresenceDay: Int = -1
+    /// Calendar day index of the last first-greeting award (once-per-day gate).
+    var lastGreetingDay: Int = -1
+
     init(firstLaunch: Date = Date(), lastSeen: Date = Date()) {
         self.firstLaunch = firstLaunch
         self.lastSeen = lastSeen
+    }
+
+    /// Lenient decode (G8): every key is optional — a v15-era payload (or a
+    /// corrupt one) falls back to defaults instead of failing the load.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        firstLaunch = try c.decodeIfPresent(Date.self, forKey: .firstLaunch) ?? Date()
+        lastSeen = try c.decodeIfPresent(Date.self, forKey: .lastSeen) ?? Date()
+        sessions = try c.decodeIfPresent(Int.self, forKey: .sessions) ?? 0
+        streakDays = try c.decodeIfPresent(Int.self, forKey: .streakDays) ?? 0
+        sproutDays = try c.decodeIfPresent(Double.self, forKey: .sproutDays) ?? 0
+        rehearsalLevel = try c.decodeIfPresent(Int.self, forKey: .rehearsalLevel) ?? 0
+        trinketDay = try c.decodeIfPresent(Int.self, forKey: .trinketDay) ?? -1
+        usualHourEMA = try c.decodeIfPresent(Double.self, forKey: .usualHourEMA)
+        bondXP = try c.decodeIfPresent(Int.self, forKey: .bondXP) ?? 0
+        lifeLog = try c.decodeIfPresent([LifeLogEntry].self, forKey: .lifeLog) ?? []
+        lastPresenceDay = try c.decodeIfPresent(Int.self, forKey: .lastPresenceDay) ?? -1
+        lastGreetingDay = try c.decodeIfPresent(Int.self, forKey: .lastGreetingDay) ?? -1
+    }
+
+    /// Derived bond level (1...5) — F1: levels are felt, never displayed.
+    var bondLevel: Int { BondRules.level(forXP: bondXP) }
+
+    /// Appends a hashed life event to the ring buffer (cap 20, oldest drops).
+    mutating func appendLifeLog(_ entry: LifeLogEntry) {
+        lifeLog.append(entry)
+        if lifeLog.count > 20 { lifeLog.removeFirst(lifeLog.count - 20) }
     }
 }
 
@@ -48,9 +86,15 @@ nonisolated struct VisitSummary: Sendable {
     var trinketPresent: Bool
     /// Nimbus: is "now" within an hour of the learned usual return time?
     var nearUsualHour: Bool
+    /// v16 F1: derived bond level at this visit (drives director + traces).
+    var bondLevel: Int
+    /// v16: app age in whole days ("day 23" — the About line).
+    var dayCount: Int
     /// Interiority tuning for the painter (persistent traces).
     var tuning: InteriorityTuning {
-        InteriorityTuning(sproutGrowth: sproutGrowth, streakDays: streakDays, trinketPresent: trinketPresent)
+        InteriorityTuning(sproutGrowth: sproutGrowth, streakDays: streakDays,
+                          trinketPresent: trinketPresent,
+                          confidantMemento: BondRules.isConfidant(bondLevel))
     }
 }
 
@@ -78,6 +122,13 @@ nonisolated final class CompanionMemoryStore: @unchecked Sendable {
     /// Calendar-day distance between dates (0 = same day, 1 = yesterday).
     static func dayDistance(from: Date, to: Date, calendar: Calendar = .current) -> Int {
         calendar.dateComponents([.day], from: calendar.startOfDay(for: from), to: calendar.startOfDay(for: to)).day ?? 0
+    }
+
+    /// Calendar day index (startOfDay / 86400) — the deterministic once-per-day
+    /// gate for F1 rituals and the life-log entries (never a wall-clock read
+    /// inside the engine; `now` is always injected).
+    static func dayIndex(of date: Date, calendar: Calendar = .current) -> Int {
+        Int(calendar.startOfDay(for: date).timeIntervalSince1970 / 86_400)
     }
 
     /// Records this visit and computes what the companion has been doing
@@ -129,6 +180,11 @@ nonisolated final class CompanionMemoryStore: @unchecked Sendable {
         }
         let nearUsualHour = abs(hour - (memory.usualHourEMA ?? hour)) <= 1.0
 
+        // v16 F1: visiting is itself a ritual — one daily-presence award per
+        // calendar day (G4: absence never costs bond; the award is simply
+        // not repeated within the same day).
+        _ = BondRules.award(&memory, .dailyPresence, now: now, calendar: calendar)
+
         memory.lastSeen = now
         save(memory)
 
@@ -139,7 +195,9 @@ nonisolated final class CompanionMemoryStore: @unchecked Sendable {
             sproutGrowth: growth,
             rehearsalLevel: memory.rehearsalLevel,
             trinketPresent: trinketPresent,
-            nearUsualHour: nearUsualHour
+            nearUsualHour: nearUsualHour,
+            bondLevel: memory.bondLevel,
+            dayCount: Self.dayDistance(from: memory.firstLaunch, to: now, calendar: calendar) + 1
         )
     }
 }

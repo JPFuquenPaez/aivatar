@@ -83,24 +83,28 @@ nonisolated struct CompanionSprite: Sendable, Equatable {
     /// re-expressed as authored cells on the sprite grid — memory is an
     /// input, so these compose with any frame deterministically.
     func interiorityDiffs(_ t: InteriorityTuning) -> [CellDiff] {
+        var diffs: [CellDiff]
         switch archetype {
         case .willow:
             // The tended sprout on top of the head, between the domes.
-            guard t.sproutGrowth >= 0.6 else { return [] }
-            var diffs = [CellDiff(10, 0, "A")]
+            guard t.sproutGrowth >= 0.6 else { diffs = [] ; break }
+            diffs = [CellDiff(10, 0, "A")]
             if t.sproutGrowth >= 1.0 { diffs.append(CellDiff(11, 0, "A")) }
-            return diffs
         case .compass:
             // The audit week: up to 7 cells under the body, lit days in
             // accent, pending days in ink.
-            guard t.streakDays > 0 else { return [] }
-            return (0..<7).map { CellDiff(5 + $0, 14, $0 < min(t.streakDays, 7) ? "A" : "K") }
+            guard t.streakDays > 0 else { diffs = [] ; break }
+            diffs = (0..<7).map { CellDiff(5 + $0, 14, $0 < min(t.streakDays, 7) ? "A" : "K") }
         case .prism:
             // The found trinket, held beside the head.
-            return t.trinketPresent ? [CellDiff(12, 4, "A"), CellDiff(12, 5, "A")] : []
+            diffs = t.trinketPresent ? [CellDiff(12, 4, "A"), CellDiff(12, 5, "A")] : []
         default:
-            return []
+            diffs = []
         }
+        // v16 F1: the confidant memento — one accent cell below the body
+        // (cell 9,16 is empty in every base grid; pinned by test).
+        if t.confidantMemento { diffs.append(CellDiff(9, 16, "A")) }
+        return diffs
     }
 
     /// Parses a 6-digit hex string (with or without '#') into 8-bit RGB.

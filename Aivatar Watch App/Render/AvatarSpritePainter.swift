@@ -69,6 +69,9 @@ nonisolated struct InteriorityTuning: Sendable {
     /// Prism's found trinket: the day's small discovery, presented on
     /// return. Hidden by default.
     var trinketPresent = false
+    /// v16 F1 level 5 ("confidant"): the companion keeps a small pixel
+    /// memento of the naming day — one accent cell below the body.
+    var confidantMemento = false
 
     static let `default` = InteriorityTuning()
 }

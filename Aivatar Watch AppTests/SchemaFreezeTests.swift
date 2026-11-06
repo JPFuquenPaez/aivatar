@@ -155,6 +155,30 @@ final class SchemaFreezeTests: XCTestCase {
         XCTAssertLessThan(total, 8_000_000, "avatar bundle must be <= 8 MB")
     }
 
+    /// v16 memory schema v3 (Ambient Life F1, G8): additive fields with
+    /// lenient decode — a v15 payload (no bondXP/lifeLog/ritual-day keys)
+    /// still decodes, defaulted, and the v3 keys round-trip when present.
+    func testCompanionMemorySchemaV3IsAdditive() throws {
+        let legacy = """
+        {"firstLaunch":1793620800,"lastSeen":1793620800,"sessions":3,"streakDays":2,
+         "sproutDays":4.0,"rehearsalLevel":0,"trinketDay":-1,"usualHourEMA":null}
+        """.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(CompanionMemory.self, from: legacy)
+        XCTAssertEqual(decoded.bondXP, 0)
+        XCTAssertEqual(decoded.lifeLog, [])
+        XCTAssertEqual(decoded.lastPresenceDay, -1)
+        XCTAssertEqual(decoded.lastGreetingDay, -1)
+        XCTAssertEqual(decoded.bondLevel, 1)
+
+        var full = CompanionMemory(firstLaunch: Date(timeIntervalSince1970: 1793620800),
+                                   lastSeen: Date(timeIntervalSince1970: 1793620800))
+        full.bondXP = 60
+        full.appendLifeLog(LifeLogEntry(kindHash: 7, dayIndex: 20_800))
+        let data = try JSONEncoder().encode(full)
+        XCTAssertEqual(try JSONDecoder().decode(CompanionMemory.self, from: data), full)
+        XCTAssertEqual(full.bondLevel, 4)
+    }
+
     /// ArchetypeVisualSet resolves palette tokens from the profile.
     func testVisualSetResolvesPalette() throws {
         let profile = try PersonalityProfile.load(.ember, bundle: .main)

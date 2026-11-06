@@ -21,6 +21,15 @@ struct SettingsView: View {
         companionName.isEmpty ? archetype.displayName : companionName
     }
 
+    /// v16 F1: "Ember · day 23 · old friends" — the About line. Bond is
+    /// never a meter; at the confidant level the line says so in words.
+    private var aboutLine: String {
+        let memory = CompanionMemoryStore().load()
+        let days = memory.map { CompanionMemoryStore.dayDistance(from: $0.firstLaunch, to: Date()) + 1 } ?? 1
+        let confidant = memory.map { BondRules.isConfidant($0.bondLevel) } ?? false
+        return "\(stageName) · day \(days)" + (confidant ? " · old friends" : "")
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -71,6 +80,10 @@ struct SettingsView: View {
                         .font(.footnote)
                 }
                 Section("About") {
+                    // v16 F1: one gentle line — day count only, never levels
+                    // or numbers of trust ("old friends" is the whole story).
+                    Text(aboutLine)
+                        .font(.footnote)
                     Text("Aivatar is procedural — no clip files, everything you see is generated live from a shared rig.")
                         .font(.footnote)
                     Text("Tip: touch and hold your companion to share a slow blink — its trust ritual.")

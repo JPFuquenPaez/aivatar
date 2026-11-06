@@ -45,4 +45,20 @@ final class HapticsChannel {
     func notify() {
         WKInterfaceDevice.current().play(.notification)
     }
+
+    /// v16 F1/F7 bond moment (ritual completed or level-up): a two-step
+    /// rising pair. Haptics fire only on this state transition — never
+    /// ambient patter (platform guideline; ≤ 1 per interaction).
+    func bond() {
+        WKInterfaceDevice.current().play(.directionUp)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            WKInterfaceDevice.current().play(.success)
+        }
+    }
+
+    /// v16 F1 farewell (wrist drop): one soft stop — the pet saying goodnight.
+    func farewell() {
+        WKInterfaceDevice.current().play(.stop)
+    }
 }

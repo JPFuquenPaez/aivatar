@@ -52,6 +52,13 @@ struct AvatarStageView: View {
     /// v12 presence: the streak days of the visit record, republished to
     /// the complication when the name changes.
     @State private var lastStreakDays = 0
+    /// v16 F1 ritual bonding: the current bond level (memory-derived input
+    /// for the director) and the once-per-session farewell gate.
+    @State private var bondLevel = 1
+    @State private var farewellAwardedThisSession = false
+    /// v16 F1: transient VoiceOver announcement for bond moments (watchOS has
+    /// no UIAccessibility.post — the single stage element's label carries it).
+    @State private var bondAnnouncement = ""
 
     /// v14 sonic presence: the one-a-lifetime creation point — state
     /// changes surface as the on-stage listening tell.
@@ -125,6 +132,9 @@ struct AvatarStageView: View {
         // v15: session memory becomes visible sprite cells (sprout /
         // week grid / trinket) — memory is an input to the director too.
         spriteDirector.interiority = summary.tuning
+        // v16 F1: bond level rides in as a director input (memory-as-input).
+        bondLevel = summary.bondLevel
+        spriteDirector.bondLevel = summary.bondLevel
         soundSource?.bind(director: spriteDirector)
         // Phase B: notification events reach this engine via the
         // session registry (§13 port); re-registering replaces any
@@ -288,6 +298,10 @@ struct AvatarStageView: View {
             .onLongPressGesture(minimumDuration: 0.5) {
                 context?.engine.handleEvent(.gesture(name: "slowBlink"))
                 director?.handleEvent(.gesture(name: "slowBlink"))
+                // v16 F1: the slow-blink ritual also grows bond (once-per-day
+                // rituals are gated inside BondRules; this one is per-hold).
+                awardRitual(.slowBlink)
+                director?.handleRitual(.slowBlink)
             }
             // v6 touch-gaze: a spatial tap sends the normalized touch
             // direction so the avatar's eyes dart to the finger (§9
@@ -306,6 +320,9 @@ struct AvatarStageView: View {
                         director?.handleEvent(.gazeAt(x: nx, y: ny))
                         director?.handleEvent(.tap)
                         HapticsChannel.shared.react(to: archetype)
+                        // v16 F1: the day's first greeting is a bond ritual.
+                        awardRitual(.firstGreetingOfDay)
+                        director?.handleRitual(.firstGreetingOfDay)
                         afterFirstInteraction()
                     }
             )
@@ -313,15 +330,35 @@ struct AvatarStageView: View {
                 context?.engine.handleEvent(.tap)
                 director?.handleEvent(.tap)
                 HapticsChannel.shared.react(to: archetype)
+                awardRitual(.firstGreetingOfDay)
+                director?.handleRitual(.firstGreetingOfDay)
                 afterFirstInteraction()
             }
             .accessibilityAction(named: "Play signature move") {
                 performQuirk()
             }
+            // v16 F1/G6: the slow-blink ritual is never gesture-only — under
+            // Reduce Motion L2 it is a VoiceOver custom action (bond accrues).
+            .accessibilityAction(named: "Share a slow blink") {
+                context?.engine.handleEvent(.gesture(name: "slowBlink"))
+                director?.handleEvent(.gesture(name: "slowBlink"))
+                awardRitual(.slowBlink)
+                director?.handleRitual(.slowBlink)
+            }
             .onChange(of: isLuminanceReduced) { reduced in
                 isResting = reduced && !Self.forceAwake
                 // v14: the mic NEVER runs into the Always On rest state.
                 syncSoundPresence()
+                // v16 F1: the wrist-drop farewell, acknowledged once per
+                // session when it is seen in full — a soft goodnight tick.
+                if reduced, !Self.forceAwake, !farewellAwardedThisSession {
+                    farewellAwardedThisSession = true
+                    awardRitual(.farewellAcknowledged)
+                    director?.handleRitual(.farewellAcknowledged)
+                    HapticsChannel.shared.farewell()
+                } else if !reduced {
+                    farewellAwardedThisSession = false
+                }
             }
             .onAppear {
                 isResting = isLuminanceReduced
@@ -419,11 +456,47 @@ struct AvatarStageView: View {
     /// The naming ceremony's answer: the companion celebrates its new
     /// name (§10.5.1 — the moment personalization becomes ownership).
     /// The complication learns the new name immediately (v12 presence).
+    /// v16 F1: the ceremony is the one-time large bond grant.
     private func celebrateNaming() {
         context?.engine.handleEvent(.gesture(name: "sparkle"))
         director?.handleEvent(.gesture(name: "sparkle"))
         HapticsChannel.shared.react(to: archetype)
+        awardRitual(.namingCeremony)
+        director?.handleRitual(.namingCeremony)
         publishCompanionWidgetState(streakDays: lastStreakDays)
+    }
+
+    /// v16 F1: awards a bond ritual against the persistent memory (pure
+    /// BondRules call — deterministic under the real clock at the shell),
+    /// then feeds the new level to the director and, on a level-up, plays
+    /// the bond haptic and announces it to VoiceOver ("trusts you more").
+    /// No numbers are ever shown on the stage (G4: felt, not read).
+    @MainActor
+    private func awardRitual(_ ritual: BondRitual) {
+        let store = CompanionMemoryStore()
+        var memory = store.load() ?? CompanionMemory()
+        let award = BondRules.award(&memory, ritual)
+        store.save(memory)
+        guard award.xpGained > 0 else { return }
+        bondLevel = award.newLevel
+        director?.bondLevel = award.newLevel
+        if award.leveledUp {
+            HapticsChannel.shared.bond()
+            announce("\(stageName) trusts you more")
+        }
+    }
+
+    /// One VoiceOver announcement for bond moments. watchOS has no
+    /// UIAccessibility.post, so the announcement rides the stage's single
+    /// accessibility label for a few seconds — VoiceOver re-reads the label
+    /// when it changes while focused.
+    @MainActor
+    private func announce(_ text: String) {
+        bondAnnouncement = text
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            if bondAnnouncement == text { bondAnnouncement = "" }
+        }
     }
 
     private func performQuirk() {
@@ -434,13 +507,19 @@ struct AvatarStageView: View {
 
     private var accessibilityText: String {
         let kind = "your \(archetype.animalName) companion"
+        var text: String
         if isResting {
-            return "\(stageName), \(kind), is resting"
+            text = "\(stageName), \(kind), is resting"
+        } else if isListening {
+            text = "\(stageName), \(kind), is listening for sounds"
+        } else {
+            text = "\(stageName), \(kind), is calm"
         }
-        if isListening {
-            return "\(stageName), \(kind), is listening for sounds"
+        // v16 F1: bond level-ups are announced, not displayed.
+        if !bondAnnouncement.isEmpty {
+            text += ". \(bondAnnouncement)"
         }
-        return "\(stageName), \(kind), is calm"
+        return text
     }
 }
 

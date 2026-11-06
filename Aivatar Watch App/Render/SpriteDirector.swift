@@ -71,6 +71,19 @@ nonisolated final class SpriteDirector {
     /// sprite overlay cells. Memory is an input — never wall-clock here.
     var interiority: InteriorityTuning = .default
 
+    /// v16 F1: bond level (1...5) as a director input — memory-derived,
+    /// clamped. It biases the idle schedule: a bonded companion quirks more
+    /// (its signature is in the rotation) and glances away less (it looks
+    /// at you more). Pure input, so goldens stay deterministic.
+    private var _bondLevel = 1
+    var bondLevel: Int {
+        get { _bondLevel }
+        set { _bondLevel = min(max(newValue, 1), BondRules.maxLevel) }
+    }
+    /// The last ritual ack played (F1) — test/VoiceOver surface.
+    private(set) var lastRitual: BondRitual?
+    private(set) var ritualCount = 0
+
     init(profile: PersonalityProfile, seed: UInt64) {
         let resolved = Archetype(rawValue: profile.id) ?? .ember
         archetype = resolved
@@ -107,8 +120,12 @@ nonisolated final class SpriteDirector {
         // Idle schedule (draw order fixed: blink, glance, quirk). A firing
         // act preempts the floor frame; draws only run on idle ticks.
         scheduledIdle = scheduledIdleFrame()
-        let glanceMul: Float = mood == .bored ? 2 : (mood == .lonely ? 0.3 : 1)
-        let eventMul: Float = mood == .playful ? 2 : (mood == .lonely ? 1.5 : 1)
+        // v16 F1: bond biases the idle schedule — higher bond, more signature
+        // quirks, fewer glances away (the companion looks at you more).
+        let glanceMul: Float = (mood == .bored ? 2 : (mood == .lonely ? 0.3 : 1))
+            * BondRules.glanceAwayMultiplier(bondLevel)
+        let eventMul: Float = (mood == .playful ? 2 : (mood == .lonely ? 1.5 : 1))
+            * BondRules.quirkRateMultiplier(bondLevel)
         if rng.nextFloat() < blinkP {
             play(.blink)
         } else if mode != .reduceMotionL2, rng.nextFloat() < glanceP * glanceMul {
@@ -225,6 +242,21 @@ nonisolated final class SpriteDirector {
         }
     }
 
+    /// F1 ritual ack (v16): the stage awards bond through BondRules and
+    /// tells the director to play the ritual's act. Every ritual gets a
+    /// visible answer within one tick — rituals are never gesture-only.
+    func handleRitual(_ ritual: BondRitual) {
+        markInteraction()
+        lastRitual = ritual
+        ritualCount += 1
+        switch ritual {
+        case .slowBlink, .farewellAcknowledged:
+            play(.slowBlink)
+        case .firstGreetingOfDay, .namingCeremony, .dailyPresence:
+            play(.happy)
+        }
+    }
+
     func setResting(_ value: Bool) {
         resting = value
         if value {
@@ -324,7 +356,8 @@ nonisolated final class SpriteDirector {
         case .perk:
             queue = [("perk", 3), ("idle", 1)]
         case .farewell:
-            queue = [("idle", 1), ("blink", 2), ("sleepy", 12)]
+            // v16 F1: level 4+ earns a longer goodbye bloom.
+            queue = [("idle", 1), ("blink", 2), ("sleepy", BondRules.farewellBloomTicks(bondLevel))]
         }
         actCount += 1
     }

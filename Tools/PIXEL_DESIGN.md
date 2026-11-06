@@ -164,6 +164,34 @@ reference mascot — the Mistral cat: a 16x14 logical grid, 5 colors,
   mood transitions + determinism, poke/yawn rate caps, wind-up
   invariant, mote spawn/chase/fade + duty cycle, overlay budgets.
 
+## 7.3 Ritual bonding (v16, Ambient Life F1) — bond is felt, never metered
+
+- **Rituals, not resources**: bond grows only through micro-rituals —
+  the long-press slow blink, the day's first greeting, the acknowledged
+  farewell (once per session), the one-time naming ceremony, and daily
+  presence (opening the app once a day). There is no hunger, no decay,
+  no death — absence never reduces anything (G4 is structural: bond XP
+  is monotonic, there is no code path that subtracts).
+- **Levels are invisible on the stage**: no XP bar, no numbers, no
+  streak flame. What changes is behavior — L2+: the signature quirk
+  joins the idle rotation (rate ×1.5→×3), L3+: the companion glances
+  away less (it looks at you more), L4+: the farewell bloom holds
+  longer, L5 ("confidant"): a one-cell accent memento below the body
+  (cell 9,16 — pinned empty in every base grid) and the About line
+  "· old friends".
+- **Every ritual answers within one tick** (150 ms): slow blink →
+  the watchable slow blink, greetings/naming → happy, farewell → the
+  acknowledging blink. Under Reduce Motion L2 the ritual is a
+  VoiceOver custom action ("Share a slow blink") — never gesture-only.
+- **Announcements, not UI**: a level-up plays the two-step bond haptic
+  and posts one VoiceOver announcement ("Ember trusts you more").
+- **Memory schema v3 is additive**: `bondXP`, `lifeLog` (ring of 20
+  hashed entries), and the two once-per-day gates decode with defaults
+  from v15 payloads (G8); `SchemaFreezeTests` pins the contract.
+- Verify: `BondRulesTests` — XP table, thresholds, monotonicity,
+  once-per-day gates, level-up crossing, legacy decode, ring cap,
+  director bond bias + determinism, memento cell, sequence goldens.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,
