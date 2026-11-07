@@ -95,8 +95,7 @@ final class HapticsAndPostcardTests: XCTestCase {
                 XCTAssertEqual(first, pin, "\(archetype.rawValue) postcard changed")
             }
         }
-        XCTAssertTrue(expected.values.allSatisfy { $0 != 0 },
-                      "RECORD MODE — postcard pins: " + recorded.joined(separator: ", "))
+        PinRecorder.requirePinned(expected, recorded: recorded.joined(separator: ", "), label: "postcard pins")
     }
 
     func testPostcardCaptionLintAndPrivacy() {

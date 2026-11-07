@@ -307,9 +307,6 @@ final class BondRulesTests: XCTestCase {
                 XCTAssertEqual(value, pin, "\(archetype.rawValue) bond-level-3 sequence changed")
             }
         }
-        XCTAssertTrue(
-            expected.values.allSatisfy { $0 != 0 },
-            "RECORD MODE — bond sequence hashes to pin: " + recorded.joined(separator: ", ")
-        )
+        PinRecorder.requirePinned(expected, recorded: recorded.joined(separator: ", "), label: "bond sequence hashes")
     }
 }

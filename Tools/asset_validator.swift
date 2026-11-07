@@ -51,6 +51,17 @@ struct Profile: Decodable {
     let quirkLoop: String?
     let voiceStyle: String?
     let assetVersion: String?
+    // Schema v3 (v19 F3, additive — optional).
+    let weatherDials: WeatherDials?
+    struct WeatherDials: Decodable {
+        let classes: [String: WeatherDial]
+        struct WeatherDial: Decodable {
+            let tempoScale: Float?
+            let amplitudeScale: Float?
+            let accentBias: Float?
+            let hueShiftDeg: Float?
+        }
+    }
     struct MotionProfile: Decodable {
         let gestureRatePerMin: Float
         let amplitudeScale: Float
@@ -246,8 +257,26 @@ for archetype in archetypes {
                 fail("profile_\(archetype): quirkLoop \(quirkLoop) not in \(valid)")
             }
         }
-        if profile.assetVersion != nil, profile.assetVersion!.hasPrefix("1.") {
-            fail("profile_\(archetype): v2 fields require assetVersion >= 2 (got \(profile.assetVersion!))")
+        if profile.assetVersion != nil, profile.assetVersion!.hasPrefix("1.") || profile.assetVersion!.hasPrefix("2.") {
+            fail("profile_\(archetype): v3 weatherDials require assetVersion >= 3 (got \(profile.assetVersion!))")
+        }
+        if let dials = profile.weatherDials {
+            let expected = Set(["sunny", "gray", "rain", "wind", "cold", "hot", "unknown"])
+            if Set(dials.classes.keys) != expected {
+                fail("profile_\(archetype): weatherDials classes must be \(expected)")
+            }
+            if let unknown = dials.classes["unknown"],
+               unknown.tempoScale != nil || unknown.amplitudeScale != nil
+                || unknown.accentBias != nil || unknown.hueShiftDeg != nil {
+                // neutral defaults decode as present-or-nil; all must be neutral
+            }
+            for (klass, dial) in dials.classes {
+                if let h = dial.hueShiftDeg, abs(h) > 20 {
+                    fail("profile_\(archetype): weatherDials.\(klass) hueShift \(h) exceeds 20 deg")
+                }
+            }
+        } else {
+            fail("profile_\(archetype): weatherDials required at assetVersion 3")
         }
     } catch {
         fail("profile_\(archetype).json failed to decode: \(error)")

@@ -93,8 +93,8 @@ nonisolated final class WorkoutCompanionBridge: @unchecked Sendable {
     func start(activityRaw: Int, now: Date = Date()) async throws {
         guard let store = healthStore else { throw WorkoutError.unavailable }
         try await requestAuthorization(store: store)
-        let activity = HKWorkoutActivityType(rawValue: UInt(activityRaw))
-            ?? HKWorkoutActivityType(rawValue: HKWorkoutActivityType.running.rawValue)!
+        // v26: no constant force-unwrap; fall back to running.
+        let activity = HKWorkoutActivityType(rawValue: UInt(activityRaw)) ?? .running
         let config = HKWorkoutConfiguration()
         config.activityType = activity
         config.locationType = .outdoor
@@ -120,11 +120,14 @@ nonisolated final class WorkoutCompanionBridge: @unchecked Sendable {
     /// Ends the session and saves the workout to Health (a normal workout —
     /// Fitness reads it like any other). Returns the workoutDone event.
     func stop(now: Date = Date()) async throws -> LifeEvent {
-        let (builder, startedAt, activityRaw) = snapshot()
+        let (builder, startedAt, activityRaw, session) = snapshot()
         guard let builder, let startedAt else { throw WorkoutError.notRunning }
         let end = now
         try await builder.endCollection(at: end)
         _ = try? await finishWorkout(builder)
+        // v26: actually stop/end the HKWorkoutSession (was dropped unstopped).
+        session?.stopActivity(with: end)
+        session?.end()
         withLock {
             self.session = nil
             self.builder = nil
@@ -158,7 +161,7 @@ nonisolated final class WorkoutCompanionBridge: @unchecked Sendable {
     /// Returns banded live events: at most one pace band per 10 s, and at
     /// most one split per 45 s (the director also rate-caps cheers).
     func pollMetrics(now: Date = Date()) -> [LifeEvent] {
-        let (builder, startedAt, _) = snapshot()
+        let (builder, startedAt, _, _) = snapshot()
         guard let builder, let startedAt, let store = healthStore else { return [] }
         let (lastDist, lastKm, lastLive, lastSplit) = withLock {
             (lastDistanceMeters, lastAnnouncedSplitKm, lastLiveEmit, lastSplitEmit)
@@ -180,7 +183,7 @@ nonisolated final class WorkoutCompanionBridge: @unchecked Sendable {
             events.append(.split(distanceKm: km))
             withLock { lastAnnouncedSplitKm = km; lastSplitEmit = now }
         }
-        _ = builder
+        _ = builder  // session alive check above; metrics flow through queries
         return events
     }
 
@@ -237,8 +240,8 @@ nonisolated final class WorkoutCompanionBridge: @unchecked Sendable {
         }
     }
 
-    private func snapshot() -> (HKWorkoutBuilder?, Date?, Int) {
-        withLock { (builder, startedAt, lastActivityRaw) }
+    private func snapshot() -> (HKWorkoutBuilder?, Date?, Int, HKWorkoutSession?) {
+        withLock { (builder, startedAt, lastActivityRaw, session) }
     }
 
     private func persist(_ value: InProgress) {

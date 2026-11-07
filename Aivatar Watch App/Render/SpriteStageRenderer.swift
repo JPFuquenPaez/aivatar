@@ -121,7 +121,9 @@ struct SpriteStageRenderer: View {
         farewellGeneration += 1
         let generation = farewellGeneration
         farewellStartedAt = Date()
-        farewellTotalSeconds = 15 * SpriteDirector.tickDuration  // idle 1 + blink 2 + sleepy 12
+        // v26: the ramp matches the bonded bloom (idle 1 + blink 2 + sleepy N),
+        // so a level-4+ goodbye doesn't get cut off mid-ramp.
+        farewellTotalSeconds = Double(3 + BondRules.farewellBloomTicks(director.bondLevel)) * SpriteDirector.tickDuration
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(farewellTotalSeconds * 1_000_000_000))
             guard generation == farewellGeneration else { return }

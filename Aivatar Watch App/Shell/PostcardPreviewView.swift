@@ -1,14 +1,17 @@
 import SwiftUI
 
-/// PostcardPreviewView (v22, F8): the watch-side preview of the user's
-/// deterministic postcard — the real rendered companion plus the
-/// auto-generated caption. The shareable export (looping card via the
-/// share sheet) lands with the iPhone companion shell; the composer behind
-/// this preview is the same bit-exact path (pinned by tests).
+/// PostcardPreviewView (v22 F8, v26 animated): the watch-side preview of the
+/// user's deterministic postcard — now playing the ACTUAL composed card
+/// (PostcardComposer.frames, the same bit-exact run the export will use) at
+/// the 150 ms director clock, plus the auto-generated caption. The
+/// share-sheet export lands with the iPhone companion shell.
 struct PostcardPreviewView: View {
     let archetype: Archetype
 
     @AppStorage("companionName") private var companionName = ""
+
+    @State private var frames: [CGImage] = []
+    @State private var start = Date()
 
     private var name: String {
         companionName.isEmpty ? archetype.displayName : companionName
@@ -34,13 +37,16 @@ struct PostcardPreviewView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            if let image = CompanionIcon.image(for: archetype) {
-                image
-                    .resizable()
-                    .interpolation(.none)
-                    .scaledToFit()
-                    .frame(width: 60, height: 54)
+            TimelineView(.animation(minimumInterval: SpriteDirector.tickDuration)) { timeline in
+                let idx = frames.isEmpty ? 0
+                    : Int(timeline.date.timeIntervalSince(start) / SpriteDirector.tickDuration) % frames.count
+                if !frames.isEmpty {
+                    Image(decorative: frames[idx], scale: 1)
+                        .interpolation(.none)
+                        .accessibilityHidden(true)
+                }
             }
+            .frame(width: 60, height: 54)
             Text(PostcardComposer.caption(inputs))
                 .font(.footnote)
                 .multilineTextAlignment(.center)
@@ -50,6 +56,12 @@ struct PostcardPreviewView: View {
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 12)
+        .onAppear {
+            // Compose the card once (deterministic), then play it.
+            frames = PostcardComposer.frames(inputs)
+                .compactMap { CompanionIcon.cgImage(for: archetype, grid: $0) }
+            start = Date()
+        }
     }
 }
 

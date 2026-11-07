@@ -1455,12 +1455,9 @@ final class GoldenFrameTests: XCTestCase {
         }
 
         let recorded = Archetype.allCases
-            .map { "\($0.rawValue) = \(actual[$0]!)" }
+            .map { PinRecorder.line($0, actual) }
             .joined(separator: ", ")
-        XCTAssertTrue(
-            expected.values.allSatisfy { $0 != 0 },
-            "RECORD MODE — golden hashes to pin: \(recorded)"
-        )
+        PinRecorder.requirePinned(expected, recorded: recorded, label: "golden hashes")
     }
 
     func testGoldenFramesAreDeterministicAcrossEngines() throws {
@@ -1663,16 +1660,13 @@ final class PixelStageTests: XCTestCase {
             actual[archetype] = hash(bytes)
             let pin = expected[archetype] ?? 0
             if pin != 0 {
-                XCTAssertEqual(actual[archetype]!, pin, "\(archetype.rawValue) pixel frame changed")
+                XCTAssertEqual(actual[archetype] ?? 0, pin, "\(archetype.rawValue) pixel frame changed")
             }
         }
         let recorded = Archetype.allCases
-            .map { "\($0.rawValue) = \(actual[$0]!)" }
+            .map { PinRecorder.line($0, actual) }
             .joined(separator: ", ")
-        XCTAssertTrue(
-            expected.values.allSatisfy { $0 != 0 },
-            "RECORD MODE — pixel hashes to pin: \(recorded)"
-        )
+        PinRecorder.requirePinned(expected, recorded: recorded, label: "pixel hashes")
     }
 
     func testPixelFramesAreDeterministic() throws {

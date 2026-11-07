@@ -17,6 +17,8 @@ struct ContentView: View {
         let seed = UInt64(value(after: "-spike-seed", in: args) ?? "") ?? 20261010
 
         return Group {
+            // v26: spike views are debug-only — never routable in release.
+            #if DEBUG
             switch renderer {
             case "canvas":
                 CanvasGreyboxSpikeView(seed: seed, frameBudget: frames)
@@ -25,6 +27,9 @@ struct ContentView: View {
             default:
                 AvatarStageView(archetype: launchArchetype(args))
             }
+            #else
+            AvatarStageView(archetype: launchArchetype(args))
+            #endif
         }
         .onAppear {
             spikeLogger.log("AIVATAR-SPIKE: root appear args=\(args.joined(separator: "|"), privacy: .public) renderer=\(renderer ?? "nil", privacy: .public)")
@@ -40,18 +45,5 @@ struct ContentView: View {
     private func value(after flag: String, in args: [String]) -> String? {
         guard let index = args.firstIndex(of: flag), index + 1 < args.count else { return nil }
         return args[index + 1]
-    }
-}
-
-/// Interim stage placeholder; replaced by `AvatarStageView` in A2.
-private struct PlaceholderView: View {
-    var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: "person.crop.circle")
-                .font(.title2)
-                .foregroundStyle(.tint)
-            Text("Aivatar")
-                .font(.title3)
-        }
     }
 }

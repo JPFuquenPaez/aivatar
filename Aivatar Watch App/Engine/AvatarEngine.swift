@@ -227,7 +227,10 @@ nonisolated final class AvatarEngine {
             telemetry.record(counter: "avatar.event.gazeAt", value: 1)
             return
         }
+        // v26: the live stage never steps the engine, so cap the queue —
+        // an unbounded append here would be a slow leak per event.
         pendingEvents.append(event)
+        if pendingEvents.count > 64 { pendingEvents.removeFirst(pendingEvents.count - 64) }
         telemetry.record(counter: "avatar.event.\(event)", value: 1)
     }
 

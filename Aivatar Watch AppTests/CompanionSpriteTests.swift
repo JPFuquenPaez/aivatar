@@ -108,10 +108,7 @@ final class CompanionSpriteTests: XCTestCase {
                 XCTAssertEqual(value, pin, "\(archetype.rawValue) authored idle grid changed")
             }
         }
-        XCTAssertTrue(
-            expected.values.allSatisfy { $0 != 0 },
-            "RECORD MODE — sprite hashes to pin: " + recorded.joined(separator: ", ")
-        )
+        PinRecorder.requirePinned(expected, recorded: recorded.joined(separator: ", "), label: "sprite hashes")
     }
 
     // MARK: - Frame craft

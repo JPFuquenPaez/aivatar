@@ -93,6 +93,40 @@ nonisolated enum CompanionIcon {
         return pixels
     }
 
+    /// Renders an arbitrary grid (e.g. a PostcardComposer frame) to a CGImage.
+    /// v26: the postcard preview plays the composed card, not a static icon.
+    static func cgImage(for archetype: Archetype, grid: [[Character]]) -> CGImage? {
+        let sprite = AuthoredSprites.sprite(for: archetype)
+        let w = CompanionSprite.gridWidth * cellScale
+        let h = CompanionSprite.gridHeight * cellScale
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        for y in 0..<min(grid.count, CompanionSprite.gridHeight) {
+            let row = grid[y]
+            for x in 0..<min(row.count, CompanionSprite.gridWidth) {
+                let symbol = row[x]
+                guard symbol != ".", let hex = sprite.paletteHex[symbol] else { continue }
+                let rgb = CompanionSprite.hexToRGB(hex)
+                for dy in 0..<cellScale {
+                    for dx in 0..<cellScale {
+                        let i = ((y * cellScale + dy) * w + x * cellScale + dx) * 4
+                        pixels[i] = rgb.r; pixels[i + 1] = rgb.g
+                        pixels[i + 2] = rgb.b; pixels[i + 3] = 255
+                    }
+                }
+            }
+        }
+        guard let data = CFDataCreate(kCFAllocatorDefault, pixels, pixels.count),
+              let provider = CGDataProvider(data: data) else { return nil }
+        return CGImage(
+            width: w, height: h,
+            bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: w * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider, decode: nil,
+            shouldInterpolate: false, intent: .defaultIntent
+        )
+    }
+
     /// PNG data of the rendered icon (ImageIO — no UIKit dependency), used
     /// to publish the complication icons into the shared app-group
     /// container (v12 presence pass; v18 adds the per-state variants).
