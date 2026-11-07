@@ -1,3 +1,4 @@
+import HealthKit
 import SwiftUI
 import WidgetKit
 
@@ -76,6 +77,10 @@ struct AvatarStageView: View {
     @State private var healthBridge: HealthSenseBridge?
     /// v18 F3: the weather bridge (watchOS 11+; dormant below).
     @State private var weatherBridge: WeatherSenseBridge?
+    /// v21 F6: Aivatar's own workout session bridge + live UI state.
+    @State private var workoutBridge: WorkoutCompanionBridge?
+    @State private var workoutActive = false
+    @State private var workoutElapsed: TimeInterval = 0
 
     init(archetype: Archetype? = nil) {
         launchOverride = archetype
@@ -91,6 +96,10 @@ struct AvatarStageView: View {
         // gives crown paging for free — stage on page 1, Settings on page 2.
         TabView {
             stage
+            // v21 F6: the workout page rides the same crown paging.
+            WorkoutPageView(archetype: archetype, active: workoutActive,
+                            elapsed: workoutElapsed,
+                            onStart: startWorkout, onStop: stopWorkout)
             SettingsView(archetype: archetype)
         }
         .tabViewStyle(.verticalPage(transitionStyle: .automatic))
@@ -104,6 +113,9 @@ struct AvatarStageView: View {
             }
             // v17 F2: a visit is a poll point — the bridges never loop.
             pollLifeSense()
+            // v21 F6: a force-quit workout is recovered on launch (the
+            // session itself cannot survive; the partial is finished).
+            recoverWorkoutIfNeeded()
         }
         .onChange(of: archetype) { _ in
             // Companion switch: each archetype is a distinct engine
@@ -327,6 +339,15 @@ struct AvatarStageView: View {
                         .padding(.horizontal, 12)
                         .transition(.opacity)
                 }
+                // v21 F6: the one number Aivatar shows during its own
+                // workout — elapsed time, system monospaced digits.
+                if workoutActive {
+                    Text(WorkoutPageView.format(workoutElapsed))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .padding(EdgeInsets(top: 6, leading: 0, bottom: 0, trailing: 10))
+                }
                 // v14: the visible listening tell — privacy is a design
                 // surface. One quiet waveform glyph while the mic is live.
                 if isListening {
@@ -524,23 +545,104 @@ struct AvatarStageView: View {
             events += weatherBridge?.poll(now: now) ?? []
         }
         guard !events.isEmpty else { return }
+        for event in events {
+            AvatarSession.shared.handleLifeEvent(event)
+            logLifeEvent(event, now: now)
+        }
+    }
+
+    /// Logs one life event into the memory ring (content-free hash) and
+    /// republishes the watch-face presence (v18 F4: an event flips the
+    /// complication's state + copy line).
+    @MainActor
+    private func logLifeEvent(_ event: LifeEvent, now: Date = Date()) {
         let store = CompanionMemoryStore()
         var memory = store.load() ?? CompanionMemory()
         let dayIndex = CompanionMemoryStore.dayIndex(of: now)
-        for event in events {
-            AvatarSession.shared.handleLifeEvent(event)
-            let classHash: Int? = {
-                if case .weatherClass(let h) = event { return h }
-                return nil
-            }()
-            memory.appendLifeLog(LifeLogEntry(
-                kindHash: LifeSenseMapping.kindHash(of: event), dayIndex: dayIndex, at: now,
-                classHash: classHash))
-        }
+        let classHash: Int? = {
+            if case .weatherClass(let h) = event { return h }
+            return nil
+        }()
+        memory.appendLifeLog(LifeLogEntry(
+            kindHash: LifeSenseMapping.kindHash(of: event), dayIndex: dayIndex, at: now,
+            classHash: classHash))
         store.save(memory)
-        // v18 F4: a life event flips the watch-face presence to "event" —
-        // republish so the complication carries the state + copy line.
         publishCompanionWidgetState()
+    }
+
+    // MARK: - Workout mode (v21, F6)
+
+    /// "Run with <name>" — starts Aivatar's own HKWorkoutSession (in-context
+    /// HealthKit ask on first use) and switches the director to the run
+    /// grammar. The workout page shows the honest controls; the stage shows
+    /// presence + a minimal elapsed corner.
+    @MainActor
+    private func startWorkout() {
+        guard !workoutActive else { return }
+        let bridge = WorkoutCompanionBridge()
+        workoutBridge = bridge
+        Task { @MainActor in
+            do {
+                try await bridge.start(activityRaw: Int(HKWorkoutActivityType.running.rawValue))
+                workoutActive = true
+                workoutElapsed = 0
+                director?.setWorkoutMode(true)
+                Task { @MainActor in
+                    await runMetricsLoop(bridge: bridge, startedAt: Date())
+                }
+            } catch {
+                workoutBridge = nil
+                // Health data unavailable or denied: no session, no pretend.
+            }
+        }
+    }
+
+    /// 10 s metrics cadence while the workout runs (G9: throttled, never a
+    /// stream). Splits cheer with one haptic; everything goes to the director.
+    @MainActor
+    private func runMetricsLoop(bridge: WorkoutCompanionBridge, startedAt: Date) async {
+        while workoutActive {
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            guard workoutActive else { break }
+            workoutElapsed = Date().timeIntervalSince(startedAt)
+            for event in bridge.pollMetrics() {
+                if case .split = event { HapticsChannel.shared.split() }
+                AvatarSession.shared.handleLifeEvent(event)
+            }
+        }
+    }
+
+    @MainActor
+    private func stopWorkout() {
+        guard let bridge = workoutBridge else { return }
+        Task { @MainActor in
+            do {
+                let done = try await bridge.stop()
+                workoutActive = false
+                director?.setWorkoutMode(false)
+                // The wind-down: celebration act + lifeLog + watch-face event.
+                AvatarSession.shared.handleLifeEvent(done)
+                logLifeEvent(done)
+            } catch {
+                workoutActive = false
+                director?.setWorkoutMode(false)
+            }
+        }
+    }
+
+    /// Force-quit recovery on launch: the session cannot survive the kill,
+    /// so a persisted in-progress marker is finished as a partial workout
+    /// (or discarded when too short to be real).
+    @MainActor
+    private func recoverWorkoutIfNeeded() {
+        let bridge = WorkoutCompanionBridge()
+        workoutBridge = bridge
+        Task { @MainActor in
+            for event in await bridge.recoverIfNeeded() {
+                AvatarSession.shared.handleLifeEvent(event)
+                logLifeEvent(event)
+            }
+        }
     }
 
     /// v14 sonic presence lifecycle: listen only while the app is the

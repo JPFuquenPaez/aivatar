@@ -61,4 +61,9 @@ final class HapticsChannel {
     func farewell() {
         WKInterfaceDevice.current().play(.stop)
     }
+
+    /// v21 F6 split cheer: one success-class beat per split.
+    func split() {
+        WKInterfaceDevice.current().play(.success)
+    }
 }

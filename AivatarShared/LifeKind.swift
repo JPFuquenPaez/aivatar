@@ -5,7 +5,7 @@ import Foundation
 /// complication's copy derivation (F4) and the app's lifeLog (v16/v17) key
 /// off exactly the same hash. FNV-1a is stable across runs and platforms.
 nonisolated enum LifeKind: String, Sendable, CaseIterable {
-    case calendarSoon, workoutDone, sleptWithWatch, weatherClass, workoutLive
+    case calendarSoon, workoutDone, sleptWithWatch, weatherClass, workoutLive, split
 
     /// Stable FNV-1a 64-bit hash as Int (payloads and log keys are content-free).
     static func hash(_ string: String) -> Int {

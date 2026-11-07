@@ -155,10 +155,10 @@ nonisolated final class SpriteDirector {
             * BondRules.quirkRateMultiplier(bondLevel) * weatherTempoMul
         if rng.nextFloat() < blinkP {
             play(.blink)
-        } else if mode != .reduceMotionL2, rng.nextFloat() < glanceP * glanceMul {
+        } else if mode != .reduceMotionL2, !workoutMode, rng.nextFloat() < glanceP * glanceMul {
             play(.look, direction: rng.nextFloat() < 0.5 ? -1 : 1)
             actCount += 1
-        } else if mode == .full, rng.nextFloat() < eventP * eventMul {
+        } else if mode == .full, !workoutMode, rng.nextFloat() < eventP * eventMul {
             play(.quirk)
             actCount += 1
         }
@@ -169,6 +169,11 @@ nonisolated final class SpriteDirector {
     /// L2 pins it to plain idle.
     private func scheduledIdleFrame() -> String {
         guard mode != .reduceMotionL2 else { return "idle" }
+        // v21 F6: in workout mode the floor is a run cycle (idleA/idleB
+        // alternating at the pace-band cadence) — no drift variants.
+        if workoutMode {
+            return (tick / Self.runCycleTicks(workoutPaceBand)) % 2 == 0 ? "idleA" : "idleB"
+        }
         let phase = tick % 18
         if phase == 8 || phase == 9 { return "breathe" }
         switch (tick / 55) % 3 {
@@ -196,22 +201,23 @@ nonisolated final class SpriteDirector {
             mood = .calm
         }
         // Lonely poke: one attention-seeking beat, rate-capped at ~36 s,
-        // never under Reduce Motion L2.
-        if mood == .lonely, mode != .reduceMotionL2,
+        // never under Reduce Motion L2 or during a workout.
+        if mood == .lonely, mode != .reduceMotionL2, !workoutMode,
            tick - lastLonelyPokeTick > 240, queue.isEmpty {
             lastLonelyPokeTick = tick
             queue = [("perk", 2), ("blink", 2), ("idle", 2)]
             actCount += 1
         }
         // One yawn per long unattended stretch (90 s idle, 4.5 min cooldown).
-        if mode != .reduceMotionL2, sinceInteraction > 600,
+        if mode != .reduceMotionL2, !workoutMode, sinceInteraction > 600,
            tick - lastYawnTick > 1800, queue.isEmpty {
             lastYawnTick = tick
             queue = [("yawn", 3), ("idle", 2)]
             actCount += 1
         }
-        // Self-play mote (v16): full mode only, never while an act plays.
-        if mode == .full, queue.isEmpty {
+        // Self-play mote (v16): full mode only, never while an act plays or
+        // during a workout (v21: one focal story — the run).
+        if mode == .full, !workoutMode, queue.isEmpty {
             if var mote = moteCell {
                 moteTicksLeft -= 1
                 if moteTicksLeft % 4 == 0 {
@@ -375,19 +381,58 @@ nonisolated final class SpriteDirector {
            let klass = ConditionClass.fromHash(classHash) {
             setCondition(klass)
         }
+        // v21 F6: live pace bands steer the run grammar (no act).
+        if case .workoutLive(let band) = event {
+            setWorkoutPaceBand(band)
+        }
         guard let act = Self.reactionAct(for: event, archetype: archetype) else { return }
         let kind = Self.kind(of: event)
-        if lifeActThisWake { return }
-        if let last = lastLifeActTick[kind], tick - last < Self.lifeEventCooldownTicks { return }
+        // During a workout the one-per-wake gate is off (the run is live);
+        // the per-kind cooldown still holds, and splits get a tighter one.
+        if !workoutMode && lifeActThisWake { return }
+        let cooldown = kind == .split ? Self.splitCooldownTicks : Self.lifeEventCooldownTicks
+        if let last = lastLifeActTick[kind], tick - last < cooldown { return }
         lastLifeActTick[kind] = tick
-        lifeActThisWake = true
+        if !workoutMode { lifeActThisWake = true }
         lifeEventCount += 1
+        if kind == .split { splitCount += 1 }
         curiousUntilTick = tick + 200
         if mode == .reduceMotionL2 {
             play(.blink)
         } else {
             play(act)
         }
+    }
+
+    /// Minimum ticks between split cheers (45 s at 150 ms — F6 split channel).
+    static let splitCooldownTicks = 300
+
+    // MARK: - Workout mode (v21, F6)
+
+    /// True while Aivatar's own workout session runs: the idle floor becomes
+    /// a run cycle (no random quirks/glances/motes — the run IS the motion;
+    /// splits are the only acts). Frame budget: the renderer drops to a
+    /// lower cadence in workout mode (G9 power).
+    private(set) var workoutMode = false
+    private(set) var workoutPaceBand = 2
+    private(set) var splitCount = 0
+
+    func setWorkoutMode(_ on: Bool, paceBand: Int = 2) {
+        workoutMode = on
+        if on {
+            moteCell = nil
+            setWorkoutPaceBand(paceBand)
+        }
+    }
+
+    /// Pace band 0...5 steers the run cadence (pure mapping, tested).
+    func setWorkoutPaceBand(_ band: Int) {
+        workoutPaceBand = min(max(band, 0), 5)
+    }
+
+    /// Run-cycle length in ticks for a pace band: faster pace, shorter cycle.
+    nonisolated static func runCycleTicks(_ paceBand: Int) -> Int {
+        max(2, 5 - min(max(paceBand, 0), 5))
     }
 
     /// The event's cooldown/log kind (LifeEvent carries values; the kind is
@@ -399,6 +444,7 @@ nonisolated final class SpriteDirector {
         case .sleptWithWatch: return .sleptWithWatch
         case .weatherClass: return .weatherClass
         case .workoutLive: return .workoutLive
+        case .split: return .split
         }
     }
 
@@ -429,7 +475,20 @@ nonisolated final class SpriteDirector {
             guard let klass = ConditionClass.fromHash(classHash) else { return nil }
             return Self.weatherAct(for: klass, archetype: archetype)
         case .workoutLive:
-            return nil                        // F6
+            return nil                        // pace bands steer the run, no act
+        case .split(let km):
+            return Self.splitCheer(distanceKm: km, archetype: archetype)
+        }
+    }
+
+    /// The split cheer (F6): one celebratory act per archetype.
+    nonisolated static func splitCheer(distanceKm: Int, archetype: Archetype) -> SpriteAct {
+        switch archetype {
+        case .ember: return .quirk        // a scamper of joy
+        case .willow: return .happy
+        case .compass: return .perk       // metronome keeps the beat
+        case .prism: return .look
+        case .nimbus: return .perk
         }
     }
 
@@ -484,7 +543,7 @@ nonisolated final class SpriteDirector {
 
     /// Life-event kinds (v17 F2) — the cooldown/log unit.
     nonisolated enum LifeEventKind: Hashable, Sendable {
-        case calendarSoon, workoutDone, sleptWithWatch, weatherClass, workoutLive
+        case calendarSoon, workoutDone, sleptWithWatch, weatherClass, workoutLive, split
     }
 
     /// The authored frame queue for one act (L2 degrades body accents to a

@@ -269,6 +269,23 @@ reference mascot — the Mistral cat: a 16x14 logical grid, 5 colors,
 - Verify: `WakeBeatTests` — selector priority/gates/lookback, caption
   lint, act mapping, sequence order + budget + skip + L2 + determinism.
 
+## 7.8 Workout mode (v21, Ambient Life F6) — presence during the run
+
+- **One focal story while running**: workout mode swaps the life floor to
+  a run cycle (idleA/idleB alternating at the pace-band cadence) and
+  suspends quirks, glances, motes, lonely pokes — the run IS the motion.
+  Splits are the only acts: one cheer + one haptic, hard-capped at 1/45 s.
+- **Bands, never numbers**: live metrics are polled at a 10 s cadence into
+  pace bands 0...5 (pure mapping) — the engine stays numeric-free. The only
+  number on the stage is elapsed mm:ss (system monospaced digits).
+- **Honest recovery**: the HKWorkoutSession cannot survive a force-quit;
+  a persisted in-progress marker is finished as a partial workout (or
+  discarded under 60 s) on next launch — pure decision, unit-tested.
+- **Power**: metrics at 10 s cadence, no streams, no background polling;
+  L2 flattens the run to static + blink (splits announced by VoiceOver).
+- Verify: `WorkoutModeTests` — pace bands, split detection, recovery
+  decisions, run grammar/cadence, split caps, L2, determinism.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,

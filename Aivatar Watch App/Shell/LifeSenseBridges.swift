@@ -23,6 +23,7 @@ nonisolated enum LifeSenseMapping {
         case .sleptWithWatch: return LifeKind.hash(of: .sleptWithWatch)
         case .weatherClass: return LifeKind.hash(of: .weatherClass)
         case .workoutLive: return LifeKind.hash(of: .workoutLive)
+        case .split: return LifeKind.hash(of: .split)
         }
     }
 

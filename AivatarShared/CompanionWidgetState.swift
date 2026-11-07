@@ -119,6 +119,7 @@ nonisolated enum CompanionStateDerivation {
             case .sleptWithWatch: return "slept beside you"
             case .weatherClass: return "checked the sky"
             case .workoutLive: return "ran with you"
+            case .split: return "lap done"
             case nil: return "noticed something"
             }
         }

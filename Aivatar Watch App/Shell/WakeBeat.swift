@@ -92,6 +92,7 @@ nonisolated enum WakeBeatSelector {
                 case .sleptWithWatch: return .sleptWithWatch
                 case .weatherClass: return .weatherClass(classHash: 0)
                 case .workoutLive: return .workoutLive(paceBand: 0)
+                case .split: return .split(distanceKm: 0)
                 }
             }()
             return [SpriteDirector.reactionAct(for: event, archetype: archetype) ?? .happy]
@@ -123,6 +124,7 @@ nonisolated enum WakeBeatCaption {
             case .workoutDone: return "\(name) celebrated your run"
             case .sleptWithWatch: return "\(name) slept beside you"
             case .workoutLive: return "\(name) ran with you"
+            case .split: return "\(name) finished a lap"
             case .weatherClass: return nil  // weather has its own beat tier
             }
         case .weather(let klass):

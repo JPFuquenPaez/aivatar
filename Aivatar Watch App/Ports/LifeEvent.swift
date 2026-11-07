@@ -20,6 +20,8 @@ nonisolated enum LifeEvent: Sendable, Equatable {
     case weatherClass(classHash: Int)
     /// A live workout metric band (F6; bands, throttled by the bridge).
     case workoutLive(paceBand: Int)
+    /// A distance split completed during Aivatar's own workout (F6).
+    case split(distanceKm: Int)
 }
 
 /// One hashed entry in CompanionMemory.lifeLog — the ring buffer of the
