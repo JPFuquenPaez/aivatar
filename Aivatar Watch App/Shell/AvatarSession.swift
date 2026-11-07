@@ -38,4 +38,12 @@ final class AvatarSession {
         context?.engine.handleEvent(event)
         spriteDirector?.handleEvent(event)
     }
+
+    /// v17 F2 life-sense delivery: real-life events (calendar, workouts,
+    /// sleep) reach only the live actor — the frozen engine keeps its
+    /// AvatarEvent vocabulary untouched; the sprite director owns the
+    /// reaction grammar.
+    func handleLifeEvent(_ event: LifeEvent) {
+        spriteDirector?.handleLifeEvent(event)
+    }
 }

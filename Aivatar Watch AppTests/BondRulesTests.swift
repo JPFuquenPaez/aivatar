@@ -284,13 +284,15 @@ final class BondRulesTests: XCTestCase {
         // v16 golden pins (first pin 2026-11-03). Update deliberately —
         // and say why. RECORD MODE below reports the values to pin.
         let expected: [Archetype: UInt64] = [
-            // Pinned 2026-11-03 (v16): 600-tick idle sequence at bondLevel 3
-            // (seed 20261106) — guards the bond-biased idle schedule.
-            .ember: 11_482_025_016_655_454_855,
-            .willow: 12_207_346_766_810_517_529,
-            .compass: 1_108_907_450_760_366_338,
-            .prism: 4_419_164_532_990_926_046,
-            .nimbus: 6_272_823_208_314_927_755,
+            // Pinned 2026-11-07 (v17 re-pin): 600-tick idle sequence at
+            // bondLevel 3 (seed 20261106). Re-pinned because v17 fixed the
+            // blink act to hold 2 ticks — a 1-tick act was drained before it
+            // could render, so blinks are now visible in the sequence.
+            .ember: 11_200_920_742_000_823_231,
+            .willow: 6_518_389_219_467_205_937,
+            .compass: 12_327_888_753_096_917_402,
+            .prism: 11_134_013_506_434_280_832,
+            .nimbus: 10_051_580_212_754_643_760,
         ]
         var recorded: [String] = []
         for archetype in Archetype.allCases {

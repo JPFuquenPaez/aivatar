@@ -37,6 +37,10 @@ struct AvatarStageView: View {
     /// once-per-install in-context permission ask, and the live tell.
     @AppStorage("listenForSounds") private var listenForSounds = true
     @AppStorage("soundPermissionAsked") private var soundPermissionAsked = false
+    /// v17 F2 life sense: explicit opt-ins (absence of consent = dormant).
+    /// Polled on visit/wake only — never in a background loop.
+    @AppStorage("lifeSenseCalendar") private var lifeSenseCalendar = false
+    @AppStorage("lifeSenseHealth") private var lifeSenseHealth = false
     @State private var isListening = false
     @State private var context: AvatarRenderContext?
     /// v13: the authored-sprite stage's actor (the engine below stays
@@ -63,6 +67,9 @@ struct AvatarStageView: View {
     /// v14 sonic presence: the one-a-lifetime creation point — state
     /// changes surface as the on-stage listening tell.
     @State private var soundSource: MicrophonePresenceSource?
+    /// v17 F2: the life-sense bridges, created once, polled on visit/wake.
+    @State private var calendarBridge: CalendarSenseBridge?
+    @State private var healthBridge: HealthSenseBridge?
 
     init(archetype: Archetype? = nil) {
         launchOverride = archetype
@@ -89,6 +96,8 @@ struct AvatarStageView: View {
                 }
                 if let director { soundSource?.bind(director: director) }
             }
+            // v17 F2: a visit is a poll point — the bridges never loop.
+            pollLifeSense()
         }
         .onChange(of: archetype) { _ in
             // Companion switch: each archetype is a distinct engine
@@ -349,6 +358,8 @@ struct AvatarStageView: View {
                 isResting = reduced && !Self.forceAwake
                 // v14: the mic NEVER runs into the Always On rest state.
                 syncSoundPresence()
+                // v17 F2: a wrist-raise wake is a poll point too.
+                if !reduced { pollLifeSense() }
                 // v16 F1: the wrist-drop farewell, acknowledged once per
                 // session when it is seen in full — a soft goodnight tick.
                 if reduced, !Self.forceAwake, !farewellAwardedThisSession {
@@ -390,6 +401,8 @@ struct AvatarStageView: View {
                         director?.handleEvent(.gesture(name: "nod"))
                     }
                     wentToBackgroundAt = nil
+                    // v17 F2: returning to the foreground is a poll point.
+                    pollLifeSense()
                 } else if phase == .background {
                     wentToBackgroundAt = Date()
                 }
@@ -410,12 +423,43 @@ struct AvatarStageView: View {
         }
     }
 
-    /// v11 onboarding order: the first frame is a living companion, never a
-    /// form. After the user's FIRST interaction (the moment of delight),
-    /// the one-time ceremony sequence follows — picker, then naming (each
-    /// skipped if already done); once the sequence has run it never
-    /// returns. After onboarding, the slow-blink ritual gets its single
-    /// visible hint.
+    /// v17 F2 life sense: one on-demand poll per visit/wake/foreground — the
+    /// bridges are never run in a loop (G9: zero rest-state cost). Consent
+    /// gates everything: with both toggles off this is a no-op and the app
+    /// is indistinguishable from one without life sense. Each delivered event
+    /// also lands in the memory lifeLog as a content-free hash (the daily
+    /// calendar cap reads that ring; F5/F8 will read it for beats/postcards).
+    @MainActor
+    private func pollLifeSense() {
+        guard scenePhase == .active, !isLuminanceReduced || Self.forceAwake else { return }
+        guard lifeSenseCalendar || lifeSenseHealth else { return }
+        let now = Date()
+        var events: [LifeEvent] = []
+        if lifeSenseCalendar {
+            if calendarBridge == nil {
+                calendarBridge = CalendarSenseBridge()
+                calendarBridge?.requestAccessIfNeeded()
+            }
+            events += calendarBridge?.poll(now: now) ?? []
+        }
+        if lifeSenseHealth {
+            if healthBridge == nil {
+                healthBridge = HealthSenseBridge()
+                healthBridge?.requestAccessIfNeeded()
+            }
+            events += healthBridge?.poll(now: now) ?? []
+        }
+        guard !events.isEmpty else { return }
+        let store = CompanionMemoryStore()
+        var memory = store.load() ?? CompanionMemory()
+        let dayIndex = CompanionMemoryStore.dayIndex(of: now)
+        for event in events {
+            AvatarSession.shared.handleLifeEvent(event)
+            memory.appendLifeLog(LifeLogEntry(kindHash: LifeSenseMapping.kindHash(of: event), dayIndex: dayIndex))
+        }
+        store.save(memory)
+    }
+
     /// v14 sonic presence lifecycle: listen only while the app is the
     /// active scene, the stage is awake, the user opted in, and the
     /// in-context ask has happened. Idempotent start/stop.
@@ -428,6 +472,12 @@ struct AvatarStageView: View {
         }
     }
 
+    /// v11 onboarding order: the first frame is a living companion, never a
+    /// form. After the user's FIRST interaction (the moment of delight),
+    /// the one-time ceremony sequence follows — picker, then naming (each
+    /// skipped if already done); once the sequence has run it never
+    /// returns. After onboarding, the slow-blink ritual gets its single
+    /// visible hint.
     private func afterFirstInteraction() {
         // v14 in-context permission ask (the notification-auth pattern):
         // once per install, at the moment the feature matters — right

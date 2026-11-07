@@ -192,6 +192,26 @@ reference mascot — the Mistral cat: a 16x14 logical grid, 5 colors,
   once-per-day gates, level-up crossing, legacy decode, ring cap,
   director bond bias + determinism, memento cell, sequence goldens.
 
+## 7.4 Life sense (v17, Ambient Life F2) — reactions, never nags
+
+- **The pet notices your real day**: on visit/wake/foreground only, the
+  bridges poll once (never a loop — zero rest-state cost) and translate
+  calendar-soon / workout-done / slept-with-watch into content-free
+  `LifeEvent`s (hashes + bands, never titles or numbers — G5).
+- **Motion budget**: a life event is an Expressive-tier act — at most ONE
+  per wake, a 10-min per-kind cooldown, nothing while resting, and under
+  L2 a face-readable blink only. The per-archetype answer (Nimbus's alert
+  perk, Willow's settle-blink, Compass's week-grid quirk) is the
+  personality, not a notification light.
+- **Caps are structural**: <= 3 calendar reactions/day (the bridge reads
+  the lifeLog ring, not the clock); re-opens never re-celebrate old
+  workouts (anchored query); sleep reports once per day.
+- **Consent = dormancy**: both Settings toggles off -> no polling, no
+  permission ask, app indistinguishable from one without the feature.
+- Verify: `LifeSenseTests` — window/cap/banding pure cores, hash-only
+  payloads, mapping parity across archetypes, one-per-wake + cooldown +
+  L2/rest behavior, determinism.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,

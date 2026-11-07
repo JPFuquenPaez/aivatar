@@ -173,7 +173,7 @@ nonisolated final class SpriteDirector {
         if mood == .lonely, mode != .reduceMotionL2,
            tick - lastLonelyPokeTick > 240, queue.isEmpty {
             lastLonelyPokeTick = tick
-            queue = [("perk", 2), ("blink", 1), ("idle", 2)]
+            queue = [("perk", 2), ("blink", 2), ("idle", 2)]
             actCount += 1
         }
         // One yawn per long unattended stretch (90 s idle, 4.5 min cooldown).
@@ -230,6 +230,7 @@ nonisolated final class SpriteDirector {
         case .wake:
             markInteraction()
             resting = false
+            lifeActThisWake = false
             play(.happy)
         case .sleep:
             play(.farewell)
@@ -324,6 +325,79 @@ nonisolated final class SpriteDirector {
     /// Minimum director ticks between sound-driven acts (2.4 s at 150 ms.)
     static let soundActGapTicks = 16
 
+    // MARK: - Life sense (v17, Ambient Life F2)
+
+    /// Minimum director ticks between life-event acts of the same kind
+    /// (10 min at 150 ms) — a calendar volley is one reaction, not a storm.
+    static let lifeEventCooldownTicks = 4000
+
+    private var lastLifeActTick: [LifeEventKind: Int] = [:]
+    /// Max one life-event reaction per wake (F2); reset on .wake.
+    private var lifeActThisWake = false
+    private(set) var lifeEventCount = 0
+
+    /// The director's reaction to a real-life event (calendar soon, workout
+    /// done, slept with the watch). Reactions, never nags: at most one per
+    /// wake, per-kind 10 min cooldown, nothing while resting, and under
+    /// Reduce Motion L2 a face-readable blink only. The companion also gets
+    /// curious for a while — it noticed your day.
+    func handleLifeEvent(_ event: LifeEvent) {
+        if resting { return }
+        guard let act = Self.reactionAct(for: event, archetype: archetype) else { return }
+        let kind = Self.kind(of: event)
+        if lifeActThisWake { return }
+        if let last = lastLifeActTick[kind], tick - last < Self.lifeEventCooldownTicks { return }
+        lastLifeActTick[kind] = tick
+        lifeActThisWake = true
+        lifeEventCount += 1
+        curiousUntilTick = tick + 200
+        if mode == .reduceMotionL2 {
+            play(.blink)
+        } else {
+            play(act)
+        }
+    }
+
+    /// The event's cooldown/log kind (LifeEvent carries values; the kind is
+    /// what cooldowns and the lifeLog hash key off).
+    nonisolated static func kind(of event: LifeEvent) -> LifeEventKind {
+        switch event {
+        case .calendarSoon: return .calendarSoon
+        case .workoutDone: return .workoutDone
+        case .sleptWithWatch: return .sleptWithWatch
+        case .weatherClass: return .weatherClass
+        case .workoutLive: return .workoutLive
+        }
+    }
+
+    /// Pure mapping: life event -> the archetype's in-character act. Every
+    /// F2 kind has an answer for every archetype (parity pinned by tests);
+    /// weather/workout-live belong to F3/F6 and answer nil for now.
+    nonisolated static func reactionAct(for event: LifeEvent, archetype: Archetype) -> SpriteAct? {
+        switch event {
+        case .calendarSoon:
+            switch archetype {
+            case .ember: return .happy        // warm: "you have somewhere to be"
+            case .willow: return .slowBlink   // settle-calm
+            case .compass: return .quirk      // taps the week grid
+            case .prism: return .look         // inspects the new shape of the day
+            case .nimbus: return .perk        // notices first — alert tick
+            }
+        case .workoutDone:
+            switch archetype {
+            case .ember: return .quirk        // the celebration dance
+            case .willow: return .happy
+            case .compass: return .happy
+            case .prism: return .happy
+            case .nimbus: return .perk
+            }
+        case .sleptWithWatch:
+            return .slowBlink                 // "slept beside you" — the soft blink
+        case .weatherClass, .workoutLive:
+            return nil                        // F3 / F6
+        }
+    }
+
     // MARK: - Acts
 
     /// Act vocabulary: discrete beats over frame ids.
@@ -331,9 +405,18 @@ nonisolated final class SpriteDirector {
         case blink, happy, quirk, look, slowBlink, farewell, perk
     }
 
+    /// Life-event kinds (v17 F2) — the cooldown/log unit.
+    nonisolated enum LifeEventKind: Hashable, Sendable {
+        case calendarSoon, workoutDone, sleptWithWatch, weatherClass, workoutLive
+    }
+
     private func play(_ act: SpriteAct, direction: Int = 0) {
         if act == .blink {
-            queue = [("blink", 1), ("idle", 1)]
+            // v17: a 1-tick act is drained before it can render (the step
+            // removes it before currentFrame is read) — blinks were invisible.
+            // Hold 2 ticks so the blink is actually visible for one 150 ms
+            // frame, the cat's blink grammar.
+            queue = [("blink", 2), ("idle", 1)]
             blinkCount += 1
             return
         }
@@ -347,7 +430,7 @@ nonisolated final class SpriteDirector {
         case .quirk:
             // Anticipation (v15): a 1-tick wind-up before the signature move.
             queue = bodyGated
-                ? [("blink", 1), ("idle", 1)]
+                ? [("blink", 2), ("idle", 1)]
                 : [("perk", 1), ("quirk", 2), ("idle", 1)]
         case .look:
             queue = [(direction < 0 ? "glanceL" : "glanceR", 4), ("idle", 1)]

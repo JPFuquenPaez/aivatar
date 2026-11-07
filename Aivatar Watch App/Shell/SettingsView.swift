@@ -15,6 +15,10 @@ struct SettingsView: View {
     /// permission ask is the real gate; this is the always-visible off
     /// switch).
     @AppStorage("listenForSounds") private var listenForSounds = true
+    /// v17 F2 life sense: explicit opt-ins — with both off, the feature is
+    /// fully dormant (no polling, no permission ask).
+    @AppStorage("lifeSenseCalendar") private var lifeSenseCalendar = false
+    @AppStorage("lifeSenseHealth") private var lifeSenseHealth = false
     @State private var showNaming = false
 
     private var stageName: String {
@@ -77,6 +81,19 @@ struct SettingsView: View {
                     Text("Sounds")
                 } footer: {
                     Text("While Aivatar is open with the stage awake, its microphone listens for your voice and claps so your companion can react. Sounds are analyzed on the watch instantly and never recorded or saved.")
+                        .font(.footnote)
+                }
+                // v17 F2 life sense: the consent copy names exactly what is
+                // read, where, and what is never kept (G5 written down).
+                Section {
+                    Toggle("Calendar", isOn: $lifeSenseCalendar)
+                        .accessibilityHint("Your companion can notice when a calendar event is about to start")
+                    Toggle("Workouts & sleep", isOn: $lifeSenseHealth)
+                        .accessibilityHint("Your companion can celebrate your saved workouts and notice your sleep")
+                } header: {
+                    Text("Life sense")
+                } footer: {
+                    Text("While Aivatar is open, your companion can react to upcoming calendar events and to workouts and sleep saved in Health — read on this watch only. Event titles and health details are never stored, only a hash, and nothing ever leaves the watch.")
                         .font(.footnote)
                 }
                 Section("About") {
