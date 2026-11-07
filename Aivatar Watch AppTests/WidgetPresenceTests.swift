@@ -164,15 +164,10 @@ final class WidgetPresenceTests: XCTestCase {
             let event = CompanionIcon.snapshotBytes(for: archetype, state: .event)
             XCTAssertEqual(awake.count, asleep.count)
             XCTAssertNotEqual(awake, asleep, "\(archetype.rawValue): asleep icon is the dim variant")
-            // The event variant highlights accent cells — only visible when
-            // the idle grid carries an accent cell (compass/prism do).
-            let hasAccent = AuthoredSprites.sprite(for: archetype)
-                .symbols(frameID: "idle").joined().contains("A")
-            if hasAccent {
-                XCTAssertNotEqual(awake, event, "\(archetype.rawValue): event icon highlights")
-            } else {
-                XCTAssertEqual(awake, event, "\(archetype.rawValue): no accent cells in idle")
-            }
+            // v24: the event variant is ALWAYS distinct — accent cells go to
+            // paper, and when the idle grid has none (ember/willow) the body
+            // flashes accent instead.
+            XCTAssertNotEqual(awake, event, "\(archetype.rawValue): event icon always differs from awake")
             // Asleep dims every non-transparent pixel (rest LOD factors).
             for i in stride(from: 0, to: awake.count, by: 4) where awake[i + 3] == 255 {
                 XCTAssertLessThanOrEqual(asleep[i], awake[i])

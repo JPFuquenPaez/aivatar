@@ -223,7 +223,9 @@ nonisolated enum AuthoredSprites {
             "quirk": [ CellDiff(15, 9, "W"), CellDiff(16, 9, ".") ],  // tail wag
             "perk": [ CellDiff(3, 0, "B"), CellDiff(6, 0, "B"), CellDiff(13, 0, "B"), CellDiff(16, 0, "B") ],  // ears flare
             "breathe": [ CellDiff(3, 11, "B"), CellDiff(18, 11, "B") ],
-            "idleA": [ CellDiff(16, 9, "."), CellDiff(19, 9, "B") ],
+            // v24: the white tail tip rides the wag (was cleared and the tail
+            // extended in body tone — the fox's identity anchor vanished).
+            "idleA": [ CellDiff(16, 9, "."), CellDiff(19, 9, "W") ],
             "idleB": [ CellDiff(5, 0, "."), CellDiff(3, 0, "B") ],
             "yawn": [ CellDiff(6, 3, "D"), CellDiff(7, 3, "D"), CellDiff(6, 4, "B"), CellDiff(7, 4, "B"),
                       CellDiff(12, 3, "D"), CellDiff(13, 3, "D"), CellDiff(12, 4, "B"), CellDiff(13, 4, "B"),
@@ -318,8 +320,10 @@ nonisolated enum AuthoredSprites {
             "sleepy": [ CellDiff(4, 4, "D"), CellDiff(5, 4, "D"), CellDiff(4, 5, "B"), CellDiff(5, 5, "B") ],
             "happy": [ CellDiff(4, 5, "B"), CellDiff(5, 5, "B"),
                        CellDiff(0, 8, "K"), CellDiff(2, 9, "K") ],  // mouth open
-            "glanceL": [ CellDiff(4, 5, "B"), CellDiff(4, 6, "B"), CellDiff(3, 5, "W"), CellDiff(3, 6, "K"),
-                         CellDiff(4, 5, "K"), CellDiff(4, 6, "K") ],
+            // v24: clear the old pupil cells (5,5)/(5,6) so the eye slides
+            // cleanly to x=3-4 instead of smearing 3-wide.
+            "glanceL": [ CellDiff(5, 5, "B"), CellDiff(5, 6, "B"), CellDiff(3, 5, "W"),
+                         CellDiff(4, 5, "K"), CellDiff(3, 6, "K") ],
             "glanceR": [ CellDiff(4, 5, "B"), CellDiff(4, 6, "B"), CellDiff(5, 5, "W"), CellDiff(6, 5, "K"),
                          CellDiff(5, 6, "K"), CellDiff(6, 6, "K") ],
             "quirk": [ CellDiff(14, 3, "."), CellDiff(16, 4, "A"), CellDiff(13, 5, ".") ],  // fin flick
@@ -411,14 +415,17 @@ nonisolated enum AuthoredSprites {
                         CellDiff(11, 4, "D"), CellDiff(12, 4, "D"), CellDiff(11, 5, "B"), CellDiff(12, 5, "B") ],
             "happy": [ CellDiff(6, 5, "B"), CellDiff(7, 5, "B"), CellDiff(11, 5, "B"), CellDiff(12, 5, "B"),
                        CellDiff(8, 9, "A"), CellDiff(9, 9, "A") ],  // beak opens
-            "glanceL": [ CellDiff(7, 5, "B"), CellDiff(7, 6, "B"), CellDiff(5, 5, "W"), CellDiff(6, 5, "K"),
-                         CellDiff(5, 6, "K"), CellDiff(6, 6, "K"),
-                         CellDiff(12, 5, "B"), CellDiff(12, 6, "B"), CellDiff(10, 5, "W"), CellDiff(11, 5, "K"),
-                         CellDiff(10, 6, "K"), CellDiff(11, 6, "K") ],
-            "glanceR": [ CellDiff(6, 5, "B"), CellDiff(6, 6, "B"), CellDiff(7, 5, "W"), CellDiff(8, 5, "K"),
-                         CellDiff(7, 6, "K"), CellDiff(8, 6, "K"),
-                         CellDiff(11, 5, "B"), CellDiff(11, 6, "B"), CellDiff(12, 5, "W"), CellDiff(13, 5, "K"),
-                         CellDiff(12, 6, "K"), CellDiff(13, 6, "K") ],
+            // v24: both eyes shift one cell (left for glanceL, right for
+            // glanceR), clearing the vacated cells — the old right-eye half
+            // of glanceR targeted x=11-13 (no-ops) and never moved the eye.
+            "glanceL": [ CellDiff(5, 5, "W"), CellDiff(6, 5, "K"), CellDiff(5, 6, "K"),
+                         CellDiff(7, 5, "B"), CellDiff(7, 6, "B"),
+                         CellDiff(11, 5, "W"), CellDiff(12, 5, "K"), CellDiff(11, 6, "K"),
+                         CellDiff(13, 5, "B"), CellDiff(13, 6, "B") ],
+            "glanceR": [ CellDiff(7, 5, "W"), CellDiff(8, 5, "K"), CellDiff(7, 6, "K"), CellDiff(8, 6, "K"),
+                         CellDiff(6, 5, "B"), CellDiff(6, 6, "B"),
+                         CellDiff(13, 5, "W"), CellDiff(14, 5, "K"), CellDiff(13, 6, "K"), CellDiff(14, 6, "K"),
+                         CellDiff(12, 5, "B"), CellDiff(12, 6, "B") ],
             "quirk": [ CellDiff(0, 8, "D"), CellDiff(1, 8, "D"), CellDiff(1, 10, "."), CellDiff(2, 10, "."),
                        CellDiff(2, 11, "."), CellDiff(3, 11, ".") ],  // wing flap
             "perk": [ CellDiff(7, 1, "B"), CellDiff(10, 1, "B") ],  // crest tuft rises

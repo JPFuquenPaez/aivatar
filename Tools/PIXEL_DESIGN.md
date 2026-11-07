@@ -317,7 +317,10 @@ reference mascot — the Mistral cat: a 16x14 logical grid, 5 colors,
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,
    with a reason comment).
-2. `Tools/visual_smoke_test.sh` — all five archetypes render on-simulator.
+2. `Tools/visual_smoke_test.sh` — all five archetypes render on-simulator
+   (v23: fresh boot per attempt, capture in the launch+3s..+21s lit window,
+   up to 3 boots per archetype; analyzer coverage floor is 10% — the dimmed
+   watch face reads ~3.4% and must not pass as an avatar).
 3. `Tools/assess_similarity.swift` on the captures — palettes separate,
    tone counts in the authored band.
 4. Screenshot eyeball pass at native AND zoomed-out (thumbnail) size.

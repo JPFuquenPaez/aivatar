@@ -61,7 +61,9 @@ nonisolated final class SpriteDirector {
         weatherTempoMul = max(0.2, dial.tempoScale)
         weatherGlanceMul = max(0.2, dial.amplitudeScale)
         weatherMoteMul = min(2.0, max(0.5, 1.0 - dial.accentBias * 0.5))
-        weatherHueShiftDeg = dial.hueShiftDeg
+        // v24: the hue-shift cap is enforced in code, not just in the data —
+        // <= 20 degrees, Prism only (the LUT budget rule, PIXEL_DESIGN §7.6).
+        weatherHueShiftDeg = archetype == .prism ? min(max(dial.hueShiftDeg, -20), 20) : 0
     }
 
     /// The acting queue: (frame id, hold ticks). Non-empty = an act plays.
