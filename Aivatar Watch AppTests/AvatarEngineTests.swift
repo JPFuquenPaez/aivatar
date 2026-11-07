@@ -668,7 +668,8 @@ final class AvatarEngineTests: XCTestCase {
         CompanionWidgetState.write(snapshot, defaults: defaults)
         XCTAssertEqual(CompanionWidgetState.readSnapshot(defaults: defaults), snapshot)
         XCTAssertEqual(CompanionWidgetState.iconURL(forArchetypeRaw: "willow", container: URL(fileURLWithPath: "/tmp/c"))?.absoluteString,
-                       "file:///tmp/c/Icons/willow.png", "icon names key off the archetype raw value")
+                       "file:///tmp/c/\(CompanionWidgetState.iconsDirectoryName)/willow.png",
+                       "icon names key off the archetype raw value (versioned icons dir)")
     }
 
     func testCompanionWidgetIconsPublishable() throws {

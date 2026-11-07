@@ -10,8 +10,9 @@ import ImageIO
 /// §4). Static on purpose — a watch picker must be glanceable and
 /// near-zero power; the live companion appears on the stage.
 /// The complication icon's state variant (v18 F4). Asleep matches the
-/// stage's rest LOD dim (body x0.22, paper x0.30); event highlights the
-/// accent cells in the species' paper tone — "something happened".
+/// stage's rest LOD dim (body x0.22, paper x0.30); event is a uniform flash
+/// for every animal — accents to paper, body to accent (v29) —
+/// "something happened", legible even on accent-carrying families.
 nonisolated enum IconState: String, Sendable {
     case asleep, awake, event
 }
@@ -54,10 +55,6 @@ nonisolated enum CompanionIcon {
     static func snapshotBytes(for archetype: Archetype, state: IconState = .awake) -> [UInt8] {
         let sprite = AuthoredSprites.sprite(for: archetype)
         let grid = sprite.symbols(frameID: "idle")
-        // v24: animals whose idle grid carries no accent cell (ember, willow)
-        // flash the BODY in the accent tone on event — the state change must
-        // be visible on text-less families for all five animals.
-        let idleHasAccent = grid.joined().contains("A")
         let w = CompanionSprite.gridWidth * cellScale
         let h = CompanionSprite.gridHeight * cellScale
         var pixels = [UInt8](repeating: 0, count: w * h * 4)
@@ -65,11 +62,14 @@ nonisolated enum CompanionIcon {
             for x in 0..<CompanionSprite.gridWidth {
                 var symbol = grid[y][x]
                 guard symbol != "." else { continue }
-                // v18/v24: the event variant highlights accents in paper, or
-                // the body in accent when the idle grid has no accent cells.
+                // v18/v29: the event variant is a uniform, legible flash for
+                // EVERY animal — accent cells go to paper AND the body flashes
+                // in the accent tone. (v24 only flashed the body when the idle
+                // grid had no accent cells, which left Prism's event icon
+                // nearly unchanged — not legible on a text-less family.)
                 if state == .event {
                     if symbol == "A" { symbol = "W" }
-                    else if symbol == "B", !idleHasAccent { symbol = "A" }
+                    else if symbol == "B" { symbol = "A" }
                 }
                 guard let hex = sprite.paletteHex[symbol] else { continue }
                 var rgb = CompanionSprite.hexToRGB(hex)

@@ -57,7 +57,25 @@ cp "$ROOT/Tools/visual_smoke.swift" "$WORK/analyzer/main.swift"
 env -u SDKROOT xcrun --sdk macosx swiftc "$WORK/analyzer/main.swift" -o "$WORK/analyzer/analyze" 2>/dev/null
 
 echo "==> Capturing all five archetypes (fresh boot per attempt, up to 5 attempts)"
-installed=0
+# v29 harness fix: the sim display grant is racy on the first boots after a
+# cold start — the first archetype(s) captured only the dimmed watch face
+# (3.4% coverage) while later ones passed. Warm the sim up first: install
+# once, then a few throwaway boot/launch/screenshot cycles, so the measured
+# loop starts on a warm display.
+xcrun simctl shutdown "$UDID" 2>/dev/null || true
+xcrun simctl boot "$UDID"
+sleep 5
+xcrun simctl install "$UDID" "$APP"
+installed=1
+for w in 1 2 3; do
+  xcrun simctl launch "$UDID" "$BUNDLE" -archetype ember -stageAwake >/dev/null 2>&1 || true
+  sleep 4
+  xcrun simctl io "$UDID" screenshot "$WORK/warm.png" >/dev/null 2>&1 || true
+  rm -f "$WORK/warm.png"
+  xcrun simctl shutdown "$UDID" 2>/dev/null || true
+  xcrun simctl boot "$UDID"
+  sleep 5
+done
 for a in ember willow compass prism nimbus; do
   got=0
   for attempt in 1 2 3 4 5; do

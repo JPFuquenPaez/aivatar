@@ -134,6 +134,15 @@ nonisolated final class CompanionMemoryStore: @unchecked Sendable {
         }
     }
 
+    /// v29: a wrist-raise wake refreshes only the presence timestamp (the
+    /// complication's awake window) — it must NOT count a new session or
+    /// re-run the visit awards, so it is deliberately not recordVisit().
+    func touchLastSeen(now: Date = Date()) {
+        var memory = load() ?? CompanionMemory(firstLaunch: now, lastSeen: now)
+        memory.lastSeen = now
+        save(memory)
+    }
+
     /// Calendar-day distance between dates (0 = same day, 1 = yesterday).
     static func dayDistance(from: Date, to: Date, calendar: Calendar = .current) -> Int {
         calendar.dateComponents([.day], from: calendar.startOfDay(for: from), to: calendar.startOfDay(for: to)).day ?? 0

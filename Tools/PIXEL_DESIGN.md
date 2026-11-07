@@ -352,6 +352,30 @@ poses, one focal story.
   the new act grammar). Verify: `CompanionSpriteTests`, `SpriteFixTests`,
   `Life2Tests`, `BondRulesTests`, `WakeBeatTests`, `HapticsAndPostcardTests`.
 
+## 7.12 Widget + chrome polish (v29) — presence that stays honest
+
+- **One publisher**: `CompanionWidgetPublisher.publish(archetype:name:)` is
+  the single writer of the watch-face snapshot (stage, rename in Settings,
+  wake, life events all use it — no hand-rolled copies). The icons directory
+  is versioned (`Icons-v2`) so a rendering-rule change re-seeds atomically on
+  both targets; stale PNGs never linger.
+- **Wake refreshes presence without a fake session**: a wrist-raise updates
+  only `lastSeen` (`touchLastSeen`) — the complication's awake window —
+  never `sessions` or the daily-presence award.
+- **Event icon legibility floor**: the event state is a uniform flash for
+  all five animals (accents to paper AND body to accent); a test pins >= 8
+  changed art cells per archetype so the state change can never shrink to a
+  speck (v24's rule left Prism nearly unchanged).
+- **Widget process stays cheap**: icon PNG bytes are read ONCE per timeline
+  entry in the provider (`CompanionEntry.iconData`), never per view render.
+- **Setup surfaces**: postcard preview is a bigger SetupTheme card (90x81 pt,
+  4.5x the grid) and renders a single static frame under Reduce Motion; all
+  remaining hardcoded strings (picker/postcard nav titles, reduce-motion
+  footer, postcard preview line, widget name/description) are localized in
+  en + fr and pinned by `LocalizationTests`.
+- **Motion leftover**: in workout mode a split cheer lands on the next
+  stride boundary (`playOnStrideBoundary`) instead of snapping mid-stride.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,

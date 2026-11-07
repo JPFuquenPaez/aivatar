@@ -102,7 +102,7 @@ struct SettingsView: View {
                 } header: {
                     Text(String(localized: "settings.accessibility"))
                 } footer: {
-                    Text("Stops idle gestures and sway; your companion holds still and blinks.")
+                    Text(String(localized: "settings.reduce_motion_footer"))
                         .font(.footnote)
                 }
                 // v14 sonic presence: the opt-out lives next to the
@@ -169,6 +169,12 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle(String(localized: "settings.nav"))
+            // v29: a rename republishes the complication immediately (the
+            // watch face carries the name) — the shared publisher, same path
+            // as the stage, not a hand-rolled copy.
+            .onChange(of: companionName) { _ in
+                CompanionWidgetPublisher.publish(archetype: archetype, name: stageName)
+            }
             .sheet(isPresented: $showNaming) {
                 NamingCeremonyView(archetype: archetype, isPresented: $showNaming, onName: nil)
             }
@@ -176,7 +182,7 @@ struct SettingsView: View {
             .sheet(isPresented: $showPostcard) {
                 NavigationStack {
                     PostcardPreviewView(archetype: archetype)
-                        .navigationTitle("Postcard")
+                        .navigationTitle(String(localized: "postcard.nav"))
                 }
             }
         }

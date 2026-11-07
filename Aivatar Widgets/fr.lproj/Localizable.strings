@@ -10,3 +10,5 @@
 "presence.noticed_something" = "a remarqué quelque chose";
 "inline.line" = "%@ · %@";
 "rect.line" = "jour %d · %@";
+"widget.name" = "Ton compagnon";
+"widget.description" = "Ton compagnon, présent sur le cadran.";

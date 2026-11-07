@@ -12,3 +12,5 @@
 "presence.noticed_something" = "noticed something";
 "inline.line" = "%@ · %@";
 "rect.line" = "day %d · %@";
+"widget.name" = "Your companion";
+"widget.description" = "Your companion, present on the watch face.";

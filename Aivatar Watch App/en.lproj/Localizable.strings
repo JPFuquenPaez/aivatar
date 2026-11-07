@@ -35,6 +35,8 @@
 "postcard.day" = "%@ · day %d";
 "postcard.old_friends" = "old friends";
 "postcard.weather_day" = "%@ day";
+"postcard.nav" = "Postcard";
+"postcard.preview" = "A card of %@, rendered from the same pixels as the stage.";
 
 /* Complication copy (shared derivation — mirrored in the widget bundle) */
 "presence.napping" = "napping";
@@ -55,6 +57,7 @@
 /* Setup surfaces (v27) */
 "picker.choose" = "Choose the %@";
 "picker.current" = "Your companion";
+"picker.nav" = "Companion";
 "naming.nav" = "Name";
 "naming.title" = "Name your %@";
 "naming.subtitle" = "Named things are kept things.";
@@ -71,6 +74,7 @@
 "settings.animal" = "Animal";
 "settings.accessibility" = "Accessibility";
 "settings.reduce_motion" = "Reduce Motion";
+"settings.reduce_motion_footer" = "Stops idle gestures and sway; your companion holds still and blinks.";
 "settings.sounds" = "Listen for sounds";
 "settings.sounds_header" = "Sounds";
 "settings.sounds_footer" = "While Aivatar is open with the stage awake, its microphone listens for your voice and claps so your companion can react. Sounds are analyzed on the watch instantly and never recorded or saved.";

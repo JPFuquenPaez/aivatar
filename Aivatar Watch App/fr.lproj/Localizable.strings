@@ -33,6 +33,8 @@
 "postcard.day" = "%@ · jour %d";
 "postcard.old_friends" = "vieux amis";
 "postcard.weather_day" = "jour %@";
+"postcard.nav" = "Carte postale";
+"postcard.preview" = "Une carte de %@, dessinée avec les mêmes pixels que la scène.";
 
 /* Complication copy */
 "presence.napping" = "fait la sieste";
@@ -53,6 +55,7 @@
 /* Surfaces de réglage (v27) */
 "picker.choose" = "Choisir : %@";
 "picker.current" = "Ton compagnon";
+"picker.nav" = "Compagnon";
 "naming.nav" = "Nom";
 "naming.title" = "Nomme ton %@";
 "naming.subtitle" = "Ce qui est nommé est gardé.";
@@ -69,6 +72,7 @@
 "settings.animal" = "Animal";
 "settings.accessibility" = "Accessibilité";
 "settings.reduce_motion" = "Réduire les mouvements";
+"settings.reduce_motion_footer" = "Arrête les gestes et le balancement ; ton compagnon reste immobile et cligne des yeux.";
 "settings.sounds" = "Écouter les sons";
 "settings.sounds_header" = "Sons";
 "settings.sounds_footer" = "tant qu'Aivatar est ouvert et l'écran allumé, son micro écoute ta voix et tes applaudissements pour que ton compagnon réagisse. Les sons sont analysés instantanément sur la montre et jamais enregistrés.";

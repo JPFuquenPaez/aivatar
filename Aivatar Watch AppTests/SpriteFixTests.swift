@@ -127,6 +127,18 @@ final class SpriteFixTests: XCTestCase {
             let awake = CompanionIcon.snapshotBytes(for: archetype, state: .awake)
             let event = CompanionIcon.snapshotBytes(for: archetype, state: .event)
             XCTAssertNotEqual(awake, event, "\(archetype.rawValue): event visible on every animal now")
+            // v29: legibility floor — the event flash must change at least 8
+            // art cells (>= 72 device px at cellScale 3), not a speck. Each
+            // cell is uniform, so sampling its first pixel is enough.
+            let cellBytes = CompanionIcon.cellScale * CompanionIcon.cellScale * 4
+            var changedCells = 0
+            for i in stride(from: 0, to: min(awake.count, event.count), by: cellBytes) {
+                if awake[i] != event[i] || awake[i + 1] != event[i + 1] || awake[i + 2] != event[i + 2] {
+                    changedCells += 1
+                }
+            }
+            XCTAssertGreaterThanOrEqual(changedCells, 8,
+                "\(archetype.rawValue): event icon changes >= 8 cells (got \(changedCells))")
         }
     }
 

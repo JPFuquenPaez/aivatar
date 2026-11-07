@@ -21,12 +21,19 @@ struct CompanionEntry: TimelineEntry {
     let snapshot: CompanionWidgetSnapshot
     /// The presence at THIS entry's date (derived, not stored per entry).
     let presence: CompanionPresence
+    /// v29: the icon PNGs are read ONCE per entry, here in the provider —
+    /// never per view render, so every timeline refresh stays cheap in the
+    /// widget process (memory budget on the smallest watch).
+    let iconData: Data?
+    let plainIconData: Data?
 }
 
 struct CompanionProvider: TimelineProvider {
     func placeholder(in context: Context) -> CompanionEntry {
         let snapshot = CompanionWidgetState.readSnapshot() ?? .default()
-        return CompanionEntry(date: .now, snapshot: snapshot, presence: snapshot.presence)
+        return CompanionEntry(date: .now, snapshot: snapshot, presence: snapshot.presence,
+                              iconData: iconData(for: snapshot.archetypeRaw, presence: snapshot.presence),
+                              plainIconData: plainIconData(for: snapshot.archetypeRaw))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CompanionEntry) -> Void) {
@@ -56,7 +63,21 @@ struct CompanionProvider: TimelineProvider {
         let now = now ?? Date()
         let presence = CompanionStateDerivation.presence(
             now: date, lastSeen: snapshot.lastSeen, lastEventAt: snapshot.lastEventAt)
-        return CompanionEntry(date: date, snapshot: snapshot, presence: presence)
+        return CompanionEntry(date: date, snapshot: snapshot, presence: presence,
+                              iconData: iconData(for: snapshot.archetypeRaw, presence: presence),
+                              plainIconData: plainIconData(for: snapshot.archetypeRaw))
+    }
+
+    /// v29: one small file read per entry — the per-state icon PNG the app
+    /// wrote into the shared container.
+    private func iconData(for archetypeRaw: String, presence: CompanionPresence) -> Data? {
+        guard let url = CompanionWidgetState.iconURL(forArchetypeRaw: archetypeRaw, presence: presence) else { return nil }
+        return try? Data(contentsOf: url)
+    }
+
+    private func plainIconData(for archetypeRaw: String) -> Data? {
+        guard let url = CompanionWidgetState.iconURL(forArchetypeRaw: archetypeRaw) else { return nil }
+        return try? Data(contentsOf: url)
     }
 }
 
@@ -74,22 +95,17 @@ struct CompanionWidgetView: View {
         CompanionStateDerivation.line(for: entry.presence, lastEventKind: kind)
     }
 
-    /// The companion's real pixel icon for THIS state, written by the app
-    /// into the shared container; falls back to the plain icon, then a
-    /// pawprint before the first app launch.
+    /// The companion's real pixel icon for THIS state — the entry carries
+    /// the PNG bytes (read once in the provider, v29); falls back to the
+    /// plain icon, then a pawprint before the first app launch.
     @ViewBuilder
     private var icon: some View {
-        let url = CompanionWidgetState.iconURL(
-            forArchetypeRaw: snapshot.archetypeRaw, presence: entry.presence)
-        if let url, let data = try? Data(contentsOf: url),
-           let ui = UIImage(data: data) {
+        if let data = entry.iconData, let ui = UIImage(data: data) {
             Image(uiImage: ui)
                 .resizable()
                 .interpolation(.none)
                 .scaledToFit()
-        } else if let plain = CompanionWidgetState.iconURL(forArchetypeRaw: snapshot.archetypeRaw),
-                  let data = try? Data(contentsOf: plain),
-                  let ui = UIImage(data: data) {
+        } else if let data = entry.plainIconData, let ui = UIImage(data: data) {
             Image(uiImage: ui)
                 .resizable()
                 .interpolation(.none)
@@ -142,8 +158,9 @@ struct CompanionWidget: Widget {
         StaticConfiguration(kind: "AivatarCompanion", provider: CompanionProvider()) { entry in
             CompanionWidgetView(entry: entry)
         }
-        .configurationDisplayName("Your companion")
-        .description("Your companion, present on the watch face.")
+        // v29: widget chrome copy is localized in the extension's own bundle.
+        .configurationDisplayName(String(localized: "widget.name"))
+        .description(String(localized: "widget.description"))
         .supportedFamilies([
             .accessoryCircular, .accessoryCorner, .accessoryInline, .accessoryRectangular,
         ])

@@ -20,8 +20,8 @@ nonisolated enum SetupTheme {
 
     /// A soft card: rounded rect on a faint white fill — the watchOS "card"
     /// idiom without heavy materials.
-    static func card<Content: View>(_ content: Content) -> some View {
-        return content
+    static func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
             .padding(12)
             .frame(maxWidth: .infinity)
             .background(Color.white.opacity(0.07))

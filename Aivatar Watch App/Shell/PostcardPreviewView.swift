@@ -9,6 +9,8 @@ struct PostcardPreviewView: View {
     let archetype: Archetype
 
     @AppStorage("companionName") private var companionName = ""
+    /// v29: under Reduce Motion the card is one static frame, never a loop.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var frames: [CGImage] = []
     @State private var start = Date()
@@ -36,24 +38,35 @@ struct PostcardPreviewView: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            TimelineView(.animation(minimumInterval: SpriteDirector.tickDuration)) { timeline in
-                let idx = frames.isEmpty ? 0
-                    : Int(timeline.date.timeIntervalSince(start) / SpriteDirector.tickDuration) % frames.count
-                if !frames.isEmpty {
-                    Image(decorative: frames[idx], scale: 1)
+        // v29: the preview rides the setup-surface card idiom and is big
+        // enough to read the pixel art (90x81 pt = 4.5x the 20x18 grid).
+        SetupTheme.card {
+            VStack(spacing: 10) {
+                if reduceMotion, let first = frames.first {
+                    Image(decorative: first, scale: 1)
                         .interpolation(.none)
                         .accessibilityHidden(true)
+                        .frame(width: 90, height: 81)
+                } else {
+                    TimelineView(.animation(minimumInterval: SpriteDirector.tickDuration)) { timeline in
+                        let idx = frames.isEmpty ? 0
+                            : Int(timeline.date.timeIntervalSince(start) / SpriteDirector.tickDuration) % frames.count
+                        if !frames.isEmpty {
+                            Image(decorative: frames[idx], scale: 1)
+                                .interpolation(.none)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .frame(width: 90, height: 81)
                 }
+                Text(PostcardComposer.caption(inputs))
+                    .font(.footnote)
+                    .multilineTextAlignment(.center)
+                Text(String(format: String(localized: "postcard.preview"), name))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
-            .frame(width: 60, height: 54)
-            Text(PostcardComposer.caption(inputs))
-                .font(.footnote)
-                .multilineTextAlignment(.center)
-            Text("A card of \(name), rendered from the same pixels as the stage.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 12)
         .onAppear {

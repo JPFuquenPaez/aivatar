@@ -171,7 +171,10 @@ nonisolated enum CompanionWidgetState {
     static let snapshotKey = "companionWidgetSnapshot"
     /// Icons live in the shared container: the app renders them once per
     /// archetype from the real pixel rasterizer (Render/CompanionIcon).
-    static let iconsDirectoryName = "Icons"
+    /// v29: versioned directory — bump when the icon rendering rule changes
+    /// (the event-flash rule changed in v29) so stale PNGs never linger;
+    /// app and widget share this constant, so both re-seed atomically.
+    static let iconsDirectoryName = "Icons-v2"
 
     static func sharedContainer() -> URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID)

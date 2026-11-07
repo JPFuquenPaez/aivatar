@@ -38,7 +38,7 @@ struct CompanionPickerView: View {
             }
         }
         .tabViewStyle(.page)
-        .navigationTitle("Companion")
+        .navigationTitle(String(localized: "picker.nav"))
         .onAppear {
             // Open on the current companion so the checkmark is visible.
             page = Archetype.allCases.firstIndex(of: selection) ?? 0
