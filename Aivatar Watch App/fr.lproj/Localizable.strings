@@ -1,0 +1,51 @@
+/* Aivatar — français. */
+
+/* Morning beats (F5) */
+"beat.noticed_day" = "%@ a remarqué ta journée";
+"beat.celebrated_run" = "%@ a fêté ta course";
+"beat.slept_beside" = "%@ a dormi près de toi";
+"beat.ran_with" = "%@ a couru avec toi";
+"beat.finished_lap" = "%@ a fini un tour";
+"beat.glows_sun" = "%@ rayonne au soleil";
+"beat.cozy" = "%@ est bien au chaud";
+"beat.loves_rain" = "%@ adore la pluie";
+"beat.rides_wind" = "%@ chevauche le vent";
+"beat.keeps_warm" = "%@ se tient au chaud";
+"beat.seeks_shade" = "%@ cherche l'ombre";
+"beat.rehearsed" = "%@ a répété une danse";
+"beat.watered" = "%@ a arrosé la pousse";
+"beat.finished_audit" = "%@ a fini l'audit";
+"beat.found_trinket" = "%@ a trouvé un trésor";
+"beat.saw_coming" = "%@ t'a vu arriver";
+
+/* Stage hints */
+"hint.slow_blink" = "Touche longuement pour partager un clin d'œil lent";
+"hint.pages" = "Couronne digitale : course et réglages";
+
+/* Workout page (F6) */
+"workout.run_with" = "Courir avec %@";
+"workout.running_with" = "Course avec %@";
+"workout.end_run" = "Terminer la course";
+"workout.sub" = "Ton compagnon court avec toi — les tours encouragent, pas de chiffres ici";
+"workout.elapsed" = "Temps écoulé %@";
+
+/* Postcard (F8) */
+"postcard.day" = "%@ · jour %d";
+"postcard.old_friends" = "vieux amis";
+"postcard.weather_day" = "jour %@";
+
+/* Complication copy */
+"presence.napping" = "fait la sieste";
+"presence.awake" = "éveillé";
+"presence.noticed_day" = "a remarqué ta journée";
+"presence.celebrated_workout" = "a fêté ton entraînement";
+"presence.slept_beside" = "a dormi près de toi";
+"presence.checked_sky" = "a regardé le ciel";
+"presence.ran_with" = "a couru avec toi";
+"presence.lap_done" = "tour fait";
+"presence.noticed_something" = "a remarqué quelque chose";
+"inline.line" = "%@ · %@";
+"rect.line" = "jour %d · %@";
+
+/* About line (F1) */
+"about.day" = "%@ · jour %d";

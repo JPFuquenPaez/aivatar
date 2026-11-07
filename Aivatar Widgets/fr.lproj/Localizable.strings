@@ -1,0 +1,12 @@
+/* Aivatar widget — français. */
+"presence.napping" = "fait la sieste";
+"presence.awake" = "éveillé";
+"presence.noticed_day" = "a remarqué ta journée";
+"presence.celebrated_workout" = "a fêté ton entraînement";
+"presence.slept_beside" = "a dormi près de toi";
+"presence.checked_sky" = "a regardé le ciel";
+"presence.ran_with" = "a couru avec toi";
+"presence.lap_done" = "tour fait";
+"presence.noticed_something" = "a remarqué quelque chose";
+"inline.line" = "%@ · %@";
+"rect.line" = "jour %d · %@";

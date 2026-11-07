@@ -21,25 +21,25 @@ struct WorkoutPageView: View {
     var body: some View {
         VStack(spacing: 10) {
             if active {
-                Text("Running with \(name)")
+                Text(String(format: String(localized: "workout.running_with"), name))
                     .font(.footnote)
                 Text(Self.format(elapsed))
                     .font(.title3.monospacedDigit())
-                    .accessibilityLabel("Elapsed time \(Self.format(elapsed))")
+                    .accessibilityLabel(String(format: String(localized: "workout.elapsed"), Self.format(elapsed)))
                 Button {
                     onStop()
                 } label: {
-                    Label("End run", systemImage: "stop.fill")
+                    Label(String(localized: "workout.end_run"), systemImage: "stop.fill")
                 }
                 .accessibilityHint("Ends the workout and saves it to Health")
             } else {
                 Button {
                     onStart()
                 } label: {
-                    Label("Run with \(name)", systemImage: "figure.run")
+                    Label(String(format: String(localized: "workout.run_with"), name), systemImage: "figure.run")
                 }
                 .accessibilityHint("Starts a workout with your companion running beside you")
-                Text("Your companion runs with you — splits cheer, no numbers here")
+                Text(String(localized: "workout.sub"))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

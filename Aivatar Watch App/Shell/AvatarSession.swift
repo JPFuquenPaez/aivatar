@@ -18,7 +18,9 @@ final class AvatarSession {
     private(set) weak var spriteDirector: SpriteDirector?
     private(set) var archetype: Archetype = .ember
 
-    func register(context: AvatarRenderContext, director: SpriteDirector, archetype: Archetype) {
+    /// v25: context may be nil (sprite-only stage when the rig failed to
+    /// load) — the director is the live actor either way.
+    func register(context: AvatarRenderContext?, director: SpriteDirector, archetype: Archetype) {
         self.context = context
         self.spriteDirector = director
         self.archetype = archetype

@@ -1,0 +1,53 @@
+/* Aivatar — English (base localization). v25 groundwork: all glanceable,
+   name-interpolated copy goes through String(localized:) with %@ placeholders
+   so word order is translator-controlled. French in fr.lproj. */
+
+/* Morning beats (F5) */
+"beat.noticed_day" = "%@ noticed your day";
+"beat.celebrated_run" = "%@ celebrated your run";
+"beat.slept_beside" = "%@ slept beside you";
+"beat.ran_with" = "%@ ran with you";
+"beat.finished_lap" = "%@ finished a lap";
+"beat.glows_sun" = "%@ glows in the sun";
+"beat.cozy" = "%@ is cozy today";
+"beat.loves_rain" = "%@ loves the rain";
+"beat.rides_wind" = "%@ rides the wind";
+"beat.keeps_warm" = "%@ keeps warm today";
+"beat.seeks_shade" = "%@ seeks the shade";
+"beat.rehearsed" = "%@ rehearsed a dance";
+"beat.watered" = "%@ watered the sprout";
+"beat.finished_audit" = "%@ finished the audit";
+"beat.found_trinket" = "%@ found a trinket";
+"beat.saw_coming" = "%@ saw you coming";
+
+/* Stage hints */
+"hint.slow_blink" = "Touch and hold to share a slow blink";
+"hint.pages" = "Turn the Digital Crown for run & settings";
+
+/* Workout page (F6) */
+"workout.run_with" = "Run with %@";
+"workout.running_with" = "Running with %@";
+"workout.end_run" = "End run";
+"workout.sub" = "Your companion runs with you — splits cheer, no numbers here";
+"workout.elapsed" = "Elapsed time %@";
+
+/* Postcard (F8) */
+"postcard.day" = "%@ · day %d";
+"postcard.old_friends" = "old friends";
+"postcard.weather_day" = "%@ day";
+
+/* Complication copy (shared derivation — mirrored in the widget bundle) */
+"presence.napping" = "napping";
+"presence.awake" = "awake";
+"presence.noticed_day" = "noticed your day";
+"presence.celebrated_workout" = "celebrated your workout";
+"presence.slept_beside" = "slept beside you";
+"presence.checked_sky" = "checked the sky";
+"presence.ran_with" = "ran with you";
+"presence.lap_done" = "lap done";
+"presence.noticed_something" = "noticed something";
+"inline.line" = "%@ · %@";
+"rect.line" = "day %d · %@";
+
+/* About line (F1) */
+"about.day" = "%@ · day %d";

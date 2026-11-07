@@ -114,36 +114,38 @@ nonisolated enum WakeBeatSelector {
 /// painter pixels (typography stays crisp). House voice: <= 8 words,
 /// playful never needy; nil for the plain warm greeting.
 nonisolated enum WakeBeatCaption {
+    /// v25: all caption copy goes through String(localized:) with a %@
+    /// placeholder, so word order is translator-controlled (en/fr at launch).
     static func text(for beat: WakeBeat, name: String) -> String? {
         switch beat {
         case .warm:
             return nil
         case .lifeEvent(let kind):
             switch kind {
-            case .calendarSoon: return "\(name) noticed your day"
-            case .workoutDone: return "\(name) celebrated your run"
-            case .sleptWithWatch: return "\(name) slept beside you"
-            case .workoutLive: return "\(name) ran with you"
-            case .split: return "\(name) finished a lap"
+            case .calendarSoon: return String(format: String(localized: "beat.noticed_day"), name)
+            case .workoutDone: return String(format: String(localized: "beat.celebrated_run"), name)
+            case .sleptWithWatch: return String(format: String(localized: "beat.slept_beside"), name)
+            case .workoutLive: return String(format: String(localized: "beat.ran_with"), name)
+            case .split: return String(format: String(localized: "beat.finished_lap"), name)
             case .weatherClass: return nil  // weather has its own beat tier
             }
         case .weather(let klass):
             switch klass {
-            case .sunny: return "\(name) glows in the sun"
-            case .gray: return "\(name) is cozy today"
-            case .rain: return "\(name) loves the rain"
-            case .wind: return "\(name) rides the wind"
-            case .cold: return "\(name) keeps warm today"
-            case .hot: return "\(name) seeks the shade"
+            case .sunny: return String(format: String(localized: "beat.glows_sun"), name)
+            case .gray: return String(format: String(localized: "beat.cozy"), name)
+            case .rain: return String(format: String(localized: "beat.loves_rain"), name)
+            case .wind: return String(format: String(localized: "beat.rides_wind"), name)
+            case .cold: return String(format: String(localized: "beat.keeps_warm"), name)
+            case .hot: return String(format: String(localized: "beat.seeks_shade"), name)
             case .unknown: return nil
             }
         case .memory(let memoryBeat):
             switch memoryBeat {
-            case .rehearsal: return "\(name) rehearsed a dance"
-            case .sprout: return "\(name) watered the sprout"
-            case .weekGrid: return "\(name) finished the audit"
-            case .trinket: return "\(name) found a trinket"
-            case .barometer: return "\(name) saw you coming"
+            case .rehearsal: return String(format: String(localized: "beat.rehearsed"), name)
+            case .sprout: return String(format: String(localized: "beat.watered"), name)
+            case .weekGrid: return String(format: String(localized: "beat.finished_audit"), name)
+            case .trinket: return String(format: String(localized: "beat.found_trinket"), name)
+            case .barometer: return String(format: String(localized: "beat.saw_coming"), name)
             }
         }
     }

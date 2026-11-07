@@ -31,11 +31,13 @@ struct SettingsView: View {
 
     /// v16 F1: "Ember · day 23 · old friends" — the About line. Bond is
     /// never a meter; at the confidant level the line says so in words.
+    /// v25: localized (en/fr).
     private var aboutLine: String {
         let memory = CompanionMemoryStore().load()
         let days = memory.map { CompanionMemoryStore.dayDistance(from: $0.firstLaunch, to: Date()) + 1 } ?? 1
         let confidant = memory.map { BondRules.isConfidant($0.bondLevel) } ?? false
-        return "\(stageName) · day \(days)" + (confidant ? " · old friends" : "")
+        let base = String(format: String(localized: "about.day"), stageName, days)
+        return confidant ? base + " · " + String(localized: "postcard.old_friends") : base
     }
 
     var body: some View {
@@ -92,10 +94,20 @@ struct SettingsView: View {
                 Section {
                     Toggle("Calendar", isOn: $lifeSenseCalendar)
                         .accessibilityHint("Your companion can notice when a calendar event is about to start")
+                        // v25 (audit M2): ask at the opt-in moment, not later.
+                        .onChange(of: lifeSenseCalendar) { on in
+                            if on { CalendarSenseBridge().requestAccessIfNeeded() }
+                        }
                     Toggle("Workouts & sleep", isOn: $lifeSenseHealth)
                         .accessibilityHint("Your companion can celebrate your saved workouts and notice your sleep")
+                        .onChange(of: lifeSenseHealth) { on in
+                            if on { HealthSenseBridge().requestAccessIfNeeded() }
+                        }
                     Toggle("Weather", isOn: $lifeSenseWeather)
                         .accessibilityHint("Your companion can notice the current weather where you are")
+                        .onChange(of: lifeSenseWeather) { on in
+                            if on { WeatherSenseBridge().requestLocationAuthorizationIfNeeded() }
+                        }
                 } header: {
                     Text("Life sense")
                 } footer: {

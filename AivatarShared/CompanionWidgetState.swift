@@ -67,19 +67,21 @@ nonisolated struct CompanionWidgetSnapshot: Codable, Sendable, Equatable {
         CompanionWidgetSnapshot(archetypeRaw: archetypeRaw, name: name, streakDays: streakDays)
     }
 
-    /// Lenient decode (G8): v12 snapshots (no v2 keys) load defaulted.
+    /// Lenient decode (G8 + v25 fault isolation): v12 snapshots (no v2 keys)
+    /// load defaulted, and a corrupt/unknown value (e.g. a future presence
+    /// raw value) falls back to the default instead of failing the snapshot.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        archetypeRaw = try c.decode(String.self, forKey: .archetypeRaw)
-        name = try c.decode(String.self, forKey: .name)
-        streakDays = try c.decodeIfPresent(Int.self, forKey: .streakDays) ?? 1
-        presence = try c.decodeIfPresent(CompanionPresence.self, forKey: .presence) ?? .asleep
-        line = try c.decodeIfPresent(String.self, forKey: .line) ?? ""
-        dayCount = try c.decodeIfPresent(Int.self, forKey: .dayCount) ?? 1
-        animalName = try c.decodeIfPresent(String.self, forKey: .animalName) ?? ""
-        lastSeen = try c.decodeIfPresent(Date.self, forKey: .lastSeen)
-        lastEventAt = try c.decodeIfPresent(Date.self, forKey: .lastEventAt)
-        lastEventKindRaw = try c.decodeIfPresent(String.self, forKey: .lastEventKindRaw)
+        archetypeRaw = (try? c.decode(String.self, forKey: .archetypeRaw)) ?? "ember"
+        name = (try? c.decode(String.self, forKey: .name)) ?? "Ember"
+        streakDays = (try? c.decodeIfPresent(Int.self, forKey: .streakDays)) ?? 1
+        presence = (try? c.decodeIfPresent(CompanionPresence.self, forKey: .presence)) ?? .asleep
+        line = (try? c.decodeIfPresent(String.self, forKey: .line)) ?? ""
+        dayCount = (try? c.decodeIfPresent(Int.self, forKey: .dayCount)) ?? 1
+        animalName = (try? c.decodeIfPresent(String.self, forKey: .animalName)) ?? ""
+        lastSeen = try? c.decodeIfPresent(Date.self, forKey: .lastSeen)
+        lastEventAt = try? c.decodeIfPresent(Date.self, forKey: .lastEventAt)
+        lastEventKindRaw = try? c.decodeIfPresent(String.self, forKey: .lastEventKindRaw)
     }
 }
 
@@ -107,32 +109,33 @@ nonisolated enum CompanionStateDerivation {
     }
 
     /// The one-line copy for a state (+ the event kind when in event).
-    /// House voice: <= 8 words, playful never needy (G3/G4).
+    /// House voice: <= 8 words, playful never needy (G3/G4). v25: localized
+    /// (en/fr) via the widget bundle's strings (mirrored in the app bundle).
     static func line(for presence: CompanionPresence, lastEventKind: LifeKind?) -> String {
         switch presence {
-        case .asleep: return "napping"
-        case .awake: return "awake"
+        case .asleep: return String(localized: "presence.napping")
+        case .awake: return String(localized: "presence.awake")
         case .event:
             switch lastEventKind {
-            case .calendarSoon: return "noticed your day"
-            case .workoutDone: return "celebrated your workout"
-            case .sleptWithWatch: return "slept beside you"
-            case .weatherClass: return "checked the sky"
-            case .workoutLive: return "ran with you"
-            case .split: return "lap done"
-            case nil: return "noticed something"
+            case .calendarSoon: return String(localized: "presence.noticed_day")
+            case .workoutDone: return String(localized: "presence.celebrated_workout")
+            case .sleptWithWatch: return String(localized: "presence.slept_beside")
+            case .weatherClass: return String(localized: "presence.checked_sky")
+            case .workoutLive: return String(localized: "presence.ran_with")
+            case .split: return String(localized: "presence.lap_done")
+            case nil: return String(localized: "presence.noticed_something")
             }
         }
     }
 
     /// Inline family line: "Ember · napping".
     static func inlineLine(name: String, presence: CompanionPresence, lastEventKind: LifeKind?) -> String {
-        "\(name) · \(line(for: presence, lastEventKind: lastEventKind))"
+        String(format: String(localized: "inline.line"), name, line(for: presence, lastEventKind: lastEventKind))
     }
 
     /// Rectangular family second line: "day 23 · napping".
     static func rectangularLine(dayCount: Int, presence: CompanionPresence, lastEventKind: LifeKind?) -> String {
-        "day \(dayCount) · \(line(for: presence, lastEventKind: lastEventKind))"
+        String(format: String(localized: "rect.line"), dayCount, line(for: presence, lastEventKind: lastEventKind))
     }
 
     /// Timeline entry dates: now + the awake/event EXPIRY anchors + hourly

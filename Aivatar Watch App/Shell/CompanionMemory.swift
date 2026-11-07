@@ -45,23 +45,26 @@ nonisolated struct CompanionMemory: Codable, Equatable, Sendable {
         self.lastSeen = lastSeen
     }
 
-    /// Lenient decode (G8): every key is optional — a v15-era payload (or a
-    /// corrupt one) falls back to defaults instead of failing the load.
+    /// Lenient decode (G8 + v25 fault isolation): every key is optional AND
+    /// type-mismatch-tolerant (`try?` per field) — one corrupt value falls
+    /// back to its default instead of failing the whole decode. Life-log
+    /// entries decode through Fallible so one bad entry drops only itself.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        firstLaunch = try c.decodeIfPresent(Date.self, forKey: .firstLaunch) ?? Date()
-        lastSeen = try c.decodeIfPresent(Date.self, forKey: .lastSeen) ?? Date()
-        sessions = try c.decodeIfPresent(Int.self, forKey: .sessions) ?? 0
-        streakDays = try c.decodeIfPresent(Int.self, forKey: .streakDays) ?? 0
-        sproutDays = try c.decodeIfPresent(Double.self, forKey: .sproutDays) ?? 0
-        rehearsalLevel = try c.decodeIfPresent(Int.self, forKey: .rehearsalLevel) ?? 0
-        trinketDay = try c.decodeIfPresent(Int.self, forKey: .trinketDay) ?? -1
-        usualHourEMA = try c.decodeIfPresent(Double.self, forKey: .usualHourEMA)
-        bondXP = try c.decodeIfPresent(Int.self, forKey: .bondXP) ?? 0
-        lifeLog = try c.decodeIfPresent([LifeLogEntry].self, forKey: .lifeLog) ?? []
-        lastPresenceDay = try c.decodeIfPresent(Int.self, forKey: .lastPresenceDay) ?? -1
-        lastGreetingDay = try c.decodeIfPresent(Int.self, forKey: .lastGreetingDay) ?? -1
-        lastBeatDay = try c.decodeIfPresent(Int.self, forKey: .lastBeatDay) ?? -1
+        firstLaunch = (try? c.decodeIfPresent(Date.self, forKey: .firstLaunch)) ?? Date()
+        lastSeen = (try? c.decodeIfPresent(Date.self, forKey: .lastSeen)) ?? Date()
+        sessions = (try? c.decodeIfPresent(Int.self, forKey: .sessions)) ?? 0
+        streakDays = (try? c.decodeIfPresent(Int.self, forKey: .streakDays)) ?? 0
+        sproutDays = (try? c.decodeIfPresent(Double.self, forKey: .sproutDays)) ?? 0
+        rehearsalLevel = (try? c.decodeIfPresent(Int.self, forKey: .rehearsalLevel)) ?? 0
+        trinketDay = (try? c.decodeIfPresent(Int.self, forKey: .trinketDay)) ?? -1
+        usualHourEMA = try? c.decodeIfPresent(Double.self, forKey: .usualHourEMA)
+        bondXP = (try? c.decodeIfPresent(Int.self, forKey: .bondXP)) ?? 0
+        lifeLog = ((try? c.decodeIfPresent([Fallible<LifeLogEntry>].self, forKey: .lifeLog)) ?? [])
+            .compactMap(\.value)
+        lastPresenceDay = (try? c.decodeIfPresent(Int.self, forKey: .lastPresenceDay)) ?? -1
+        lastGreetingDay = (try? c.decodeIfPresent(Int.self, forKey: .lastGreetingDay)) ?? -1
+        lastBeatDay = (try? c.decodeIfPresent(Int.self, forKey: .lastBeatDay)) ?? -1
     }
 
     /// Derived bond level (1...5) — F1: levels are felt, never displayed.
@@ -98,6 +101,15 @@ nonisolated struct VisitSummary: Sendable {
         InteriorityTuning(sproutGrowth: sproutGrowth, streakDays: streakDays,
                           trinketPresent: trinketPresent,
                           confidantMemento: BondRules.isConfidant(bondLevel))
+    }
+}
+
+/// Fallible decode wrapper (v25): decodes to nil on any failure so one bad
+/// element drops only itself out of a collection.
+nonisolated struct Fallible<T: Decodable & Sendable>: Decodable, Sendable {
+    let value: T?
+    init(from decoder: Decoder) {
+        value = try? T(from: decoder)
     }
 }
 

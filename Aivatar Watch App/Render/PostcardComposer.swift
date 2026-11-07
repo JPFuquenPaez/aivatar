@@ -38,12 +38,15 @@ nonisolated enum PostcardComposer {
 
     /// The auto-generated caption: "<name> · day N" + bond/weather words.
     /// House voice, <= 8 words; never raw kinds or life-log content.
+    /// v25: localized (en/fr) with placeholders.
     static func caption(_ inputs: PostcardInputs) -> String {
-        var parts = ["\(inputs.name) · day \(max(1, inputs.dayCount))"]
-        if BondRules.isConfidant(inputs.bondLevel) { parts.append("old friends") }
+        var parts = [String(format: String(localized: "postcard.day"), inputs.name, max(1, inputs.dayCount))]
+        if BondRules.isConfidant(inputs.bondLevel) {
+            parts.append(String(localized: "postcard.old_friends"))
+        }
         if let weatherClassRaw = inputs.weatherClassRaw,
            let klass = ConditionClass(rawValue: weatherClassRaw), klass != .unknown {
-            parts.append("\(klass.rawValue) day")
+            parts.append(String(format: String(localized: "postcard.weather_day"), klass.rawValue))
         }
         return parts.joined(separator: " · ")
     }

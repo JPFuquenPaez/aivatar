@@ -1,4 +1,5 @@
 import HealthKit
+import os
 import SwiftUI
 import WidgetKit
 
@@ -34,6 +35,10 @@ struct AvatarStageView: View {
     /// v11: the slow-blink ritual hint is surfaced once, after the first
     /// touch — a hidden gesture needs one visible invitation.
     @AppStorage("ritualHintShown") private var ritualHintShown = false
+    /// v25 (audit M4): one-time hint that crown paging reaches the workout
+    /// page and Settings — shown once, after onboarding.
+    @AppStorage("pagesHintShown") private var pagesHintShown = false
+    @State private var showPagesHint = false
     /// v14 sonic presence: the user's sound-listening preference, the
     /// once-per-install in-context permission ask, and the live tell.
     @AppStorage("listenForSounds") private var listenForSounds = true
@@ -93,7 +98,8 @@ struct AvatarStageView: View {
     var body: some View {
         // watchOS 10 platform pattern (v12): the system vertical-page
         // TabView renders the page indicator next to the Digital Crown and
-        // gives crown paging for free — stage on page 1, Settings on page 2.
+        // gives crown paging for free — stage on page 1, workout page 2,
+        // Settings on page 3.
         TabView {
             stage
             // v21 F6: the workout page rides the same crown paging.
@@ -133,22 +139,30 @@ struct AvatarStageView: View {
 
     private func buildContext() {
         guard let profile = try? PersonalityProfile.load(archetype) else { return }
-        let engine = AvatarEngine(
-            skeleton: try! Skeleton(document: try! RigDocument.load()),
-            profile: profile,
-            // Stable per-archetype seed (String.hashValue is
-            // randomized per launch and must never be used here).
-            seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0),
-            // Event counters go to os_log for the on-device validation
-            // pass (§3 telemetry port, §11 budgets).
-            telemetry: OsLogTelemetrySink()
-        )
+        // v25 (audit): the frozen vector engine is dormant in the live path —
+        // a missing/corrupt rig must never crash the stage. On failure we
+        // log and run sprite-only (context = nil).
+        let engine: AvatarEngine? = {
+            do {
+                return AvatarEngine(
+                    skeleton: try Skeleton(document: try RigDocument.load()),
+                    profile: profile,
+                    // Stable per-archetype seed (String.hashValue is
+                    // randomized per launch and must never be used here).
+                    seed: 20261010 + UInt64(Archetype.allCases.firstIndex(of: archetype) ?? 0),
+                    telemetry: OsLogTelemetrySink()
+                )
+            } catch {
+                Logger(subsystem: "com.aivatar", category: "stage")
+                    .error("rig load failed, running sprite-only: \(error, privacy: .public)")
+                return nil
+            }
+        }()
         // A5d interiority: record the visit, hand the persistent traces
         // to the painter (memory is an input, never wall-clock in the
         // engine). CI/debug launches may simulate absence via -absence.
         let summary = recordVisitForBuild()
-        let renderContext = AvatarRenderContext(engine: engine, interiority: summary.tuning)
-        context = renderContext
+        context = engine.map { AvatarRenderContext(engine: $0, interiority: summary.tuning) }
         // v13: the stage acts through the sprite director (the engine
         // stays registered via the session; see buildContext comments).
         let spriteDirector = SpriteDirector(
@@ -166,7 +180,7 @@ struct AvatarStageView: View {
         // Phase B: notification events reach this engine via the
         // session registry (§13 port); re-registering replaces any
         // previous context.
-        AvatarSession.shared.register(context: renderContext, director: spriteDirector, archetype: archetype)
+        AvatarSession.shared.register(context: context, director: spriteDirector, archetype: archetype)
         presentInteriority(summary)
         // v19 F5: the morning life beat — one per day, first visit of a day.
         playMorningBeatIfNeeded()
@@ -332,7 +346,16 @@ struct AvatarStageView: View {
                 .padding(.bottom, 8)
                 .padding(.horizontal, 12)
                 if showRitualHint {
-                    Text("Touch and hold to share a slow blink")
+                    Text(String(localized: "hint.slow_blink"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 34)
+                        .padding(.horizontal, 12)
+                        .transition(.opacity)
+                }
+                // v25: the one-time pages hint (workout + settings are crown pages).
+                if showPagesHint {
+                    Text(String(localized: "hint.pages"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 34)
@@ -447,6 +470,12 @@ struct AvatarStageView: View {
                 if !visible, launchOverride == nil, !pickerCompleted, !namingCompleted {
                     showNaming = true
                 }
+                // v25: the ceremony sequence closed — now the deferred mic
+                // ask may run (in-context, once, never racing a sheet).
+                if !visible, !showNaming { syncSoundPresence() }
+            }
+            .onChange(of: showNaming) { visible in
+                if !visible { syncSoundPresence() }
             }
             .onChange(of: scenePhase) { phase in
                 // v14 sonic presence: the companion only listens where
@@ -673,9 +702,11 @@ struct AvatarStageView: View {
         // v14 in-context permission ask (the notification-auth pattern):
         // once per install, at the moment the feature matters — right
         /// after the first living interaction.
+        // v25 (audit M1): mark the ask as done but DEFER the mic start until
+        // the ceremony sheets close — the TCC alert and the app sheet must
+        // not race on the first tap. syncSoundPresence() starts it then.
         if !soundPermissionAsked, listenForSounds {
             soundPermissionAsked = true
-            soundSource?.start()
         }
         if launchOverride == nil, !ceremonyShown {
             ceremonyShown = true
@@ -690,6 +721,15 @@ struct AvatarStageView: View {
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 4_500_000_000)
                 showRitualHint = false
+            }
+        } else if !pagesHintShown {
+            // v25 (audit M4): one-time hint that crown paging reaches the
+            // workout page and Settings.
+            pagesHintShown = true
+            showPagesHint = true
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 4_500_000_000)
+                showPagesHint = false
             }
         }
     }

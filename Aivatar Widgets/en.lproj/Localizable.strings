@@ -1,0 +1,14 @@
+/* Aivatar widget — English. The complication copy keys (shared derivation
+   in AivatarShared) live here so String(localized:) resolves in the widget
+   extension's own bundle. Mirrored in the app bundle for tests. */
+"presence.napping" = "napping";
+"presence.awake" = "awake";
+"presence.noticed_day" = "noticed your day";
+"presence.celebrated_workout" = "celebrated your workout";
+"presence.slept_beside" = "slept beside you";
+"presence.checked_sky" = "checked the sky";
+"presence.ran_with" = "ran with you";
+"presence.lap_done" = "lap done";
+"presence.noticed_something" = "noticed something";
+"inline.line" = "%@ · %@";
+"rect.line" = "day %d · %@";

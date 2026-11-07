@@ -222,6 +222,33 @@ final class SchemaFreezeTests: XCTestCase {
         XCTAssertEqual(full.bondLevel, 4)
     }
 
+    /// v25 fault isolation: corrupt VALUES (wrong types, one bad ring entry,
+    /// a future enum raw value) fall back per-field instead of wiping the
+    /// whole payload.
+    func testMemoryDecodesWithCorruptValuesPerField() throws {
+        let corrupt = """
+        {"firstLaunch":"not-a-date","lastSeen":1793620800,"sessions":"many","streakDays":2,
+         "sproutDays":4.0,"rehearsalLevel":0,"trinketDay":-1,"usualHourEMA":null,
+         "bondXP":"lots","lifeLog":[{"kindHash":"x","dayIndex":1},{"kindHash":7,"dayIndex":20800,"at":1793620800}],
+         "lastPresenceDay":-1,"lastGreetingDay":-1,"lastBeatDay":-1}
+        """.data(using: .utf8)!
+        let m = try JSONDecoder().decode(CompanionMemory.self, from: corrupt)
+        XCTAssertEqual(m.sessions, 0, "corrupt sessions -> default")
+        XCTAssertEqual(m.streakDays, 2, "intact fields survive")
+        XCTAssertEqual(m.lifeLog.count, 1, "only the valid ring entry survives")
+        XCTAssertEqual(m.lifeLog.first?.kindHash, 7)
+    }
+
+    func testWidgetSnapshotDecodesWithCorruptValuesPerField() throws {
+        let corrupt = """
+        {"archetypeRaw":"willow","name":"Willow","streakDays":3,"presence":"someFutureState","dayCount":"lots"}
+        """.data(using: .utf8)!
+        let s = try JSONDecoder().decode(CompanionWidgetSnapshot.self, from: corrupt)
+        XCTAssertEqual(s.presence, .asleep, "unknown/future presence raw -> asleep")
+        XCTAssertEqual(s.streakDays, 3)
+        XCTAssertEqual(s.dayCount, 1, "corrupt dayCount -> default")
+    }
+
     /// ArchetypeVisualSet resolves palette tokens from the profile.
     func testVisualSetResolvesPalette() throws {
         let profile = try PersonalityProfile.load(.ember, bundle: .main)

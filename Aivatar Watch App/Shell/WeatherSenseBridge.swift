@@ -40,6 +40,16 @@ nonisolated final class WeatherSenseBridge: LifeSenseSource, @unchecked Sendable
         self.memoryStore = memoryStore
     }
 
+    /// v25 (audit M2): ask for WhenInUse location AT THE TOGGLE FLIP (the
+    /// opt-in moment), not on the next stage visit. Idempotent; the fetch
+    /// itself still only happens on poll.
+    nonisolated func requestLocationAuthorizationIfNeeded() {
+        let manager = CLLocationManager()
+        if manager.authorizationStatus == .notDetermined {
+            manager.requestWhenInUseAuthorization()
+        }
+    }
+
     /// Sync lock helper (NSLock is unavailable directly in async contexts).
     private func withLock<T>(_ body: () -> T) -> T {
         lock.lock(); defer { lock.unlock() }
