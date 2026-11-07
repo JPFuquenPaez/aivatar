@@ -40,7 +40,29 @@ nonisolated final class SpriteDirector {
     private let blinkP: Float
     private let glanceP: Float
     private let eventP: Float
+    private let weatherDials: WeatherDials?
     private var mode: MotionAccessibilityMode = .full
+
+    /// v18 F3: the current weather condition class (an INPUT — determinism
+    /// holds because goldens inject classes, never live weather). The dials
+    /// bias the idle schedule: tempo -> quirk rate, amplitude -> glance rate,
+    /// accentBias -> mote density, hueShift -> render-time palette rotation.
+    private(set) var condition: ConditionClass = .unknown
+    private var weatherTempoMul: Float = 1
+    private var weatherGlanceMul: Float = 1
+    private var weatherMoteMul: Float = 1
+    /// Render-time hue rotation in degrees (0 = untouched palette).
+    private(set) var weatherHueShiftDeg: Float = 0
+
+    /// Sets the condition class and applies its dials (pure profile data).
+    func setCondition(_ newCondition: ConditionClass) {
+        condition = newCondition
+        let dial = weatherDials?.dial(for: newCondition) ?? WeatherDial()
+        weatherTempoMul = max(0.2, dial.tempoScale)
+        weatherGlanceMul = max(0.2, dial.amplitudeScale)
+        weatherMoteMul = min(2.0, max(0.5, 1.0 - dial.accentBias * 0.5))
+        weatherHueShiftDeg = dial.hueShiftDeg
+    }
 
     /// The acting queue: (frame id, hold ticks). Non-empty = an act plays.
     private var queue: [(frame: String, ticks: Int)] = []
@@ -92,6 +114,7 @@ nonisolated final class SpriteDirector {
         blinkP = profile.gazeProfile.blinkRatePerMin / Self.ticksPerMinute
         glanceP = profile.gazeProfile.saccadeRatePerMin / Self.ticksPerMinute * 0.35
         eventP = 0.8 / Self.ticksPerMinute * profile.motionProfile.tempoScale
+        weatherDials = profile.weatherDials
         nextMoteTick = 140 + rng.nextInt(160)
     }
 
@@ -123,9 +146,9 @@ nonisolated final class SpriteDirector {
         // v16 F1: bond biases the idle schedule — higher bond, more signature
         // quirks, fewer glances away (the companion looks at you more).
         let glanceMul: Float = (mood == .bored ? 2 : (mood == .lonely ? 0.3 : 1))
-            * BondRules.glanceAwayMultiplier(bondLevel)
+            * BondRules.glanceAwayMultiplier(bondLevel) * weatherGlanceMul
         let eventMul: Float = (mood == .playful ? 2 : (mood == .lonely ? 1.5 : 1))
-            * BondRules.quirkRateMultiplier(bondLevel)
+            * BondRules.quirkRateMultiplier(bondLevel) * weatherTempoMul
         if rng.nextFloat() < blinkP {
             play(.blink)
         } else if mode != .reduceMotionL2, rng.nextFloat() < glanceP * glanceMul {
@@ -194,7 +217,7 @@ nonisolated final class SpriteDirector {
                 }
                 if moteTicksLeft <= 0 {
                     moteCell = nil
-                    nextMoteTick = tick + 200 + rng.nextInt(200)
+                    nextMoteTick = tick + Int(Float(200 + rng.nextInt(200)) * weatherMoteMul)
                 }
             } else if tick >= nextMoteTick {
                 let edge = rng.nextInt(4)
@@ -343,6 +366,11 @@ nonisolated final class SpriteDirector {
     /// curious for a while — it noticed your day.
     func handleLifeEvent(_ event: LifeEvent) {
         if resting { return }
+        // v18 F3: a weather event also sets the condition (the ambient bias).
+        if case .weatherClass(let classHash) = event,
+           let klass = ConditionClass.fromHash(classHash) {
+            setCondition(klass)
+        }
         guard let act = Self.reactionAct(for: event, archetype: archetype) else { return }
         let kind = Self.kind(of: event)
         if lifeActThisWake { return }
@@ -393,8 +421,53 @@ nonisolated final class SpriteDirector {
             }
         case .sleptWithWatch:
             return .slowBlink                 // "slept beside you" — the soft blink
-        case .weatherClass, .workoutLive:
-            return nil                        // F3 / F6
+        case .weatherClass(let classHash):
+            guard let klass = ConditionClass.fromHash(classHash) else { return nil }
+            return Self.weatherAct(for: klass, archetype: archetype)
+        case .workoutLive:
+            return nil                        // F6
+        }
+    }
+
+    /// The per-archetype weather answer (F3): the pet's element meets the
+    /// actual element — sunny fox warms up, rain makes the frog glad, wind
+    /// makes the bird preen. Unknown classes stay neutral (no act).
+    nonisolated static func weatherAct(for condition: ConditionClass, archetype: Archetype) -> SpriteAct? {
+        switch archetype {
+        case .ember:
+            switch condition {
+            case .sunny, .hot: return .happy        // brighter sparks, bouncier
+            case .gray, .cold, .rain: return .slowBlink  // cozy huddle
+            case .wind: return .perk
+            case .unknown: return nil
+            }
+        case .willow:
+            switch condition {
+            case .rain, .sunny: return .happy       // rain: the leaf tell
+            case .hot, .cold: return .slowBlink     // shaded / slow
+            case .wind: return .look
+            case .gray, .unknown: return condition == .unknown ? nil : .slowBlink
+            }
+        case .compass:
+            switch condition {
+            case .wind: return .look                // wander jitter
+            case .cold: return .slowBlink
+            case .unknown: return nil
+            default: return .quirk                  // metronome steady
+            }
+        case .prism:
+            switch condition {
+            case .hot: return .perk
+            case .unknown: return nil
+            default: return .look                   // the turret checks the sky
+            }
+        case .nimbus:
+            switch condition {
+            case .wind: return .perk                // preen + drift
+            case .sunny: return .happy              // brighter pulse
+            case .unknown: return nil
+            default: return .look
+            }
         }
     }
 

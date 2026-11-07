@@ -107,6 +107,44 @@ nonisolated struct CompanionSprite: Sendable, Equatable {
         return diffs
     }
 
+    /// Rotates a palette hex's hue by `degrees` (HSV space, saturation and
+    /// value preserved — the value-locked ramp keeps its luminance ordering,
+    /// so the family read and the LUT budget survive). v18 F3: Prism's
+    /// temperature swings ride this; 0/360 = identity. Pure and testable.
+    static func hueRotated(_ hex: String, degrees: Double) -> String {
+        let (r, g, b) = hexToRGB(hex)
+        let rf = Double(r) / 255, gf = Double(g) / 255, bf = Double(b) / 255
+        let vMax = max(rf, gf, bf), vMin = min(rf, gf, bf)
+        let d = vMax - vMin
+        var h = 0.0
+        if d > 0 {
+            if vMax == rf { h = (gf - bf) / d + (gf < bf ? 6 : 0) }
+            else if vMax == gf { h = (bf - rf) / d + 2 }
+            else { h = (rf - gf) / d + 4 }
+            h *= 60
+        }
+        let s = vMax == 0 ? 0 : d / vMax
+        var nh = (h + degrees).truncatingRemainder(dividingBy: 360)
+        if nh < 0 { nh += 360 }
+        // HSV: chroma C = V*S = d, and m = V - C = vMin.
+        let c = d
+        let x = c * (1 - abs(nh.truncatingRemainder(dividingBy: 120) / 60 - 1))
+        let m = vMin
+        var rgb: (Double, Double, Double)
+        switch nh {
+        case 0..<60: rgb = (c, x, 0)
+        case 60..<120: rgb = (x, c, 0)
+        case 120..<180: rgb = (0, c, x)
+        case 180..<240: rgb = (0, x, c)
+        case 240..<300: rgb = (x, 0, c)
+        default: rgb = (c, 0, x)
+        }
+        func to8(_ v: Double) -> UInt8 {
+            UInt8(min(255, max(0, (v + m) * 255)).rounded())
+        }
+        return String(format: "%02X%02X%02X", to8(rgb.0), to8(rgb.1), to8(rgb.2))
+    }
+
     /// Parses a 6-digit hex string (with or without '#') into 8-bit RGB.
     static func hexToRGB(_ hex: String) -> (r: UInt8, g: UInt8, b: UInt8) {
         var value: UInt64 = 0

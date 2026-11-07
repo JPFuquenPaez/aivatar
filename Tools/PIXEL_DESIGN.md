@@ -230,6 +230,29 @@ reference mascot — the Mistral cat: a 16x14 logical grid, 5 colors,
   priority/windows, copy table (<= 8 words), timeline cap under
   adversarial inputs, icon variants, kind-hash parity app<->widget.
 
+## 7.6 Weather-aware personality (v18, Ambient Life F3)
+
+- **The pet's element meets the real element**: current conditions are
+  fetched on visit only (60-min cache, never a background poll; WeatherKit
+  watchOS 11+, dormant on 10), classified ON-DEVICE into a closed set
+  (sunny/gray/rain/wind/cold/hot/unknown). The engine sees only the class
+  hash — goldens inject classes, never live weather.
+- **Dials, not new concepts**: profile schema v3 `weatherDials` maps each
+  class to tempo/amplitude/accent/hue multipliers consumed by the EXISTING
+  idle schedule (quirk rate, glance rate, mote density). Absent block =
+  neutral (v2 profiles unchanged). Per-archetype answers: rain makes the
+  frog glad, wind makes the bird preen, gray makes the fox cozy.
+- **Hue shift stays inside the LUT budget**: render-time HSV hue rotation
+  (saturation/value preserved, <= 20 deg, Prism only) — the pinned grids
+  and palette-family tests are untouched; luminance ordering is pinned by
+  test. Weather never encodes meaning in color alone: motion/tempo changes
+  always accompany it, and copy stays in words.
+- **Emission is once per (class, day)** and the complication carries the
+  weather note via the existing event state ("checked the sky").
+- Verify: `WeatherSenseTests` + `SchemaFreezeTests` v3 pins — classify
+  table, hash round-trip, emission rule, dials parity/fallback, director
+  bias determinism, reaction parity, hue rotation purity.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,

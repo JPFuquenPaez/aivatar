@@ -35,6 +35,9 @@ struct SpriteStageRenderer: View {
 
     /// Resolved active/rest palettes (symbol -> sRGB Color, built once).
     private let activeColors: [Character: Color]
+    /// Base palette hexes, kept so the v18 weather hue shift can re-derive
+    /// the active palette per frame without touching the pinned grids.
+    private let activeHex: [Character: String]
     private let restColors: [Character: Color]
     /// The self-play mote tone: 25% of the body hue — a toy, not weather.
     private let moteColor: Color
@@ -45,8 +48,10 @@ struct SpriteStageRenderer: View {
         self.forceAwake = forceAwake
         var active: [Character: Color] = [:]
         var rest: [Character: Color] = [:]
+        var hexes: [Character: String] = [:]
         var mote = Color.black
         for (token, hex) in sprite.paletteHex {
+            hexes[token] = hex
             let rgb = CompanionSprite.hexToRGB(hex)
             active[token] = Color(.sRGB,
                 red: Double(rgb.r) / 255, green: Double(rgb.g) / 255, blue: Double(rgb.b) / 255)
@@ -60,8 +65,24 @@ struct SpriteStageRenderer: View {
             }
         }
         activeColors = active
+        activeHex = hexes
         restColors = rest
         moteColor = mote
+    }
+
+    /// The palette for a frame: rest uses the dim LOD; active applies the
+    /// v18 weather hue shift (only when non-zero) on top of the pinned LUT.
+    private func palette(rest: Bool) -> [Character: Color] {
+        guard !rest else { return restColors }
+        let shift = director.weatherHueShiftDeg
+        guard abs(shift) >= 0.5 else { return activeColors }
+        var out: [Character: Color] = [:]
+        for (token, hex) in activeHex {
+            let rgb = CompanionSprite.hexToRGB(CompanionSprite.hueRotated(hex, degrees: Double(shift)))
+            out[token] = Color(.sRGB,
+                red: Double(rgb.r) / 255, green: Double(rgb.g) / 255, blue: Double(rgb.b) / 255)
+        }
+        return out
     }
 
     var body: some View {
@@ -130,7 +151,7 @@ struct SpriteStageRenderer: View {
                            overlay: [CompanionSprite.CellDiff], rest: Bool,
                            mote: (x: Int, y: Int)?) {
         let grid = sprite.symbols(frameID: frameID, overlay: overlay)
-        let palette = rest ? restColors : activeColors
+        let palette = palette(rest: rest)
         // Fill-width cell: the sprite spans the screen width exactly and
         // its content center sits slightly above the vertical middle (face
         // in the upper-third glance zone, §9).

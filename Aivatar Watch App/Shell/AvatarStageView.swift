@@ -41,6 +41,8 @@ struct AvatarStageView: View {
     /// Polled on visit/wake only — never in a background loop.
     @AppStorage("lifeSenseCalendar") private var lifeSenseCalendar = false
     @AppStorage("lifeSenseHealth") private var lifeSenseHealth = false
+    /// v18 F3 weather: opt-in; fetched on visit with a 60-min cache.
+    @AppStorage("lifeSenseWeather") private var lifeSenseWeather = false
     @State private var isListening = false
     @State private var context: AvatarRenderContext?
     /// v13: the authored-sprite stage's actor (the engine below stays
@@ -70,6 +72,8 @@ struct AvatarStageView: View {
     /// v17 F2: the life-sense bridges, created once, polled on visit/wake.
     @State private var calendarBridge: CalendarSenseBridge?
     @State private var healthBridge: HealthSenseBridge?
+    /// v18 F3: the weather bridge (watchOS 11+; dormant below).
+    @State private var weatherBridge: WeatherSenseBridge?
 
     init(archetype: Archetype? = nil) {
         launchOverride = archetype
@@ -456,7 +460,7 @@ struct AvatarStageView: View {
     @MainActor
     private func pollLifeSense() {
         guard scenePhase == .active, !isLuminanceReduced || Self.forceAwake else { return }
-        guard lifeSenseCalendar || lifeSenseHealth else { return }
+        guard lifeSenseCalendar || lifeSenseHealth || lifeSenseWeather else { return }
         let now = Date()
         var events: [LifeEvent] = []
         if lifeSenseCalendar {
@@ -473,14 +477,23 @@ struct AvatarStageView: View {
             }
             events += healthBridge?.poll(now: now) ?? []
         }
+        if lifeSenseWeather {
+            if weatherBridge == nil { weatherBridge = WeatherSenseBridge() }
+            events += weatherBridge?.poll(now: now) ?? []
+        }
         guard !events.isEmpty else { return }
         let store = CompanionMemoryStore()
         var memory = store.load() ?? CompanionMemory()
         let dayIndex = CompanionMemoryStore.dayIndex(of: now)
         for event in events {
             AvatarSession.shared.handleLifeEvent(event)
+            let classHash: Int? = {
+                if case .weatherClass(let h) = event { return h }
+                return nil
+            }()
             memory.appendLifeLog(LifeLogEntry(
-                kindHash: LifeSenseMapping.kindHash(of: event), dayIndex: dayIndex, at: now))
+                kindHash: LifeSenseMapping.kindHash(of: event), dayIndex: dayIndex, at: now,
+                classHash: classHash))
         }
         store.save(memory)
         // v18 F4: a life event flips the watch-face presence to "event" —

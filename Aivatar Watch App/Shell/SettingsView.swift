@@ -19,6 +19,8 @@ struct SettingsView: View {
     /// fully dormant (no polling, no permission ask).
     @AppStorage("lifeSenseCalendar") private var lifeSenseCalendar = false
     @AppStorage("lifeSenseHealth") private var lifeSenseHealth = false
+    /// v18 F3 weather: opt-in; current conditions fetched on visit, cached.
+    @AppStorage("lifeSenseWeather") private var lifeSenseWeather = false
     @State private var showNaming = false
 
     private var stageName: String {
@@ -90,10 +92,12 @@ struct SettingsView: View {
                         .accessibilityHint("Your companion can notice when a calendar event is about to start")
                     Toggle("Workouts & sleep", isOn: $lifeSenseHealth)
                         .accessibilityHint("Your companion can celebrate your saved workouts and notice your sleep")
+                    Toggle("Weather", isOn: $lifeSenseWeather)
+                        .accessibilityHint("Your companion can notice the current weather where you are")
                 } header: {
                     Text("Life sense")
                 } footer: {
-                    Text("While Aivatar is open, your companion can react to upcoming calendar events and to workouts and sleep saved in Health — read on this watch only. Event titles and health details are never stored, only a hash, and nothing ever leaves the watch.")
+                    Text("While Aivatar is open, your companion can react to upcoming calendar events, to workouts and sleep saved in Health, and to the current weather at your location — read on this watch only, fetched at most once an hour. Event titles, health details, and weather are never stored beyond a hash, and nothing ever leaves the watch.")
                         .font(.footnote)
                 }
                 Section("About") {

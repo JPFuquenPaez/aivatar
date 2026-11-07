@@ -247,6 +247,15 @@ nonisolated struct PersonalityProfile: Codable, Sendable, Equatable {
     var quirkLoop: QuirkLoop?
     /// v3 voice copy style (future chat surface; metadata only).
     var voiceStyle: String?
+    /// Schema v3 (v18 F3 weather-aware personality, additive): per-condition
+    /// dials. Absent block = neutral behavior (all 1.0/0) — v2 profiles
+    /// still load and behave exactly as before (G8).
+    var weatherDials: WeatherDials?
+
+    /// The weather dial for a condition; nil dials (v2 profiles) = neutral.
+    func dial(for condition: ConditionClass) -> WeatherDial {
+        weatherDials?.dial(for: condition) ?? WeatherDial()
+    }
 
     static func load(_ archetype: Archetype, bundle: Bundle = .main) throws -> PersonalityProfile {
         guard let url = bundle.url(forResource: "profile_\(archetype.rawValue)", withExtension: "json", subdirectory: "AvatarAssets")
@@ -258,6 +267,30 @@ nonisolated struct PersonalityProfile: Codable, Sendable, Equatable {
         } catch {
             throw ProfileError.invalidJSON(archetype.rawValue, error)
         }
+    }
+}
+
+/// One condition class's dials (schema v3, F3). All fields default to
+/// neutral, so partial blocks are safe.
+nonisolated struct WeatherDial: Codable, Sendable, Equatable {
+    /// Multiplies the idle quirk rate (tempo) — e.g. sunny Ember is bouncier.
+    var tempoScale: Float = 1
+    /// Multiplies the glance/wander rate (amplitude) — e.g. wind jitters.
+    var amplitudeScale: Float = 1
+    /// Biases ambient accent density (mote spawn rate), -1...1.
+    var accentBias: Float = 0
+    /// Render-time palette hue rotation in degrees (Prism's temperature
+    /// swings); 0 = untouched. Kept inside the LUT budget.
+    var hueShiftDeg: Float = 0
+}
+
+/// Per-condition dial table, keyed by ConditionClass rawValue.
+nonisolated struct WeatherDials: Codable, Sendable, Equatable {
+    var classes: [String: WeatherDial] = [:]
+
+    /// The dial for a condition; unknown/missing classes are neutral.
+    func dial(for condition: ConditionClass) -> WeatherDial {
+        classes[condition.rawValue] ?? WeatherDial()
     }
 }
 

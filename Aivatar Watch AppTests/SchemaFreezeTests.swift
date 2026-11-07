@@ -30,9 +30,11 @@ final class SchemaFreezeTests: XCTestCase {
         // unified cloud-species — tint + token + tell stack; schema v2
         // fields (speciesTokens, motionGrammar, gazePolicy, blink, tell,
         // quirkLoop, voiceStyle) are additive and validated below.
+        // v3.0.0 (v18 F3): +weatherDials (additive, optional — v2 profiles
+        // still load and fall back to neutral dials).
         let expectedVersions: [Archetype: String] = [
-            .ember: "2.0.0", .willow: "2.0.0", .compass: "2.0.0",
-            .prism: "2.0.0", .nimbus: "2.0.0",
+            .ember: "3.0.0", .willow: "3.0.0", .compass: "3.0.0",
+            .prism: "3.0.0", .nimbus: "3.0.0",
         ]
         for archetype in Archetype.allCases {
             let profile = try PersonalityProfile.load(archetype, bundle: .main)
@@ -77,6 +79,47 @@ final class SchemaFreezeTests: XCTestCase {
         XCTAssertEqual(tells.count, Archetype.allCases.count, "each archetype must own a unique tell")
         XCTAssertEqual(quirks.count, Archetype.allCases.count, "each archetype must own a unique quirk loop")
         XCTAssertEqual(policies.count, Archetype.allCases.count, "each archetype must own a unique gaze policy")
+    }
+
+    /// Schema v3 (v18 F3): every profile carries a weatherDials table with
+    /// all seven condition classes, neutral "unknown", dials in range —
+    /// and the per-archetype intent (Prism owns the hue shifts).
+    func testWeatherDialsV3PresentAndParity() throws {
+        for archetype in Archetype.allCases {
+            let profile = try PersonalityProfile.load(archetype, bundle: .main)
+            let dials = try XCTUnwrap(profile.weatherDials, "\(archetype.rawValue): weatherDials required at assetVersion 3")
+            XCTAssertEqual(Set(dials.classes.keys), Set(ConditionClass.allCases.map(\.rawValue)),
+                           "\(archetype.rawValue): all condition classes present")
+            let unknown = try XCTUnwrap(dials.classes["unknown"])
+            XCTAssertEqual(unknown, WeatherDial(), "\(archetype.rawValue): unknown is neutral")
+            for (_, dial) in dials.classes {
+                XCTAssertGreaterThan(dial.tempoScale, 0)
+                XCTAssertGreaterThan(dial.amplitudeScale, 0)
+                XCTAssertLessThanOrEqual(abs(dial.accentBias), 1)
+                XCTAssertLessThanOrEqual(abs(dial.hueShiftDeg), 20, "hue shifts stay inside the LUT budget")
+            }
+        }
+        // Prism is the hue-shift archetype; the others keep their palette.
+        let prism = try XCTUnwrap(try PersonalityProfile.load(.prism, bundle: .main).weatherDials)
+        XCTAssertTrue(prism.classes.values.contains { $0.hueShiftDeg != 0 })
+        for archetype in Archetype.allCases where archetype != .prism {
+            let dials = try XCTUnwrap(try PersonalityProfile.load(archetype, bundle: .main).weatherDials)
+            XCTAssertTrue(dials.classes.values.allSatisfy { $0.hueShiftDeg == 0 },
+                          "\(archetype.rawValue): only Prism rotates hue")
+        }
+    }
+
+    /// G8: a v2 profile (no weatherDials key) still decodes, dials nil —
+    /// the director falls back to neutral multipliers.
+    func testProfileV2WithoutWeatherDialsFallsBack() throws {
+        let profile = try PersonalityProfile.load(.ember, bundle: .main)
+        let data = try JSONEncoder().encode(profile)
+        var dict = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        dict.removeValue(forKey: "weatherDials")
+        let v2data = try JSONSerialization.data(withJSONObject: dict)
+        let decoded = try JSONDecoder().decode(PersonalityProfile.self, from: v2data)
+        XCTAssertNil(decoded.weatherDials)
+        XCTAssertEqual(decoded.dial(for: .rain), WeatherDial(), "nil dials = neutral")
     }
 
     /// §10 parity: every gesture clip must exist for every archetype

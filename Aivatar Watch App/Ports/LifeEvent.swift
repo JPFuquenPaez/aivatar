@@ -33,11 +33,15 @@ nonisolated struct LifeLogEntry: Codable, Equatable, Sendable {
     /// When it happened (v18 F4: drives the complication's event window).
     /// nil in v16/v17 entries — decoded leniently.
     var at: Date?
+    /// For weatherClass entries: the condition-class hash (content-free).
+    /// nil otherwise / in older entries — decoded leniently.
+    var classHash: Int?
 
-    init(kindHash: Int, dayIndex: Int, at: Date? = nil) {
+    init(kindHash: Int, dayIndex: Int, at: Date? = nil, classHash: Int? = nil) {
         self.kindHash = kindHash
         self.dayIndex = dayIndex
         self.at = at
+        self.classHash = classHash
     }
 
     init(from decoder: Decoder) throws {
@@ -45,6 +49,7 @@ nonisolated struct LifeLogEntry: Codable, Equatable, Sendable {
         kindHash = try c.decode(Int.self, forKey: .kindHash)
         dayIndex = try c.decode(Int.self, forKey: .dayIndex)
         at = try c.decodeIfPresent(Date.self, forKey: .at)
+        classHash = try c.decodeIfPresent(Int.self, forKey: .classHash)
     }
 }
 

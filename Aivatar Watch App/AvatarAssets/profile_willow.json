@@ -37,5 +37,7 @@
   "voiceStyle": "understated, present progressive, no exclamation marks",
   "gesturePoolWeights": { "wave": 0.15, "bounce": 0.0, "stretch": 0.25, "spin": 0.0, "nod": 0.3, "tilt": 0.1, "lookAround": 0.0, "shiftWeight": 0.0, "shiver": 0.0, "doubleTake": 0.0, "sparkle": 0.0, "puff": 0.0, "preen": 0.0, "swayCatch": 0.2, "tick": 0.0, "mirror": 0.0, "driftFloat": 0.0, "slowBlink": 0.0 },
   "quirks": ["long soft blinks", "leaf sway on weight shift"],
-  "assetVersion": "2.0.0"
+  "assetVersion": "3.0.0"
+,
+  "weatherDials": { "classes": {"sunny": {"tempoScale": 1.0, "amplitudeScale": 1.0, "accentBias": 0.1, "hueShiftDeg": 0}, "gray": {"tempoScale": 0.9, "amplitudeScale": 0.9, "accentBias": 0.0, "hueShiftDeg": 0}, "rain": {"tempoScale": 1.25, "amplitudeScale": 1.1, "accentBias": 0.3, "hueShiftDeg": 0}, "wind": {"tempoScale": 1.0, "amplitudeScale": 1.1, "accentBias": 0.1, "hueShiftDeg": 0}, "cold": {"tempoScale": 0.8, "amplitudeScale": 0.9, "accentBias": -0.1, "hueShiftDeg": 0}, "hot": {"tempoScale": 0.65, "amplitudeScale": 0.8, "accentBias": -0.2, "hueShiftDeg": 0}, "unknown": {"tempoScale": 1.0, "amplitudeScale": 1.0, "accentBias": 0.0, "hueShiftDeg": 0}} }
 }
