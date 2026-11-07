@@ -525,31 +525,35 @@ struct AvatarStageView: View {
         guard scenePhase == .active, !isLuminanceReduced || Self.forceAwake else { return }
         guard lifeSenseCalendar || lifeSenseHealth || lifeSenseWeather else { return }
         let now = Date()
-        var events: [LifeEvent] = []
-        if lifeSenseCalendar {
-            if calendarBridge == nil {
-                calendarBridge = CalendarSenseBridge()
-                calendarBridge?.requestAccessIfNeeded()
+        // v23: polls are async (HealthKit/EventKit queries must never block
+        // the main thread) — run them off-main-actor in one task.
+        Task { @MainActor in
+            var events: [LifeEvent] = []
+            if lifeSenseCalendar {
+                if calendarBridge == nil {
+                    calendarBridge = CalendarSenseBridge()
+                    calendarBridge?.requestAccessIfNeeded()
+                }
+                events += await calendarBridge?.poll(now: now) ?? []
             }
-            events += calendarBridge?.poll(now: now) ?? []
-        }
-        if lifeSenseHealth {
-            if healthBridge == nil {
-                healthBridge = HealthSenseBridge()
-                healthBridge?.requestAccessIfNeeded()
+            if lifeSenseHealth {
+                if healthBridge == nil {
+                    healthBridge = HealthSenseBridge()
+                    healthBridge?.requestAccessIfNeeded()
+                }
+                events += await healthBridge?.poll(now: now) ?? []
             }
-            events += healthBridge?.poll(now: now) ?? []
-        }
-        if lifeSenseWeather {
-            if weatherBridge == nil { weatherBridge = WeatherSenseBridge() }
-            events += weatherBridge?.poll(now: now) ?? []
-        }
-        guard !events.isEmpty else { return }
-        for event in events {
-            AvatarSession.shared.handleLifeEvent(event)
-            logLifeEvent(event, now: now)
-            // v22 F7: a noticed life event gets one soft haptic (capped).
-            HapticsChannel.shared.play(.lifeEvent, archetype: archetype)
+            if lifeSenseWeather {
+                if weatherBridge == nil { weatherBridge = WeatherSenseBridge() }
+                events += await weatherBridge?.poll(now: now) ?? []
+            }
+            guard !events.isEmpty else { return }
+            for event in events {
+                AvatarSession.shared.handleLifeEvent(event)
+                logLifeEvent(event, now: now)
+                // v22 F7: a noticed life event gets one soft haptic (capped).
+                HapticsChannel.shared.play(.lifeEvent, archetype: archetype)
+            }
         }
     }
 

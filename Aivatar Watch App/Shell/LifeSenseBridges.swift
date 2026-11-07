@@ -100,17 +100,25 @@ nonisolated final class CalendarSenseBridge: LifeSenseSource, @unchecked Sendabl
         self.memoryStore = memoryStore
     }
 
+    /// Sync lock helper (NSLock is unavailable directly in async contexts).
+    private func withLock<T>(_ body: () -> T) -> T {
+        lock.lock(); defer { lock.unlock() }
+        return body()
+    }
+
     /// In-context authorization ask — called once, when the user enables the
     /// toggle (not at launch: a prompt with nothing behind it is worse than
     /// none, watchOS HIG). Idempotent.
     nonisolated func requestAccessIfNeeded() {
-        lock.lock()
-        if accessRequested { lock.unlock(); return }
-        accessRequested = true
-        let status = EKEventStore.authorizationStatus(for: .event)
-        if status == .fullAccess { authorized = true; lock.unlock(); return }
-        lock.unlock()
-        guard status == .notDetermined else { return }
+        let (shouldAsk, status) = withLock {
+            if accessRequested { return (false, EKEventStore.authorizationStatus(for: .event)) }
+            accessRequested = true
+            let s = EKEventStore.authorizationStatus(for: .event)
+            if s == .fullAccess { authorized = true }
+            return (true, s)
+        }
+        if status == .fullAccess { return }
+        guard status == .notDetermined, shouldAsk else { return }
         store.requestFullAccessToEvents { [weak self] granted, _ in
             guard let self else { return }
             self.lock.lock()
@@ -121,11 +129,8 @@ nonisolated final class CalendarSenseBridge: LifeSenseSource, @unchecked Sendabl
 
     /// On-demand poll. Returns [] when unauthorized or when today's cap is
     /// spent (the cap counts lifeLog entries, not raw events).
-    nonisolated func poll(now: Date) -> [LifeEvent] {
-        lock.lock()
-        let ok = authorized
-        lock.unlock()
-        guard ok else { return [] }
+    nonisolated func poll(now: Date) async -> [LifeEvent] {
+        guard withLock({ authorized }) else { return [] }
         let predicate = store.predicateForEvents(
             withStart: now, end: now + LifeSenseMapping.calendarSoonWindowSec, calendars: nil)
         let items = store.events(matching: predicate).map {
@@ -161,6 +166,12 @@ nonisolated final class HealthSenseBridge: LifeSenseSource, @unchecked Sendable 
         self.store = healthStore
     }
 
+    /// Sync lock helper (NSLock is unavailable directly in async contexts).
+    private func withLock<T>(_ body: () -> T) -> T {
+        lock.lock(); defer { lock.unlock() }
+        return body()
+    }
+
     /// The read set is named exactly in the consent copy: saved workouts and
     /// sleep analysis, read-only, on this watch.
     private static var readTypes: Set<HKObjectType> {
@@ -169,98 +180,116 @@ nonisolated final class HealthSenseBridge: LifeSenseSource, @unchecked Sendable 
 
     nonisolated func requestAccessIfNeeded() {
         guard let store else { return }
-        lock.lock()
-        if accessRequested { lock.unlock(); return }
-        accessRequested = true
-        lock.unlock()
+        if withLock({ accessRequested }) { return }
+        withLock { accessRequested = true }
         store.requestAuthorization(toShare: [], read: Self.readTypes) { [weak self] granted, _ in
-            guard let self else { return }
-            self.lock.lock()
-            self.authorized = granted
-            self.lock.unlock()
+            self?.withLock { self?.authorized = granted }
         }
     }
 
-    nonisolated func poll(now: Date) -> [LifeEvent] {
+    nonisolated func poll(now: Date) async -> [LifeEvent] {
         guard let store else { return [] }
-        lock.lock()
-        let ok = authorized
-        lock.unlock()
-        guard ok else { return [] }
+        guard withLock({ authorized }) else { return [] }
 
         var events: [LifeEvent] = []
-        events += pollWorkouts(store: store, now: now)
-        events += pollSleep(store: store, now: now)
+        events += await pollWorkouts(store: store, now: now)
+        events += await pollSleep(store: store, now: now)
         return events
     }
 
     /// Anchored query: only NEW saved workouts since the last poll produce an
     /// event (a re-open must not re-celebrate yesterday's run — G4-adjacent:
-    /// reactions, never nags).
-    private func pollWorkouts(store: HKHealthStore, now: Date) -> [LifeEvent] {
+    /// reactions, never nags). Async (v23): the query resolves via a
+    /// continuation, never a main-thread semaphore.
+    private func pollWorkouts(store: HKHealthStore, now: Date) async -> [LifeEvent] {
         let queryAnchor = defaults.data(forKey: Self.anchorKey)
             .flatMap { try? NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: $0) }
-        let box = ResultBox<[LifeEvent]>([])
-        let semaphore = DispatchSemaphore(value: 0)
+        let once = OnceBox<[LifeEvent]>([])
         let query = HKAnchoredObjectQuery(
             type: HKObjectType.workoutType(),
             predicate: HKQuery.predicateForSamples(withStart: now.addingTimeInterval(-7 * 86_400), end: now, options: []),
             anchor: queryAnchor,
             limit: HKObjectQueryNoLimit
         ) { _, samples, _, newAnchor, error in
-            defer { semaphore.signal() }
             guard error == nil else { return }
             if let data = try? NSKeyedArchiver.archivedData(withRootObject: newAnchor, requiringSecureCoding: true) {
                 self.defaults.set(data, forKey: Self.anchorKey)
             }
-            box.value = (samples as? [HKWorkout] ?? []).map {
+            let result = (samples as? [HKWorkout] ?? []).map {
                 LifeSenseMapping.workoutDoneEvent(.init(
                     activityRaw: Int($0.workoutActivityType.rawValue),
                     durationSec: $0.duration))
             }
+            once.set(result)  // initial + any update callbacks; resume once
         }
         store.execute(query)
-        _ = semaphore.wait(timeout: .now() + 5)
-        return box.value
+        return await withCheckedContinuation { cont in
+            once.onSet = { cont.resume(returning: $0) }
+            // Safety timeout in case no callback ever arrives.
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                once.setIfUnset([])
+            }
+        }
     }
 
     /// Sleep analysis for the last night, once per calendar day.
-    private func pollSleep(store: HKHealthStore, now: Date) -> [LifeEvent] {
+    private func pollSleep(store: HKHealthStore, now: Date) async -> [LifeEvent] {
         let dayIndex = CompanionMemoryStore.dayIndex(of: now)
         if defaults.integer(forKey: Self.sleepDayKey) == dayIndex { return [] }
         let start = now.addingTimeInterval(-12 * 3_600)
         let predicate = HKQuery.predicateForSamples(withStart: start, end: now, options: [])
-        let box = ResultBox<Bool>(false)
-        let semaphore = DispatchSemaphore(value: 0)
+        let once = OnceBox<Bool>(false)
         let query = HKSampleQuery(
             sampleType: HKCategoryType(.sleepAnalysis),
             predicate: predicate,
             limit: HKObjectQueryNoLimit,
             sortDescriptors: nil
         ) { _, samples, _ in
-            defer { semaphore.signal() }
-            box.value = (samples as? [HKCategorySample])?.contains {
+            once.set((samples as? [HKCategorySample])?.contains {
                 $0.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue
                     || $0.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue
                     || $0.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue
                     || $0.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue
-            } ?? false
+            } ?? false)
         }
         store.execute(query)
-        _ = semaphore.wait(timeout: .now() + 5)
-        guard box.value else { return [] }
+        let slept = await withCheckedContinuation { cont in
+            once.onSet = { cont.resume(returning: $0) }
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                once.setIfUnset(false)
+            }
+        }
+        guard slept else { return [] }
         defaults.set(dayIndex, forKey: Self.sleepDayKey)
         return LifeSenseMapping.sleepEvent(sleptWithWatch: true)
     }
 
-    /// Sendable box for query callbacks (Swift 6 closure captures).
-    private final class ResultBox<T: Sendable>: @unchecked Sendable {
+    /// Resume-once box for query callbacks (v23: replaces semaphore waits).
+    private final class OnceBox<T: Sendable>: @unchecked Sendable {
         private let lock = NSLock()
         private var _value: T
-        var value: T {
-            get { lock.lock(); defer { lock.unlock() }; return _value }
-            set { lock.lock(); _value = newValue; lock.unlock() }
-        }
+        private var _set = false
+        var onSet: (@Sendable (T) -> Void)?
         init(_ value: T) { _value = value }
+        func set(_ value: T) {
+            lock.lock()
+            _value = value
+            let fire = !_set
+            _set = true
+            let h = onSet
+            lock.unlock()
+            if fire { h?(value) }
+        }
+        func setIfUnset(_ value: T) {
+            lock.lock()
+            let wasSet = _set
+            if !wasSet { _value = value; _set = true }
+            let h = onSet
+            lock.unlock()
+            if !wasSet { h?(value) }
+        }
     }
+
 }

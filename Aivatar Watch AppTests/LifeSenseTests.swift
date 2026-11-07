@@ -97,8 +97,9 @@ final class LifeSenseTests: XCTestCase {
         XCTAssertEqual(LifeSenseMapping.sleepEvent(sleptWithWatch: false), [])
     }
 
-    func testNullLifeSenseSourceIsDormant() {
-        XCTAssertEqual(NullLifeSenseSource().poll(now: base), [], "no consent -> nothing, ever")
+    func testNullLifeSenseSourceIsDormant() async {
+        let events = await NullLifeSenseSource().poll(now: base)
+        XCTAssertEqual(events, [], "no consent -> nothing, ever")
     }
 
     // MARK: - Reaction mapping parity

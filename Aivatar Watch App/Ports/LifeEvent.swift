@@ -58,15 +58,16 @@ nonisolated struct LifeLogEntry: Codable, Equatable, Sendable {
 /// LifeSenseSource (§0): a bridge that polls a system signal on demand —
 /// on visit/wake only, never in a background loop (G9: zero rest-state
 /// cost). The engine never sees this protocol; the shell polls and emits
-/// LifeEvents on the AvatarEvent path.
+/// LifeEvents on the AvatarEvent path. `poll` is async (v23): HealthKit /
+/// EventKit queries must never block the main thread with a semaphore.
 nonisolated protocol LifeSenseSource: Sendable {
     /// Events observed since the last poll. Pure translation; no content.
-    func poll(now: Date) -> [LifeEvent]
+    func poll(now: Date) async -> [LifeEvent]
 }
 
 /// Null stub: with no consent granted the feature is fully dormant and
 /// the app is indistinguishable from one without life sense (F2 acceptance).
 nonisolated struct NullLifeSenseSource: LifeSenseSource {
     nonisolated init() {}
-    nonisolated func poll(now: Date) -> [LifeEvent] { [] }
+    nonisolated func poll(now: Date) async -> [LifeEvent] { [] }
 }

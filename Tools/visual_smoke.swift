@@ -88,10 +88,12 @@ let paletteChecks: [(name: String, desc: String,
 var failed = false
 print("archetype | coverage | regionBright | centroidX | brightAvg          | result")
 for entry in paletteChecks {
-    let s = analyze(path: "\(dir)/smoke-\(entry.name).png")
+    let s = analyze(path: "\(dir)/\(entry.name).png")
     var reasons: [String] = []
-    if s.coverage < 0.03 {
-        reasons.append("coverage \(String(format: "%.1f", s.coverage * 100))% < 3% (screen nearly black?)")
+    // v23: the dimmed watch face alone reads ~3.4% coverage and can sneak
+    // through cool-palette checks — a painted avatar is ~30%+. Floor at 10%.
+    if s.coverage < 0.10 {
+        reasons.append("coverage \(String(format: "%.1f", s.coverage * 100))% < 10% (watch face or unpainted app, not the avatar)")
     }
     if s.regionBright < 1500 {
         reasons.append("region bright px \(s.regionBright) < 1500 (avatar missing from its band?)")

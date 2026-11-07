@@ -40,6 +40,12 @@ nonisolated final class WeatherSenseBridge: LifeSenseSource, @unchecked Sendable
         self.memoryStore = memoryStore
     }
 
+    /// Sync lock helper (NSLock is unavailable directly in async contexts).
+    private func withLock<T>(_ body: () -> T) -> T {
+        lock.lock(); defer { lock.unlock() }
+        return body()
+    }
+
     // MARK: - Pure core (unit-tested without WeatherKit/location)
 
     /// Classify raw conditions into the closed set. Inputs are plain values
@@ -74,14 +80,12 @@ nonisolated final class WeatherSenseBridge: LifeSenseSource, @unchecked Sendable
 
     // MARK: - LifeSenseSource
 
-    /// Sync poll: returns the weather event when the cached class is known
-    /// and not yet logged today. Kicks an async refresh when the cache is
-    /// stale (fire-and-forget — poll itself never blocks on the network).
-    nonisolated func poll(now: Date) -> [LifeEvent] {
-        lock.lock()
-        let klass = cachedClass
-        let at = cachedAt
-        lock.unlock()
+    /// Async poll (v23 protocol): returns the weather event when the cached
+    /// class is known and not yet logged today. Kicks an async refresh when
+    /// the cache is stale (fire-and-forget — poll itself never blocks on the
+    /// network).
+    nonisolated func poll(now: Date) async -> [LifeEvent] {
+        let klass = withLock { cachedClass }
         refreshIfStale(now: now)
         guard let klass, klass != .unknown else { return [] }
         let dayIndex = CompanionMemoryStore.dayIndex(of: now)
@@ -134,7 +138,10 @@ nonisolated final class WeatherSenseBridge: LifeSenseSource, @unchecked Sendable
     }
 
     /// One-shot device location via CLLocationManager (WhenInUse). Any failure
-    /// throws -> .unknown -> neutral behavior, never a crash.
+    /// throws -> .unknown -> neutral behavior, never a crash. The delegate is
+    /// retained for the duration of the request (CLLocationManager.delegate is
+    /// weak) and the continuation resumes exactly once (v23 fix: the old code
+    /// could deallocate the delegate before any callback AND double-resume).
     @available(watchOS 11, *)
     private static func currentLocation() async throws -> CLLocation {
         let manager = CLLocationManager()
@@ -142,43 +149,66 @@ nonisolated final class WeatherSenseBridge: LifeSenseSource, @unchecked Sendable
             manager.requestWhenInUseAuthorization()
         }
         for _ in 0..<50 {
-            if manager.authorizationStatus == .authorizedWhenInUse
-                || manager.authorizationStatus == .authorizedAlways {
-                break
+            switch manager.authorizationStatus {
+            case .authorizedWhenInUse, .authorizedAlways: break
+            case .denied, .restricted: throw WeatherError.locationDenied
+            default: break
             }
+            if manager.authorizationStatus == .authorizedWhenInUse
+                || manager.authorizationStatus == .authorizedAlways { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         guard manager.authorizationStatus == .authorizedWhenInUse
             || manager.authorizationStatus == .authorizedAlways else {
             throw WeatherError.locationDenied
         }
+        let delegate = OneShotDelegate()
+        manager.delegate = delegate  // weak on the manager; the closures below retain it
         return try await withCheckedThrowingContinuation { cont in
-            let delegate = OneShotDelegate { result in
+            delegate.setHandler { result in
                 switch result {
                 case .success(let loc): cont.resume(returning: loc)
                 case .failure(let err): cont.resume(throwing: err)
                 }
             }
-            manager.delegate = delegate
             manager.requestLocation()
-            Task {
+            Task { [weak delegate] in
                 try? await Task.sleep(nanoseconds: 10_000_000_000)
-                cont.resume(throwing: WeatherError.timeout)
+                delegate?.emitTimeout()
             }
         }
     }
 
     private enum WeatherError: Error { case locationDenied, timeout }
 
+    /// Resume-once delegate: the first result (location, error, or timeout)
+    /// wins; later callbacks are dropped.
     @available(watchOS 11, *)
     private final class OneShotDelegate: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
-        let onResult: (Result<CLLocation, Error>) -> Void
-        init(_ onResult: @escaping (Result<CLLocation, Error>) -> Void) { self.onResult = onResult }
+        private let lock = NSLock()
+        private var handler: (@Sendable (Result<CLLocation, Error>) -> Void)?
+        private var done = false
+
+        func setHandler(_ h: @escaping @Sendable (Result<CLLocation, Error>) -> Void) {
+            lock.lock(); handler = h; lock.unlock()
+        }
+
+        func emitTimeout() { emit(.failure(WeatherError.timeout)) }
+
+        private func emit(_ result: Result<CLLocation, Error>) {
+            lock.lock()
+            guard !done else { lock.unlock(); return }
+            done = true
+            let h = handler
+            lock.unlock()
+            h?(result)
+        }
+
         func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-            if let loc = locations.last { onResult(.success(loc)) }
+            if let loc = locations.last { emit(.success(loc)) }
         }
         func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-            onResult(.failure(error))
+            emit(.failure(error))
         }
     }
 }
