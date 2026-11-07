@@ -126,6 +126,10 @@ nonisolated final class SpriteDirector {
         return queue.first?.frame ?? scheduledIdle
     }
 
+    /// Ticks still queued in the current act run (test-visible: F5 beat
+    /// duration budget = pendingActTicks * tickDuration <= 5 s).
+    var pendingActTicks: Int { queue.reduce(0) { $0 + $1.ticks } }
+
     /// Advances the director clock to `target` ticks (idempotent).
     func advance(toTick target: Int) {
         while tick < target { step() }
@@ -483,38 +487,54 @@ nonisolated final class SpriteDirector {
         case calendarSoon, workoutDone, sleptWithWatch, weatherClass, workoutLive
     }
 
-    private func play(_ act: SpriteAct, direction: Int = 0) {
+    /// The authored frame queue for one act (L2 degrades body accents to a
+    /// face-readable blink). v17: blinks hold 2 ticks — a 1-tick act is
+    /// drained before it can render, so blinks were invisible.
+    private func frames(for act: SpriteAct, direction: Int = 0) -> [(frame: String, ticks: Int)] {
         if act == .blink {
-            // v17: a 1-tick act is drained before it can render (the step
-            // removes it before currentFrame is read) — blinks were invisible.
-            // Hold 2 ticks so the blink is actually visible for one 150 ms
-            // frame, the cat's blink grammar.
-            queue = [("blink", 2), ("idle", 1)]
-            blinkCount += 1
-            return
+            return [("blink", 2), ("idle", 1)]
         }
-        // Face readability under Reduce Motion L2: body accents degrade.
         let bodyGated = mode == .reduceMotionL2
         switch act {
         case .blink:
-            break  // handled above
+            return [("blink", 2), ("idle", 1)]
         case .happy:
-            queue = [("happy", 2), ("idle", 2)]
+            return [("happy", 2), ("idle", 2)]
         case .quirk:
             // Anticipation (v15): a 1-tick wind-up before the signature move.
-            queue = bodyGated
+            return bodyGated
                 ? [("blink", 2), ("idle", 1)]
                 : [("perk", 1), ("quirk", 2), ("idle", 1)]
         case .look:
-            queue = [(direction < 0 ? "glanceL" : "glanceR", 4), ("idle", 1)]
+            return [(direction < 0 ? "glanceL" : "glanceR", 4), ("idle", 1)]
         case .slowBlink:
-            queue = [("idle", 3), ("blink", 6), ("idle", 2)]
+            return [("idle", 3), ("blink", 6), ("idle", 2)]
         case .perk:
-            queue = [("perk", 3), ("idle", 1)]
+            return [("perk", 3), ("idle", 1)]
         case .farewell:
             // v16 F1: level 4+ earns a longer goodbye bloom.
-            queue = [("idle", 1), ("blink", 2), ("sleepy", BondRules.farewellBloomTicks(bondLevel))]
+            return [("idle", 1), ("blink", 2), ("sleepy", BondRules.farewellBloomTicks(bondLevel))]
         }
-        actCount += 1
+    }
+
+    private func play(_ act: SpriteAct, direction: Int = 0) {
+        if act == .blink { blinkCount += 1 }
+        queue = frames(for: act, direction: direction)
+        if act != .blink { actCount += 1 }
+    }
+
+    /// v19 F5: a morning-beat sequence plays as one queued run of acts
+    /// (<= 5 s total, G1). Any input replaces the queue — the skip path is
+    /// a single tap, i.e. <= 150 ms to the stage.
+    func playSequence(_ acts: [SpriteAct]) {
+        guard !acts.isEmpty else { return }
+        markInteraction()
+        var q: [(frame: String, ticks: Int)] = []
+        for act in acts {
+            if act == .blink { blinkCount += 1 }
+            q += frames(for: act)
+        }
+        queue = q
+        actCount += acts.count
     }
 }

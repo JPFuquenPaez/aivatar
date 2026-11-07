@@ -65,6 +65,8 @@ struct AvatarStageView: View {
     /// v16 F1: transient VoiceOver announcement for bond moments (watchOS has
     /// no UIAccessibility.post — the single stage element's label carries it).
     @State private var bondAnnouncement = ""
+    /// v19 F5: the morning-beat caption (Dynamic Type text, ~5 s, then gone).
+    @State private var beatCaption: String?
 
     /// v14 sonic presence: the one-a-lifetime creation point — state
     /// changes surface as the on-stage listening tell.
@@ -154,6 +156,8 @@ struct AvatarStageView: View {
         // previous context.
         AvatarSession.shared.register(context: renderContext, director: spriteDirector, archetype: archetype)
         presentInteriority(summary)
+        // v19 F5: the morning life beat — one per day, first visit of a day.
+        playMorningBeatIfNeeded()
         lastStreakDays = summary.streakDays
         publishCompanionWidgetState()
     }
@@ -299,6 +303,14 @@ struct AvatarStageView: View {
                     Color.black
                 }
                 VStack(spacing: 2) {
+                    // v19 F5: the beat caption rides as text (Dynamic Type),
+                    // never as painter pixels.
+                    if let beatCaption {
+                        Text(beatCaption)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .transition(.opacity)
+                    }
                     Text(stageName)
                         .font(.footnote)
                     Text(isResting ? "resting" : "is here")
@@ -447,6 +459,36 @@ struct AvatarStageView: View {
                 NamingCeremonyView(archetype: archetype, isPresented: $showNaming) { _ in
                     celebrateNaming()
                 }
+            }
+        }
+    }
+
+    /// v19 F5: selects and plays the morning beat (once per day). Also
+    /// re-injects today's weather class from the lifeLog as the director's
+    /// ambient condition input — the class persists across sessions while
+    /// the log entry is today's. Any input skips the beat (the queue is
+    /// replaced by the tap's act — skip <= 150 ms, G1).
+    @MainActor
+    private func playMorningBeatIfNeeded() {
+        guard let director else { return }
+        let store = CompanionMemoryStore()
+        guard var memory = store.load() else { return }
+        let now = Date()
+        let dayIndex = CompanionMemoryStore.dayIndex(of: now)
+        if let w = memory.lifeLog.filter({
+            $0.kindHash == LifeKind.hash(of: .weatherClass) && $0.dayIndex == dayIndex
+        }).last, let ch = w.classHash, let klass = ConditionClass.fromHash(ch) {
+            director.setCondition(klass)
+        }
+        guard let beat = WakeBeatSelector.beat(memory: memory, archetype: archetype, now: now) else { return }
+        director.playSequence(WakeBeatSelector.acts(for: beat, archetype: archetype))
+        WakeBeatSelector.markShown(&memory, now: now)
+        store.save(memory)
+        if let caption = WakeBeatCaption.text(for: beat, name: stageName) {
+            beatCaption = caption
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                if beatCaption == caption { beatCaption = nil }
             }
         }
     }
@@ -609,6 +651,10 @@ struct AvatarStageView: View {
         // v16 F1: bond level-ups are announced, not displayed.
         if !bondAnnouncement.isEmpty {
             text += ". \(bondAnnouncement)"
+        }
+        // v19 F5: the beat caption is read once, then the standard state.
+        if let beatCaption {
+            text += ". \(beatCaption)"
         }
         return text
     }

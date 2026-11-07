@@ -253,6 +253,22 @@ reference mascot — the Mistral cat: a 16x14 logical grid, 5 colors,
   table, hash round-trip, emission rule, dials parity/fallback, director
   bias determinism, reaction parity, hue rotation purity.
 
+## 7.7 Morning life beats (v19, Ambient Life F5)
+
+- **The first glance of the day is a greeting, not a dashboard**: once per
+  day, a pure selector picks ONE beat — life event (18 h lookback) >
+  weather line > the companion's own memory trace > warm — and the
+  director plays it as one queued act run (existing vocabulary only).
+- **Budget and skip**: the whole beat is <= 5 s (pinned via
+  `pendingActTicks`); any input replaces the queue, so the skip path is
+  one tap = <= 150 ms. Later visits the same day get the short wake only.
+- **Copy is typography, never pixels**: the caption is a Dynamic Type
+  `Text` overlay (<= 8 words, house voice) and rides the stage's
+  accessibility label for VoiceOver; under L2 the beat flattens to
+  face-only frames and the caption still shows.
+- Verify: `WakeBeatTests` — selector priority/gates/lookback, caption
+  lint, act mapping, sequence order + budget + skip + L2 + determinism.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,

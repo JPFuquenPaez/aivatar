@@ -37,6 +37,8 @@ nonisolated struct CompanionMemory: Codable, Equatable, Sendable {
     var lastPresenceDay: Int = -1
     /// Calendar day index of the last first-greeting award (once-per-day gate).
     var lastGreetingDay: Int = -1
+    /// v19 F5: calendar day index of the last morning-beat shown (once/day).
+    var lastBeatDay: Int = -1
 
     init(firstLaunch: Date = Date(), lastSeen: Date = Date()) {
         self.firstLaunch = firstLaunch
@@ -59,6 +61,7 @@ nonisolated struct CompanionMemory: Codable, Equatable, Sendable {
         lifeLog = try c.decodeIfPresent([LifeLogEntry].self, forKey: .lifeLog) ?? []
         lastPresenceDay = try c.decodeIfPresent(Int.self, forKey: .lastPresenceDay) ?? -1
         lastGreetingDay = try c.decodeIfPresent(Int.self, forKey: .lastGreetingDay) ?? -1
+        lastBeatDay = try c.decodeIfPresent(Int.self, forKey: .lastBeatDay) ?? -1
     }
 
     /// Derived bond level (1...5) — F1: levels are felt, never displayed.
