@@ -56,6 +56,9 @@ struct AvatarStageView: View {
     @State private var director: SpriteDirector?
     @State private var isResting = false
     @State private var showPicker = false
+    /// v27 debug/CI hooks: -showPicker opens the companion picker directly,
+    /// -page N jumps the TabView to page N (0 stage, 1 workout, 2 settings).
+    @State private var tabSelection = 0
     @State private var showNaming = false
     @State private var showRitualHint = false
     /// "It noticed" (§10.5.5): timestamp when the app left the active
@@ -100,7 +103,7 @@ struct AvatarStageView: View {
         // TabView renders the page indicator next to the Digital Crown and
         // gives crown paging for free — stage on page 1, workout page 2,
         // Settings on page 3.
-        TabView {
+        TabView(selection: $tabSelection) {
             stage
             // v21 F6: the workout page rides the same crown paging.
             WorkoutPageView(archetype: archetype, active: workoutActive,
@@ -122,6 +125,17 @@ struct AvatarStageView: View {
             // v21 F6: a force-quit workout is recovered on launch (the
             // session itself cannot survive; the partial is finished).
             recoverWorkoutIfNeeded()
+            // v27 debug/CI hooks.
+            let args = ProcessInfo.processInfo.arguments
+            if args.contains("-showPicker") {
+                pickerCompleted = true
+                ceremonyShown = true
+                showPicker = true
+            }
+            if let i = args.firstIndex(of: "-page"), i + 1 < args.count,
+               let n = Int(args[i + 1]) {
+                tabSelection = n
+            }
         }
         .onChange(of: archetype) { _ in
             // Companion switch: each archetype is a distinct engine

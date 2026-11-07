@@ -43,36 +43,64 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Companion") {
+                // v27: an identity card leads Settings — the companion in its
+                // tinted disc, its name, and the one gentle About line.
+                Section {
+                    HStack(spacing: 10) {
+                        SetupTheme.iconDisc(for: archetype, size: 44)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(stageName)
+                                .font(.headline)
+                            Text(aboutLine)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .listRowBackground(Color.clear)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(stageName), \(archetype.fullName). \(aboutLine)")
+                }
+                Section(String(localized: "settings.companion")) {
                     Button {
                         showNaming = true
                     } label: {
-                        HStack {
-                            Text("Name")
-                            Spacer()
-                            Text(stageName)
-                                .foregroundStyle(.secondary)
+                        Label {
+                            HStack {
+                                Text(String(localized: "settings.name"))
+                                Spacer()
+                                Text(stageName)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "text.badge.star")
+                                .foregroundStyle(SetupTheme.accent(for: archetype))
                         }
                     }
                     .accessibilityLabel("Name, currently \(stageName)")
                     NavigationLink {
                         CompanionPickerView()
                     } label: {
-                        HStack {
-                            Text("Companion")
-                            Spacer()
-                            Text(archetype.animal.name)
-                                .foregroundStyle(.secondary)
+                        Label {
+                            HStack {
+                                Text(String(localized: "settings.animal"))
+                                Spacer()
+                                Text(archetype.animal.name)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "pawprint.fill")
+                                .foregroundStyle(SetupTheme.accent(for: archetype))
                         }
                         .accessibilityLabel("Companion, currently \(archetype.fullName)")
                     }
                 }
                 Section {
-                    Toggle("Reduce Motion", isOn: $reduceMotionL2)
+                    Toggle(String(localized: "settings.reduce_motion"), isOn: $reduceMotionL2)
                         .accessibilityLabel("Reduce Motion, stronger than the system setting")
                         .accessibilityHint("Keeps your companion still with only a gentle blink")
                 } header: {
-                    Text("Accessibility")
+                    Text(String(localized: "settings.accessibility"))
                 } footer: {
                     Text("Stops idle gestures and sway; your companion holds still and blinks.")
                         .font(.footnote)
@@ -81,64 +109,66 @@ struct SettingsView: View {
                 // behavior it governs, with the privacy contract in the
                 // footer — no hidden recording, no background listening.
                 Section {
-                    Toggle("Listen for sounds", isOn: $listenForSounds)
+                    Toggle(String(localized: "settings.sounds"), isOn: $listenForSounds)
                         .accessibilityHint("Your companion reacts to your voice and claps while the app is open")
                 } header: {
-                    Text("Sounds")
+                    Text(String(localized: "settings.sounds_header"))
                 } footer: {
-                    Text("While Aivatar is open with the stage awake, its microphone listens for your voice and claps so your companion can react. Sounds are analyzed on the watch instantly and never recorded or saved.")
+                    Text(String(localized: "settings.sounds_footer"))
                         .font(.footnote)
                 }
                 // v17 F2 life sense: the consent copy names exactly what is
                 // read, where, and what is never kept (G5 written down).
                 Section {
-                    Toggle("Calendar", isOn: $lifeSenseCalendar)
+                    Toggle(String(localized: "settings.calendar"), isOn: $lifeSenseCalendar)
                         .accessibilityHint("Your companion can notice when a calendar event is about to start")
                         // v25 (audit M2): ask at the opt-in moment, not later.
                         .onChange(of: lifeSenseCalendar) { on in
                             if on { CalendarSenseBridge().requestAccessIfNeeded() }
                         }
-                    Toggle("Workouts & sleep", isOn: $lifeSenseHealth)
+                    Toggle(String(localized: "settings.health"), isOn: $lifeSenseHealth)
                         .accessibilityHint("Your companion can celebrate your saved workouts and notice your sleep")
                         .onChange(of: lifeSenseHealth) { on in
                             if on { HealthSenseBridge().requestAccessIfNeeded() }
                         }
-                    Toggle("Weather", isOn: $lifeSenseWeather)
+                    Toggle(String(localized: "settings.weather"), isOn: $lifeSenseWeather)
                         .accessibilityHint("Your companion can notice the current weather where you are")
                         .onChange(of: lifeSenseWeather) { on in
                             if on { WeatherSenseBridge().requestLocationAuthorizationIfNeeded() }
                         }
                 } header: {
-                    Text("Life sense")
+                    Text(String(localized: "settings.life_sense"))
                 } footer: {
-                    Text("While Aivatar is open, your companion can react to upcoming calendar events, to workouts and sleep saved in Health, and to the current weather at your location — read on this watch only, fetched at most once an hour. Event titles, health details, and weather are never stored beyond a hash, and nothing ever leaves the watch.")
+                    Text(String(localized: "settings.life_sense_footer"))
                         .font(.footnote)
                 }
-                Section("About") {
-                    // v16 F1: one gentle line — day count only, never levels
-                    // or numbers of trust ("old friends" is the whole story).
-                    Text(aboutLine)
-                        .font(.footnote)
+                Section(String(localized: "settings.about")) {
                     // v22 F8: the deterministic postcard of this companion.
                     Button {
                         showPostcard = true
                     } label: {
-                        HStack {
-                            Text("Postcard")
-                            Spacer()
+                        Label {
+                            HStack {
+                                Text(String(localized: "settings.postcard"))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(.secondary)
+                                    .font(.caption2)
+                            }
+                        } icon: {
                             Image(systemName: "rectangle.portrait.on.rectangle.portrait")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(SetupTheme.accent(for: archetype))
                         }
                     }
                     .accessibilityHint("Preview a shareable card of your companion")
-                    Text("Aivatar is procedural — no clip files, everything you see is generated live from a shared rig.")
+                    Text(String(localized: "settings.about_copy"))
                         .font(.footnote)
-                    Text("Tip: touch and hold your companion to share a slow blink — its trust ritual.")
+                    Text(String(localized: "settings.tip"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle(String(localized: "settings.nav"))
             .sheet(isPresented: $showNaming) {
                 NamingCeremonyView(archetype: archetype, isPresented: $showNaming, onName: nil)
             }

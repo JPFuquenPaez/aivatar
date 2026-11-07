@@ -49,3 +49,36 @@
 
 /* About line (F1) */
 "about.day" = "%@ · jour %d";
+
+/* Surfaces de réglage (v27) */
+"picker.choose" = "Choisir : %@";
+"picker.current" = "Ton compagnon";
+"naming.nav" = "Nom";
+"naming.title" = "Nomme ton %@";
+"naming.subtitle" = "Ce qui est nommé est gardé.";
+"naming.placeholder" = "ex. %@";
+"naming.preview" = "Répondra à « %@ »";
+"naming.field" = "Nom du compagnon";
+"naming.clear" = "Effacer";
+"naming.commit" = "Le nommer";
+"naming.commit_hint" = "Enregistre le nom et fête ça";
+"naming.cancel" = "Pas maintenant";
+"settings.nav" = "Réglages";
+"settings.companion" = "Compagnon";
+"settings.name" = "Nom";
+"settings.animal" = "Animal";
+"settings.accessibility" = "Accessibilité";
+"settings.reduce_motion" = "Réduire les mouvements";
+"settings.sounds" = "Écouter les sons";
+"settings.sounds_header" = "Sons";
+"settings.sounds_footer" = "tant qu'Aivatar est ouvert et l'écran allumé, son micro écoute ta voix et tes applaudissements pour que ton compagnon réagisse. Les sons sont analysés instantanément sur la montre et jamais enregistrés.";
+"settings.calendar" = "Calendrier";
+"settings.health" = "Séances et sommeil";
+"settings.weather" = "Météo";
+"settings.life_sense" = "Contexte";
+"settings.life_sense_footer" = "tant qu'Aivatar est ouvert, ton compagnon peut réagir aux événements à venir du calendrier, aux séances et au sommeil enregistrés dans Santé, et à la météo actuelle là où tu es — lu uniquement sur cette montre, récupéré au plus une fois par heure. Titres, détails de santé et météo ne sont jamais conservés au-delà d'un haché, et rien ne quitte la montre.";
+"settings.about" = "À propos";
+"settings.postcard" = "Carte postale";
+"settings.about_copy" = "Aivatar est procédural — aucun fichier d'animation, tout ce que tu vois est généré en direct.";
+"settings.tip" = "Astuce : touche longuement ton compagnon pour partager un clin d'œil lent — son rituel de confiance.";
+"workout.start" = "Commencer";

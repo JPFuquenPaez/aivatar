@@ -51,3 +51,36 @@
 
 /* About line (F1) */
 "about.day" = "%@ · day %d";
+
+/* Setup surfaces (v27) */
+"picker.choose" = "Choose the %@";
+"picker.current" = "Your companion";
+"naming.nav" = "Name";
+"naming.title" = "Name your %@";
+"naming.subtitle" = "Named things are kept things.";
+"naming.placeholder" = "e.g. %@";
+"naming.preview" = "Will answer to \"%@\"";
+"naming.field" = "Companion name";
+"naming.clear" = "Clear";
+"naming.commit" = "Name them";
+"naming.commit_hint" = "Saves the name and celebrates";
+"naming.cancel" = "Not now";
+"settings.nav" = "Settings";
+"settings.companion" = "Companion";
+"settings.name" = "Name";
+"settings.animal" = "Animal";
+"settings.accessibility" = "Accessibility";
+"settings.reduce_motion" = "Reduce Motion";
+"settings.sounds" = "Listen for sounds";
+"settings.sounds_header" = "Sounds";
+"settings.sounds_footer" = "While Aivatar is open with the stage awake, its microphone listens for your voice and claps so your companion can react. Sounds are analyzed on the watch instantly and never recorded or saved.";
+"settings.calendar" = "Calendar";
+"settings.health" = "Workouts & sleep";
+"settings.weather" = "Weather";
+"settings.life_sense" = "Life sense";
+"settings.life_sense_footer" = "While Aivatar is open, your companion can react to upcoming calendar events, to workouts and sleep saved in Health, and to the current weather at your location — read on this watch only, fetched at most once an hour. Event titles, health details, and weather are never stored beyond a hash, and nothing ever leaves the watch.";
+"settings.about" = "About";
+"settings.postcard" = "Postcard";
+"settings.about_copy" = "Aivatar is procedural — no clip files, everything you see is generated live from a shared rig.";
+"settings.tip" = "Tip: touch and hold your companion to share a slow blink — its trust ritual.";
+"workout.start" = "Start run";

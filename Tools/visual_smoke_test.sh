@@ -56,11 +56,11 @@ mkdir -p "$WORK/analyzer"
 cp "$ROOT/Tools/visual_smoke.swift" "$WORK/analyzer/main.swift"
 env -u SDKROOT xcrun --sdk macosx swiftc "$WORK/analyzer/main.swift" -o "$WORK/analyzer/analyze" 2>/dev/null
 
-echo "==> Capturing all five archetypes (fresh boot per attempt, up to 3 attempts)"
+echo "==> Capturing all five archetypes (fresh boot per attempt, up to 5 attempts)"
 installed=0
 for a in ember willow compass prism nimbus; do
   got=0
-  for attempt in 1 2 3; do
+  for attempt in 1 2 3 4 5; do
     xcrun simctl shutdown "$UDID" 2>/dev/null || true
     xcrun simctl boot "$UDID"
     sleep 5
@@ -88,7 +88,7 @@ for a in ember willow compass prism nimbus; do
     done
     [ "$got" = 1 ] && break
   done
-  echo "    $a: $([ "$got" = 1 ] && echo captured || echo 'no lit frame after 3 boots')"
+  echo "    $a: $([ "$got" = 1 ] && echo captured || echo 'no lit frame after 5 boots')"
 done
 xcrun simctl shutdown "$UDID" 2>/dev/null || true
 rm -rf "$WORK/try.png" "$WORK/trydir"

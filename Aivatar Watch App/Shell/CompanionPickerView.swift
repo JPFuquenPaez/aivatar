@@ -47,18 +47,21 @@ struct CompanionPickerView: View {
 
     private func page(_ archetype: Archetype) -> some View {
         let isSelected = archetype == selection
+        let accent = SetupTheme.accent(for: archetype)
         return GeometryReader { geometry in
-            VStack(spacing: 8) {
-                Spacer(minLength: 4)
-                VStack(spacing: 6) {
-                    if let icon = CompanionIcon.image(for: archetype) {
-                        icon
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: geometry.size.height * 0.42)
-                    }
+            VStack(spacing: 10) {
+                Spacer(minLength: 2)
+                // v27: the companion in its tinted disc — selected pages get
+                // the accent ring + check badge; the icon is the hero.
+                SetupTheme.iconDisc(for: archetype, selected: isSelected,
+                                    size: min(geometry.size.height * 0.34, 84))
+                VStack(spacing: 4) {
                     Text(archetype.animal.name)
-                        .font(.headline)
+                        .font(.title3.weight(.semibold))
+                    Text(archetype.animal.element.uppercased())
+                        .font(.caption2)
+                        .foregroundStyle(accent)
+                        .tracking(1)
                     Text(archetype.animal.temperament)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -68,21 +71,21 @@ struct CompanionPickerView: View {
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(archetype.fullName), \(archetype.animal.element). \(archetype.animal.temperament)\(isSelected ? ", your current companion" : "")")
-                Spacer(minLength: 4)
+                Spacer(minLength: 2)
                 Button {
                     choose(archetype)
                 } label: {
                     Label(
-                        isSelected ? "Your companion" : "Choose the \(archetype.animalName)",
+                        isSelected
+                            ? String(localized: "picker.current")
+                            : String(format: String(localized: "picker.choose"), archetype.animalName),
                         systemImage: isSelected ? "checkmark.circle.fill" : "circle"
                     )
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.setupProminent(tint: isSelected ? .gray : accent))
                 .accessibilityLabel(isSelected
                                      ? "\(archetype.animal.name) is your companion"
-                                     : "Choose the \(archetype.animalName)")
+                                     : String(format: String(localized: "picker.choose"), archetype.animalName))
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }

@@ -19,25 +19,38 @@ struct WorkoutPageView: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        let accent = SetupTheme.accent(for: archetype)
+        VStack(spacing: 12) {
             if active {
+                SetupTheme.iconDisc(for: archetype, size: 56)
                 Text(String(format: String(localized: "workout.running_with"), name))
                     .font(.footnote)
+                    .foregroundStyle(.secondary)
                 Text(Self.format(elapsed))
-                    .font(.title3.monospacedDigit())
+                    .font(.title2.monospacedDigit().weight(.semibold))
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 14)
+                    .background(Color.white.opacity(0.07))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .accessibilityLabel(String(format: String(localized: "workout.elapsed"), Self.format(elapsed)))
                 Button {
                     onStop()
                 } label: {
                     Label(String(localized: "workout.end_run"), systemImage: "stop.fill")
                 }
+                .buttonStyle(.setupProminent(tint: .red))
                 .accessibilityHint("Ends the workout and saves it to Health")
             } else {
+                SetupTheme.iconDisc(for: archetype, size: 72)
+                Text(String(format: String(localized: "workout.run_with"), name))
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
                 Button {
                     onStart()
                 } label: {
-                    Label(String(format: String(localized: "workout.run_with"), name), systemImage: "figure.run")
+                    Label(String(localized: "workout.start"), systemImage: "figure.run")
                 }
+                .buttonStyle(.setupProminent(tint: accent))
                 .accessibilityHint("Starts a workout with your companion running beside you")
                 Text(String(localized: "workout.sub"))
                     .font(.caption2)
