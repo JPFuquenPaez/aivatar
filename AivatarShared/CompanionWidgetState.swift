@@ -6,8 +6,16 @@ import Foundation
 /// extension targets, so the schema has exactly one definition. Pure
 /// Foundation — no app-module imports.
 
+/// The companion's presence state on the watch face (F4): three states
+/// only, never animated in the complication — the STATE CHANGE ACROSS THE
+/// DAY is the animation. Asleep is the honest default; awake follows a
+/// visit (30 min); event follows a life event (1 h).
+nonisolated enum CompanionPresence: String, Codable, Sendable, Equatable {
+    case asleep, awake, event
+}
+
 /// What the widget renders: the current companion, its (user-owned) name,
-/// and the streak artifact.
+/// the streak artifact, and (v18 F4) the presence state + one-line copy.
 nonisolated struct CompanionWidgetSnapshot: Codable, Sendable, Equatable {
     /// Archetype rawValue ("ember" ... "nimbus") — keys the icon file.
     var archetypeRaw: String
@@ -17,10 +25,139 @@ nonisolated struct CompanionWidgetSnapshot: Codable, Sendable, Equatable {
     /// Consecutive attended days (Compass's streak artifact).
     var streakDays: Int
 
+    // MARK: - Schema v2 (v18 F4 — additive, lenient decode like memory v3)
+
+    /// Presence state ("asleep" default — v12 snapshots decode as asleep).
+    var presence: CompanionPresence = .asleep
+    /// One-line state copy for inline/rectangular ("napping", "awake",
+    /// "celebrated your workout") — derived, never stored raw events.
+    var line: String = ""
+    /// App age in days ("day 23").
+    var dayCount: Int = 1
+    /// Lowercase animal name for the rectangular line ("fox").
+    var animalName: String = ""
+    /// Last visit time — drives the awake window in the widget timeline.
+    var lastSeen: Date?
+    /// Last life-event time — drives the event window.
+    var lastEventAt: Date?
+    /// Last life-event kind raw value (copy table key; hash-stable).
+    var lastEventKindRaw: String?
+
+    init(
+        archetypeRaw: String, name: String, streakDays: Int,
+        presence: CompanionPresence = .asleep, line: String = "", dayCount: Int = 1,
+        animalName: String = "", lastSeen: Date? = nil, lastEventAt: Date? = nil,
+        lastEventKindRaw: String? = nil
+    ) {
+        self.archetypeRaw = archetypeRaw
+        self.name = name
+        self.streakDays = streakDays
+        self.presence = presence
+        self.line = line
+        self.dayCount = dayCount
+        self.animalName = animalName
+        self.lastSeen = lastSeen
+        self.lastEventAt = lastEventAt
+        self.lastEventKindRaw = lastEventKindRaw
+    }
+
     static func `default`(
         archetypeRaw: String = "ember", name: String = "Ember", streakDays: Int = 1
     ) -> CompanionWidgetSnapshot {
         CompanionWidgetSnapshot(archetypeRaw: archetypeRaw, name: name, streakDays: streakDays)
+    }
+
+    /// Lenient decode (G8): v12 snapshots (no v2 keys) load defaulted.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        archetypeRaw = try c.decode(String.self, forKey: .archetypeRaw)
+        name = try c.decode(String.self, forKey: .name)
+        streakDays = try c.decodeIfPresent(Int.self, forKey: .streakDays) ?? 1
+        presence = try c.decodeIfPresent(CompanionPresence.self, forKey: .presence) ?? .asleep
+        line = try c.decodeIfPresent(String.self, forKey: .line) ?? ""
+        dayCount = try c.decodeIfPresent(Int.self, forKey: .dayCount) ?? 1
+        animalName = try c.decodeIfPresent(String.self, forKey: .animalName) ?? ""
+        lastSeen = try c.decodeIfPresent(Date.self, forKey: .lastSeen)
+        lastEventAt = try c.decodeIfPresent(Date.self, forKey: .lastEventAt)
+        lastEventKindRaw = try c.decodeIfPresent(String.self, forKey: .lastEventKindRaw)
+    }
+}
+
+/// CompanionStateDerivation (F4): the PURE state/copy/timeline rules, shared
+/// by app (publish) and widget (render) — deterministic under injected
+/// dates, so the whole schedule is unit-testable without WidgetKit.
+nonisolated enum CompanionStateDerivation {
+    /// A visit keeps the companion "awake" on the face for 30 min.
+    static let awakeWindowSec: TimeInterval = 30 * 60
+    /// A life event keeps it in "event" for 1 h.
+    static let eventWindowSec: TimeInterval = 60 * 60
+    /// G9 power cap: at most this many timeline entries per reload.
+    static let timelineCap = 12
+
+    /// State from raw inputs. Priority: event > awake > asleep. Windows are
+    /// strict (<) so the expiry anchor lands exactly on the revert.
+    static func presence(now: Date, lastSeen: Date?, lastEventAt: Date?) -> CompanionPresence {
+        if let e = lastEventAt, now.timeIntervalSince(e) >= 0, now.timeIntervalSince(e) < eventWindowSec {
+            return .event
+        }
+        if let s = lastSeen, now.timeIntervalSince(s) >= 0, now.timeIntervalSince(s) < awakeWindowSec {
+            return .awake
+        }
+        return .asleep
+    }
+
+    /// The one-line copy for a state (+ the event kind when in event).
+    /// House voice: <= 8 words, playful never needy (G3/G4).
+    static func line(for presence: CompanionPresence, lastEventKind: LifeKind?) -> String {
+        switch presence {
+        case .asleep: return "napping"
+        case .awake: return "awake"
+        case .event:
+            switch lastEventKind {
+            case .calendarSoon: return "noticed your day"
+            case .workoutDone: return "celebrated your workout"
+            case .sleptWithWatch: return "slept beside you"
+            case .weatherClass: return "checked the sky"
+            case .workoutLive: return "ran with you"
+            case nil: return "noticed something"
+            }
+        }
+    }
+
+    /// Inline family line: "Ember · napping".
+    static func inlineLine(name: String, presence: CompanionPresence, lastEventKind: LifeKind?) -> String {
+        "\(name) · \(line(for: presence, lastEventKind: lastEventKind))"
+    }
+
+    /// Rectangular family second line: "day 23 · napping".
+    static func rectangularLine(dayCount: Int, presence: CompanionPresence, lastEventKind: LifeKind?) -> String {
+        "day \(dayCount) · \(line(for: presence, lastEventKind: lastEventKind))"
+    }
+
+    /// Timeline entry dates: now + the awake/event EXPIRY anchors + hourly
+    /// anchors, sorted, deduped, hard-capped (G9). Including the expiry
+    /// times is what keeps the face from showing a stale awake/event state
+    /// (F4 acceptance: never stale by more than the 30 min window).
+    /// Per-entry presence is computed from the snapshot's timestamps, so the
+    /// face reverts to asleep on its own — the app never polls.
+    static func timelineDates(now: Date, lastSeen: Date? = nil, lastEventAt: Date? = nil,
+                              cap: Int = timelineCap, calendar: Calendar = .current) -> [Date] {
+        var set: [Date] = [now]
+        if let s = lastSeen { set.append(s.addingTimeInterval(awakeWindowSec)) }
+        if let e = lastEventAt { set.append(e.addingTimeInterval(eventWindowSec)) }
+        var next = calendar.date(byAdding: .hour, value: 1, to: now) ?? now.addingTimeInterval(3_600)
+        while set.count < max(1, cap) {
+            set.append(next)
+            next = calendar.date(byAdding: .hour, value: 1, to: next) ?? next.addingTimeInterval(3_600)
+        }
+        let sorted = set.filter { $0 >= now }.sorted()
+        var seen: Set<Date> = []
+        var out: [Date] = []
+        for d in sorted where seen.insert(d).inserted {
+            out.append(d)
+            if out.count >= max(1, cap) { break }
+        }
+        return out
     }
 }
 
@@ -43,6 +180,20 @@ nonisolated enum CompanionWidgetState {
         (container ?? sharedContainer())?
             .appendingPathComponent(iconsDirectoryName)
             .appendingPathComponent("\(raw).png")
+    }
+
+    /// v18 F4: per-state icon (asleep = rest-dim variant, awake = normal,
+    /// event = accent-highlighted). Falls back to the v12 plain icon name
+    /// when state is nil (older app versions seeded only "\(raw).png").
+    static func iconURL(
+        forArchetypeRaw raw: String,
+        presence: CompanionPresence?,
+        container: URL? = nil
+    ) -> URL? {
+        guard let presence else { return iconURL(forArchetypeRaw: raw, container: container) }
+        return (container ?? sharedContainer())?
+            .appendingPathComponent(iconsDirectoryName)
+            .appendingPathComponent("\(raw)-\(presence.rawValue).png")
     }
 
     /// Reads the snapshot; nil = the app has not published yet (first

@@ -11,23 +11,18 @@ import HealthKit
 /// titles, names, or raw numbers. FNV-1a is stable across runs/platforms.
 nonisolated enum LifeSenseMapping {
     /// Stable FNV-1a 64-bit hash of a string, as Int (payloads are content-free).
-    static func hash(_ string: String) -> Int {
-        var h: UInt64 = 0xcbf29ce484222325
-        for byte in string.utf8 {
-            h ^= UInt64(byte)
-            h = h &* 0x100000001b3
-        }
-        return Int(bitPattern: UInt(h))
-    }
+    /// Delegates to the SHARED LifeKind so the widget's copy table keys off
+    /// the same hash (v18).
+    static func hash(_ string: String) -> Int { LifeKind.hash(string) }
 
     /// The event kind's log hash (ring-buffer key in CompanionMemory.lifeLog).
     static func kindHash(of event: LifeEvent) -> Int {
         switch event {
-        case .calendarSoon: return hash("calendarSoon")
-        case .workoutDone: return hash("workoutDone")
-        case .sleptWithWatch: return hash("sleptWithWatch")
-        case .weatherClass: return hash("weatherClass")
-        case .workoutLive: return hash("workoutLive")
+        case .calendarSoon: return LifeKind.hash(of: .calendarSoon)
+        case .workoutDone: return LifeKind.hash(of: .workoutDone)
+        case .sleptWithWatch: return LifeKind.hash(of: .sleptWithWatch)
+        case .weatherClass: return LifeKind.hash(of: .weatherClass)
+        case .workoutLive: return LifeKind.hash(of: .workoutLive)
         }
     }
 

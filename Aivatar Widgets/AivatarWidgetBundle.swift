@@ -1,43 +1,62 @@
 import WidgetKit
 import SwiftUI
 
-/// Aivatar widget extension (v12 presence pass): the watch-face
-/// complication — the surface where, per the watchOS HIG, people actually
-/// experience a watch app between launches. State comes from the shared
-/// app-group snapshot (AivatarShared/CompanionWidgetState.swift, compiled
-/// into both targets); the app redraws the timeline on every context
-/// build, companion switch and rename, so the widget never polls.
+/// Aivatar widget extension (v12 presence pass, v18 F4 state model): the
+/// watch-face complication — the surface where, per the watchOS HIG, people
+/// actually experience a watch app between launches. State comes from the
+/// shared app-group snapshot (AivatarShared, compiled into both targets);
+/// the app reloads the timeline on its own state changes, so the widget
+/// never polls.
 ///
-/// Design per complication-family guidance: the circular/corner families
-/// show the REAL rendered pixel companion (the icon PNG the app writes
-/// from the rasterizer — never a stock symbol); inline carries the name
-/// and the streak; content is monochrome-adaptable and glanceable at the
-/// face's size/temperature settings.
+/// F4: three presence states (asleep/awake/event), never animated — the
+/// state change across the day IS the animation. The timeline encodes the
+/// schedule (hourly anchors, hard cap 12 entries, G9) and each entry carries
+/// the presence AT ITS DATE, derived purely from the snapshot timestamps, so
+/// the face reverts to asleep on its own. The circular/corner families show
+/// the REAL rendered pixel companion per state (asleep = rest-dim icon);
+/// inline/rectangular carry the state in words (text-first accessibility).
 
 struct CompanionEntry: TimelineEntry {
     let date: Date
     let snapshot: CompanionWidgetSnapshot
+    /// The presence at THIS entry's date (derived, not stored per entry).
+    let presence: CompanionPresence
 }
 
 struct CompanionProvider: TimelineProvider {
     func placeholder(in context: Context) -> CompanionEntry {
-        CompanionEntry(date: .now, snapshot: CompanionWidgetState.readSnapshot() ?? .default())
+        let snapshot = CompanionWidgetState.readSnapshot() ?? .default()
+        return CompanionEntry(date: .now, snapshot: snapshot, presence: snapshot.presence)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CompanionEntry) -> Void) {
-        completion(CompanionEntry(date: .now, snapshot: current()))
+        completion(entry(at: .now))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CompanionEntry>) -> Void) {
-        // Rare safety-net refresh only: streaks roll at midnight and the
-        // app reloads the timeline on its own state changes (power
-        // discipline — complications must not poll).
-        completion(Timeline(entries: [CompanionEntry(date: .now, snapshot: current())],
-                            policy: .after(.now + 4 * 3600)))
+        // v18 F4: hourly anchors capped at 12 entries (G9); each entry's
+        // presence is derived from the snapshot's timestamps, so awake/event
+        // expire on their own (30 min / 1 h windows). Rare safety-net policy
+        // only — the app reloads on its own state changes.
+        let now = Date()
+        let snapshot = current()
+        let dates = CompanionStateDerivation.timelineDates(
+            now: now, lastSeen: snapshot.lastSeen, lastEventAt: snapshot.lastEventAt)
+        let entries = dates.map { entry(at: $0, snapshot: snapshot, now: now) }
+        let last = dates.last ?? now
+        completion(Timeline(entries: entries, policy: .after(last.addingTimeInterval(3_600))))
     }
 
     private func current() -> CompanionWidgetSnapshot {
         CompanionWidgetState.readSnapshot() ?? .default()
+    }
+
+    private func entry(at date: Date, snapshot: CompanionWidgetSnapshot? = nil, now: Date? = nil) -> CompanionEntry {
+        let snapshot = snapshot ?? current()
+        let now = now ?? Date()
+        let presence = CompanionStateDerivation.presence(
+            now: date, lastSeen: snapshot.lastSeen, lastEventAt: snapshot.lastEventAt)
+        return CompanionEntry(date: date, snapshot: snapshot, presence: presence)
     }
 }
 
@@ -45,13 +64,32 @@ struct CompanionWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: CompanionEntry
 
-    /// The companion's real pixel icon, written by the app into the shared
-    /// container; falls back to a pawprint before the first app launch.
+    private var snapshot: CompanionWidgetSnapshot { entry.snapshot }
+    private var kind: LifeKind? {
+        snapshot.lastEventKindRaw.flatMap { LifeKind(rawValue: $0) }
+    }
+    /// The state line for this entry's date ("napping", "celebrated your
+    /// workout") — words, not pixels, carry the state for VoiceOver.
+    private var stateLine: String {
+        CompanionStateDerivation.line(for: entry.presence, lastEventKind: kind)
+    }
+
+    /// The companion's real pixel icon for THIS state, written by the app
+    /// into the shared container; falls back to the plain icon, then a
+    /// pawprint before the first app launch.
     @ViewBuilder
     private var icon: some View {
-        let url = CompanionWidgetState.iconURL(forArchetypeRaw: entry.snapshot.archetypeRaw)
+        let url = CompanionWidgetState.iconURL(
+            forArchetypeRaw: snapshot.archetypeRaw, presence: entry.presence)
         if let url, let data = try? Data(contentsOf: url),
            let ui = UIImage(data: data) {
+            Image(uiImage: ui)
+                .resizable()
+                .interpolation(.none)
+                .scaledToFit()
+        } else if let plain = CompanionWidgetState.iconURL(forArchetypeRaw: snapshot.archetypeRaw),
+                  let data = try? Data(contentsOf: plain),
+                  let ui = UIImage(data: data) {
             Image(uiImage: ui)
                 .resizable()
                 .interpolation(.none)
@@ -65,18 +103,36 @@ struct CompanionWidgetView: View {
         Group {
             switch family {
             case .accessoryInline:
-                // Inline: the widest glance — name + the streak beat.
-                Text(entry.snapshot.streakDays > 1
-                     ? "\(entry.snapshot.name) · \(entry.snapshot.streakDays)-day streak"
-                     : entry.snapshot.name)
+                // Inline: name + the state in words.
+                Text(CompanionStateDerivation.inlineLine(
+                    name: snapshot.name, presence: entry.presence, lastEventKind: kind))
+            case .accessoryRectangular:
+                // Rectangular: icon + identity + day + state line.
+                HStack(spacing: 6) {
+                    icon
+                        .frame(width: 24, height: 24)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(snapshot.animalName.isEmpty
+                             ? snapshot.name
+                             : "\(snapshot.name) the \(snapshot.animalName)")
+                            .font(.footnote)
+                            .lineLimit(1)
+                        Text(CompanionStateDerivation.rectangularLine(
+                            dayCount: snapshot.dayCount, presence: entry.presence, lastEventKind: kind))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
             case .accessoryCorner:
                 icon
-                    .widgetLabel(entry.snapshot.name)
+                    .widgetLabel(stateLine)
             default:
                 // accessoryCircular: the companion itself, nothing else.
                 icon
             }
         }
+        .accessibilityLabel("\(snapshot.name), \(stateLine)")
         .containerBackground(for: .widget) { Color.black }
     }
 }
@@ -88,7 +144,9 @@ struct CompanionWidget: Widget {
         }
         .configurationDisplayName("Your companion")
         .description("Your companion, present on the watch face.")
-        .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryInline])
+        .supportedFamilies([
+            .accessoryCircular, .accessoryCorner, .accessoryInline, .accessoryRectangular,
+        ])
     }
 }
 

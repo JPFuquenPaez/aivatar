@@ -212,6 +212,24 @@ reference mascot — the Mistral cat: a 16x14 logical grid, 5 colors,
   payloads, mapping parity across archetypes, one-per-wake + cooldown +
   L2/rest behavior, determinism.
 
+## 7.5 Watch-face presence icons (v18, Ambient Life F4)
+
+- **One asset, three states**: the complication renders the same authored
+  idle grid as the stage, per presence state — `awake` is the normal LUT,
+  `asleep` is the rest-LOD dim (paper x0.30, all else x0.22 — identical
+  factors to the stage's rest frame, so the face and the stage agree),
+  `event` highlights accent cells in the species' paper tone.
+- **State is never animated in the complication** — the state change
+  across the day is the animation. Text families (inline/rectangular)
+  carry the state in words; VoiceOver reads "Ember, napping", never art.
+- **The schedule is data**: the widget timeline's hourly anchors include
+  the awake/event EXPIRY times (hard cap 12 entries, G9), and each entry's
+  presence is derived from snapshot timestamps — the face reverts to
+  asleep on its own; the app only republishes on its own state changes.
+- Verify: `WidgetPresenceTests` — lenient snapshot v2 decode, presence
+  priority/windows, copy table (<= 8 words), timeline cap under
+  adversarial inputs, icon variants, kind-hash parity app<->widget.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,

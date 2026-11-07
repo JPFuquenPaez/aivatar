@@ -151,35 +151,59 @@ struct AvatarStageView: View {
         AvatarSession.shared.register(context: renderContext, director: spriteDirector, archetype: archetype)
         presentInteriority(summary)
         lastStreakDays = summary.streakDays
-        publishCompanionWidgetState(streakDays: summary.streakDays)
+        publishCompanionWidgetState()
     }
 
-    /// v12 presence pass: publish the companion snapshot to the shared
-    /// app group and ask WidgetKit to redraw the timeline — the watch-face
-    /// complication never polls; it refreshes when the app says so.
-    /// Also seeds the complication icon PNGs (the REAL rendered pixel
-    /// companion) once per archetype.
-    private func publishCompanionWidgetState(streakDays: Int) {
+    /// v12 presence pass + v18 F4 state model: publish the companion
+    /// snapshot (identity + presence state + derived one-line copy + the
+    /// timestamps the widget timeline derives its schedule from) to the
+    /// shared app group and ask WidgetKit to redraw — the complication
+    /// never polls; it refreshes when the app says so.
+    private func publishCompanionWidgetState() {
+        let memory = CompanionMemoryStore().load()
+        let now = Date()
+        let lastEvent = memory?.lifeLog.last
+        let lastEventKind = lastEvent.flatMap { LifeKind.kind(forHash: $0.kindHash) }
+        let dayCount = memory.map { CompanionMemoryStore.dayDistance(from: $0.firstLaunch, to: now) + 1 } ?? 1
+        let presence = CompanionStateDerivation.presence(
+            now: now, lastSeen: memory?.lastSeen, lastEventAt: lastEvent?.at)
         CompanionWidgetState.write(CompanionWidgetSnapshot(
             archetypeRaw: archetype.rawValue,
             name: stageName,
-            streakDays: streakDays
+            streakDays: memory?.streakDays ?? 1,
+            presence: presence,
+            line: CompanionStateDerivation.line(for: presence, lastEventKind: lastEventKind),
+            dayCount: dayCount,
+            animalName: archetype.animalName,
+            lastSeen: memory?.lastSeen,
+            lastEventAt: lastEvent?.at,
+            lastEventKindRaw: lastEventKind?.rawValue
         ))
         seedCompanionWidgetIcons()
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    /// Renders every archetype's icon into the shared container once (the
-    /// icons only depend on the archetype; existing files are kept).
+    /// Renders every archetype's icon into the shared container once —
+    /// v18: one PNG per (archetype, presence state) plus the v12 plain icon
+    /// (the icons only depend on the archetype+state; existing files kept).
     private func seedCompanionWidgetIcons() {
         guard let container = CompanionWidgetState.sharedContainer() else { return }
         let icons = container.appendingPathComponent(CompanionWidgetState.iconsDirectoryName)
         try? FileManager.default.createDirectory(at: icons, withIntermediateDirectories: true)
         for archetype in Archetype.allCases {
-            guard let url = CompanionWidgetState.iconURL(forArchetypeRaw: archetype.rawValue, container: container),
-                  !FileManager.default.fileExists(atPath: url.path),
-                  let png = CompanionIcon.pngData(for: archetype) else { continue }
-            try? png.write(to: url)
+            if let url = CompanionWidgetState.iconURL(forArchetypeRaw: archetype.rawValue, container: container),
+               !FileManager.default.fileExists(atPath: url.path),
+               let png = CompanionIcon.pngData(for: archetype) {
+                try? png.write(to: url)
+            }
+            for state: IconState in [.asleep, .awake, .event] {
+                let presence = CompanionPresence(rawValue: state.rawValue) ?? .awake
+                guard let url = CompanionWidgetState.iconURL(
+                        forArchetypeRaw: archetype.rawValue, presence: presence, container: container),
+                      !FileManager.default.fileExists(atPath: url.path),
+                      let png = CompanionIcon.pngData(for: archetype, state: state) else { continue }
+                try? png.write(to: url)
+            }
         }
     }
 
@@ -455,9 +479,13 @@ struct AvatarStageView: View {
         let dayIndex = CompanionMemoryStore.dayIndex(of: now)
         for event in events {
             AvatarSession.shared.handleLifeEvent(event)
-            memory.appendLifeLog(LifeLogEntry(kindHash: LifeSenseMapping.kindHash(of: event), dayIndex: dayIndex))
+            memory.appendLifeLog(LifeLogEntry(
+                kindHash: LifeSenseMapping.kindHash(of: event), dayIndex: dayIndex, at: now))
         }
         store.save(memory)
+        // v18 F4: a life event flips the watch-face presence to "event" —
+        // republish so the complication carries the state + copy line.
+        publishCompanionWidgetState()
     }
 
     /// v14 sonic presence lifecycle: listen only while the app is the
@@ -513,7 +541,7 @@ struct AvatarStageView: View {
         HapticsChannel.shared.react(to: archetype)
         awardRitual(.namingCeremony)
         director?.handleRitual(.namingCeremony)
-        publishCompanionWidgetState(streakDays: lastStreakDays)
+        publishCompanionWidgetState()
     }
 
     /// v16 F1: awards a bond ritual against the persistent memory (pure
