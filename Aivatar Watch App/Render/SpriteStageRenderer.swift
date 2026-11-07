@@ -132,6 +132,10 @@ struct SpriteStageRenderer: View {
         }
     }
 
+    /// v28: skip the Canvas redraw when nothing visible changed (OLED/battery
+    /// on long idle holds) — key = frame + overlay + mote + hue + farewell ramp bucket.
+    @State private var lastDrawKey = ""
+
     private func draw(ctx: GraphicsContext, size: CGSize, date: Date) {
         // Reduce Motion: L2 (in-app) > L1 (system). The director gates its
         // own scheduling; the renderer just forwards the resolved mode.
@@ -141,10 +145,17 @@ struct SpriteStageRenderer: View {
         // v15: session memory renders as authored overlay cells on whatever
         // frame plays (sprout / week grid / trinket).
         let overlay = sprite.interiorityDiffs(director.interiority)
+        let rampBucket = farewellPending ? Int(date.timeIntervalSince(farewellStartedAt ?? date) / 0.15) : -1
+        let key = "\(director.currentFrame)|\(overlay.count)|\(director.moteCell?.x ?? -1),\(director.moteCell?.y ?? -1)|\(director.weatherHueShiftDeg)|\(rampBucket)"
+        if key == lastDrawKey { return }
+        lastDrawKey = key
         drawFrame(ctx: ctx, size: size, frameID: director.currentFrame,
                   overlay: overlay, rest: false, mote: director.moteCell)
         if farewellPending, let start = farewellStartedAt, farewellTotalSeconds > 0 {
-            let ramp = min(1, max(0, date.timeIntervalSince(start) / farewellTotalSeconds))
+            // v28: the dim ramps over the LAST ticks (peak-end), not the whole
+            // beat — the goodbye stays warm through idle+blink, then dims.
+            let bloom = Double(BondRules.farewellBloomTicks(director.bondLevel)) * SpriteDirector.tickDuration
+            let ramp = min(1, max(0, (date.timeIntervalSince(start) - (farewellTotalSeconds - bloom)) / bloom))
             ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black.opacity(0.82 * ramp)))
         }
     }

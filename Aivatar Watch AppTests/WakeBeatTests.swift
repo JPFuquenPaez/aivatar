@@ -136,12 +136,16 @@ final class WakeBeatTests: XCTestCase {
             // Duration budget: the whole queued beat is <= 5 s (G1).
             XCTAssertLessThanOrEqual(Double(d.pendingActTicks) * SpriteDirector.tickDuration, 5.0,
                                      "\(archetype.rawValue): beat <= 5 s")
-            // The first act leads the sequence (quirk winds up with perk).
-            // Read the queued head BEFORE advancing: event-queued frames are
-            // drained by the next step, same as the live renderer.
+            // The first act leads the sequence (a quirk winds up with perk
+            // when the profile's anticipation is nonzero — v28; willow's zero
+            // anticipation leads with the quirk itself). Read the queued head
+            // BEFORE advancing: event-queued frames are drained by the next
+            // step, same as the live renderer.
+            let profile = try PersonalityProfile.load(archetype)
+            let windup = SpriteDirector.perkWindupTicks(anticipation: profile.motionGrammar?.anticipation ?? 0)
             let expectedFirst = acts.first.map { a -> String in
                 switch a {
-                case .quirk: return "perk"
+                case .quirk: return windup > 0 ? "perk" : "quirk"
                 case .happy: return "happy"
                 case .slowBlink: return "idle"
                 case .look: return "glanceR"
@@ -150,8 +154,14 @@ final class WakeBeatTests: XCTestCase {
                 }
             }
             XCTAssertEqual(d.currentFrame, expectedFirst, "\(archetype.rawValue): the beat's act leads")
-            d.advance(toTick: d.tick + 1)
-            XCTAssertNotEqual(d.currentFrame, expectedFirst, "\(archetype.rawValue): the sequence advances")
+            // v28: the wind-up holds up to 2 ticks — advance until the frame
+            // actually turns over (bounded).
+            var advanced = false
+            for _ in 0..<4 {
+                d.advance(toTick: d.tick + 1)
+                if d.currentFrame != expectedFirst { advanced = true; break }
+            }
+            XCTAssertTrue(advanced, "\(archetype.rawValue): the sequence advances")
         }
     }
 

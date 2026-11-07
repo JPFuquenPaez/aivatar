@@ -78,12 +78,15 @@ final class HapticsAndPostcardTests: XCTestCase {
         // v22 golden pins (first pin 2026-11-07): frame-hash prefixes per
         // archetype (seed 20261111, bond 3, day 23, streak 5, rain).
         let expected: [Archetype: UInt64] = [
-            // Pinned 2026-11-07 (v22): first-frame hash of each postcard.
-            .ember: 1_224_187_091_045_522_186,
+            // Pinned 2026-11-07 (v22); re-pinned 2026-11-07 (v28): ember base
+            // tail-tip cell, compass base mouth + happy patch, and nimbus
+            // idleB foot step change the authored frames; willow and prism
+            // first frames are unchanged.
+            .ember: 2_189_887_195_745_852_862,
             .willow: 5_779_802_598_010_730_844,
-            .compass: 97_645_211_441_625_435,
+            .compass: 5_426_752_643_789_965_734,
             .prism: 2_059_382_512_568_751_236,
-            .nimbus: 12_948_369_330_726_582_742,
+            .nimbus: 11_416_384_784_677_474_054,
         ]
         var recorded: [String] = []
         for archetype in Archetype.allCases {

@@ -34,12 +34,33 @@ nonisolated final class SpriteDirector {
     /// Ticks per minute on the director clock.
     private static let ticksPerMinute: Float = 60.0 / 0.15
 
+    /// v28: the blink hold in ticks from the profile's durationScale — 300 ms
+    /// is the visibility floor at the 150 ms clock (willow 1.8 -> 4 ticks, a
+    /// watchable blink; ember 0.7 -> 2). Single source for director + tests.
+    static func blinkTicks(durationScale: Float) -> Int {
+        max(2, Int(round(2 * durationScale)))
+    }
+
+    /// v28: the quirk wind-up in ticks from the profile's anticipation dial —
+    /// any nonzero anticipation earns at least one visible perk tick; exactly
+    /// zero (willow) means no wind-up at all. Single source for director+tests.
+    static func perkWindupTicks(anticipation: Float) -> Int {
+        anticipation > 0 ? max(1, Int(round(anticipation * 2))) : 0
+    }
+
     private let sprite: CompanionSprite
     private let archetype: Archetype
     private var rng: SeededRandom
     private let blinkP: Float
     private let glanceP: Float
     private let eventP: Float
+    /// v28: the profile's blink grammar + anticipation now shape the live
+    /// stage (they were only consumed by the frozen vector engine).
+    private let blinkTicks: Int
+    private let perkWindupTicks: Int
+    private var lastBlinkTick = -100
+    private var lastGazeTick = -1
+    private var lastGazeDir = 0
     private let weatherDials: WeatherDials?
     private var mode: MotionAccessibilityMode = .full
 
@@ -116,6 +137,10 @@ nonisolated final class SpriteDirector {
         blinkP = profile.gazeProfile.blinkRatePerMin / Self.ticksPerMinute
         glanceP = profile.gazeProfile.saccadeRatePerMin / Self.ticksPerMinute * 0.35
         eventP = 0.8 / Self.ticksPerMinute * profile.motionProfile.tempoScale
+        // 300 ms is the visibility floor at the 150 ms clock; willow's
+        // 1.8 durationScale -> 4 ticks (a watchable blink), ember 0.7 -> 2.
+        blinkTicks = Self.blinkTicks(durationScale: profile.blink?.durationScale ?? 1)
+        perkWindupTicks = Self.perkWindupTicks(anticipation: profile.motionGrammar?.anticipation ?? 0)
         weatherDials = profile.weatherDials
         nextMoteTick = 140 + rng.nextInt(160)
     }
@@ -155,7 +180,8 @@ nonisolated final class SpriteDirector {
             * BondRules.glanceAwayMultiplier(bondLevel) * weatherGlanceMul
         let eventMul: Float = (mood == .playful ? 2 : (mood == .lonely ? 1.5 : 1))
             * BondRules.quirkRateMultiplier(bondLevel) * weatherTempoMul
-        if rng.nextFloat() < blinkP {
+        if rng.nextFloat() < blinkP, tick - lastBlinkTick >= 3 {
+            lastBlinkTick = tick
             play(.blink)
         } else if mode != .reduceMotionL2, !workoutMode, rng.nextFloat() < glanceP * glanceMul {
             play(.look, direction: rng.nextFloat() < 0.5 ? -1 : 1)
@@ -176,8 +202,10 @@ nonisolated final class SpriteDirector {
         if workoutMode {
             return (tick / Self.runCycleTicks(workoutPaceBand)) % 2 == 0 ? "idleA" : "idleB"
         }
-        let phase = tick % 18
-        if phase == 8 || phase == 9 { return "breathe" }
+        // v28: 600 ms visible hold every 3.6 s (~17 breaths/min, 25% duty) —
+        // reads as breathing, not a twitch.
+        let phase = tick % 24
+        if (8...11).contains(phase) { return "breathe" }
         switch (tick / 55) % 3 {
         case 1: return "idleA"
         case 2: return "idleB"
@@ -259,7 +287,17 @@ nonisolated final class SpriteDirector {
 
     func handleEvent(_ event: AvatarEvent) {
         switch event {
-        case .tap, .crownTick:
+        case .tap:
+            markInteraction()
+            if tick == lastGazeTick {
+                // v28: the v6 touch-gaze was silently canceled by the tap's
+                // queue replace — play dart-then-answer as one run.
+                queue = frames(for: .look, direction: lastGazeDir) + frames(for: .happy)
+                actCount += 2
+            } else {
+                play(.happy)
+            }
+        case .crownTick:
             markInteraction()
             play(.happy)
         case .wake:
@@ -271,7 +309,9 @@ nonisolated final class SpriteDirector {
             play(.farewell)
         case .gazeAt(let x, _):
             markInteraction()
-            play(.look, direction: x < 0 ? -1 : 1)
+            lastGazeTick = tick
+            lastGazeDir = x < 0 ? -1 : 1
+            play(.look, direction: lastGazeDir)
         case .gesture(let name):
             markInteraction()
             play(gestureAct(named: name))
@@ -401,6 +441,9 @@ nonisolated final class SpriteDirector {
         curiousUntilTick = tick + 200
         if mode == .reduceMotionL2 {
             play(.blink)
+        } else if workoutMode {
+            // v29: land the cheer on a stride boundary, not mid-stride.
+            playOnStrideBoundary(act)
         } else {
             play(act)
         }
@@ -413,8 +456,10 @@ nonisolated final class SpriteDirector {
 
     /// True while Aivatar's own workout session runs: the idle floor becomes
     /// a run cycle (no random quirks/glances/motes — the run IS the motion;
-    /// splits are the only acts). Frame budget: the renderer drops to a
-    /// lower cadence in workout mode (G9 power).
+    /// splits are the only acts). Frame budget: the run cycle itself is the
+    /// motion budget (two frames per stride), and the renderer's draw-skip
+    /// memo (v28) means zero redraws between frame changes — no separate
+    /// cadence drop exists or is needed.
     private(set) var workoutMode = false
     private(set) var workoutPaceBand = 2
     private(set) var splitCount = 0
@@ -553,32 +598,61 @@ nonisolated final class SpriteDirector {
     /// drained before it can render, so blinks were invisible.
     private func frames(for act: SpriteAct, direction: Int = 0) -> [(frame: String, ticks: Int)] {
         if act == .blink {
-            return [("blink", 2), ("idle", 1)]
+            return [("blink", blinkTicks), ("idle", 1)]
         }
         let bodyGated = mode == .reduceMotionL2
         switch act {
         case .blink:
-            return [("blink", 2), ("idle", 1)]
+            return [("blink", blinkTicks), ("idle", 1)]
         case .happy:
             return [("happy", 2), ("idle", 2)]
         case .quirk:
-            // Anticipation (v15): a 1-tick wind-up before the signature move.
-            return bodyGated
-                ? [("blink", 2), ("idle", 1)]
-                : [("perk", 1), ("quirk", 2), ("idle", 1)]
+            // Anticipation from the profile (v28): ember 0.9 -> 2-tick wind-up,
+            // willow 0.0 -> none; follow-through settles for 2 ticks.
+            if bodyGated {
+                return [("blink", blinkTicks), ("idle", 1)]
+            }
+            var q: [(String, Int)] = []
+            if perkWindupTicks > 0 { q.append(("perk", perkWindupTicks)) }
+            q += [("quirk", 2), ("idle", 2)]
+            return q
         case .look:
-            return [(direction < 0 ? "glanceL" : "glanceR", 4), ("idle", 1)]
+            // v28: dart-and-hold (2 ticks) instead of a 600 ms stare.
+            return [(direction < 0 ? "glanceL" : "glanceR", 2), ("idle", 2)]
         case .slowBlink:
             return [("idle", 3), ("blink", 6), ("idle", 2)]
         case .perk:
-            return [("perk", 3), ("idle", 1)]
+            return [("perk", 3), ("idle", 2)]
         case .farewell:
             // v16 F1: level 4+ earns a longer goodbye bloom.
-            return [("idle", 1), ("blink", 2), ("sleepy", BondRules.farewellBloomTicks(bondLevel))]
+            return [("idle", 1), ("blink", blinkTicks), ("sleepy", BondRules.farewellBloomTicks(bondLevel))]
         }
     }
 
+    /// v29 workout mode: hold the current run frame until the cycle turns,
+    /// then play the act — the celebration lands on a stride boundary
+    /// instead of snapping mid-stride.
+    private func playOnStrideBoundary(_ act: SpriteAct) {
+        if act != .look, moteCell != nil {
+            moteCell = nil
+            nextMoteTick = tick + 120 + rng.nextInt(160)
+        }
+        if act == .blink { blinkCount += 1 }
+        let stride = Self.runCycleTicks(workoutPaceBand)
+        let hold = max(1, stride - (tick % stride))
+        queue = [(scheduledIdleFrame(), hold)] + frames(for: act)
+        if act != .blink { actCount += 1 }
+    }
+
     private func play(_ act: SpriteAct, direction: Int = 0) {
+        // v28: one focal story — a self-play mote never lingers during an act.
+        // A cleared mote is gone for a while, not respawned at once (otherwise
+        // act-heavy high-bond idle would spawn motes — and chase looks — faster
+        // than low-bond idle).
+        if act != .look, moteCell != nil {
+            moteCell = nil
+            nextMoteTick = tick + 120 + rng.nextInt(160)
+        }
         if act == .blink { blinkCount += 1 }
         queue = frames(for: act, direction: direction)
         if act != .blink { actCount += 1 }

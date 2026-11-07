@@ -93,12 +93,22 @@ final class Life2Tests: XCTestCase {
 
     func testQuirkAlwaysWindsUpWithPerk() throws {
         for archetype in Archetype.allCases {
+            // v28: the wind-up length is profile-driven (any nonzero
+            // anticipation earns >= 1 perk tick); anticipation exactly 0
+            // (willow) is a deliberate no-wind-up — the frog just croaks.
+            let profile = try PersonalityProfile.load(archetype)
+            let windup = SpriteDirector.perkWindupTicks(anticipation: profile.motionGrammar?.anticipation ?? 0)
             let d = try director(archetype)
             let seq = frames(d, ticks: 3000)
             for i in 1..<seq.count
             where seq[i] == "quirk" && seq[i - 1] != "quirk" {
-                XCTAssertEqual(seq[i - 1], "perk",
-                               "\(archetype.rawValue): a signature move is anticipated, not random")
+                if windup > 0 {
+                    XCTAssertEqual(seq[i - 1], "perk",
+                                   "\(archetype.rawValue): a signature move is anticipated, not random")
+                } else {
+                    XCTAssertNotEqual(seq[i - 1], "perk",
+                                      "\(archetype.rawValue): zero-anticipation archetypes never wind up")
+                }
             }
         }
     }
@@ -123,9 +133,13 @@ final class Life2Tests: XCTestCase {
             let hasMote = d.moteCell != nil
             if hasMote { activeTicks += 1 }
             if hasMote && wasNil {
-                // the companion glances toward the mote within a few ticks
-                let upcoming = frames(d, ticks: 5)
-                if upcoming.contains("glanceL") || upcoming.contains("glanceR") {
+                // the companion glances toward the mote at the spawn tick
+                // (v28 dart-and-hold) or within the next few ticks — capture
+                // the spawn frame BEFORE frames() advances the clock
+                let spawnFrame = d.currentFrame
+                let upcoming = frames(d, ticks: 3)
+                if spawnFrame == "glanceL" || spawnFrame == "glanceR"
+                    || upcoming.contains("glanceL") || upcoming.contains("glanceR") {
                     sawGlanceAfterSpawn = true
                 }
             }

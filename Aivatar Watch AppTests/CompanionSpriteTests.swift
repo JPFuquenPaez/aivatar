@@ -89,10 +89,12 @@ final class CompanionSpriteTests: XCTestCase {
         // v13 golden pins (first pin 2026-11-03). Update deliberately —
         // and say why. RECORD MODE below reports the values to pin.
         let expected: [Archetype: UInt64] = [
-            // Pinned 2026-11-03 (v13): the authored 20x18 idle grids.
-            .ember: 12_626_353_783_622_487_802,
+            // Pinned 2026-11-03 (v13); re-pinned 2026-11-07 (v28): ember's base
+            // tail tip moved to the literal tip (x=18) and compass's base row 8
+            // gained its 2-cell mouth — the other three idle grids are unchanged.
+            .ember: 2_451_309_545_071_567_918,
             .willow: 6_115_991_415_473_770_972,
-            .compass: 91_049_369_191_467_680,
+            .compass: 1_718_610_583_237_580_081,
             .prism: 9_456_951_818_924_182_236,
             .nimbus: 5_552_407_490_590_961_342,
         ]
@@ -340,8 +342,16 @@ final class CompanionSpriteTests: XCTestCase {
             XCTAssertEqual(director.currentFrame, "idle", "\(archetype.rawValue): farewell breathes first")
             director.advance(toTick: director.tick + 1)
             XCTAssertEqual(director.currentFrame, "blink", "\(archetype.rawValue): farewell blinks")
-            director.advance(toTick: director.tick + 2)
-            XCTAssertEqual(director.currentFrame, "sleepy", "\(archetype.rawValue): farewell ends sleepy")
+            // v28: the blink holds the profile-driven blinkTicks before the
+            // sleepy hand-off — advance through the whole blink, never past it.
+            var endedSleepy = false
+            for _ in 0..<10 {
+                director.advance(toTick: director.tick + 1)
+                if director.currentFrame == "sleepy" { endedSleepy = true; break }
+                XCTAssertEqual(director.currentFrame, "blink",
+                               "\(archetype.rawValue): farewell stays in the blink until the hand-off")
+            }
+            XCTAssertTrue(endedSleepy, "\(archetype.rawValue): farewell ends sleepy")
         }
     }
 }

@@ -195,7 +195,7 @@ nonisolated enum AuthoredSprites {
             "..BBBBBBWWWWBBBBBB..",
             "..BBBBBBWKKWBBBBBB..",
             "...BBBBBBBBBBBBBB...",
-            "......BBBBBB....WBB.",
+            "......BBBBBB....BBW.",
             ".....BBBWWWWBBB..BBB",
             "....BBBWWWWWWBBBBB..",
             "....BBDDDDDDDDDDBB..",
@@ -220,12 +220,12 @@ nonisolated enum AuthoredSprites {
                          CellDiff(7, 5, "K"), CellDiff(8, 5, "K"),
                          CellDiff(12, 4, "B"), CellDiff(12, 5, "B"), CellDiff(13, 4, "W"), CellDiff(14, 4, "K"),
                          CellDiff(13, 5, "K"), CellDiff(14, 5, "K") ],
-            "quirk": [ CellDiff(15, 9, "W"), CellDiff(16, 9, ".") ],  // tail wag
+            "quirk": [ CellDiff(18, 9, "B"), CellDiff(19, 9, "W") ],  // tail wag, tip rides
             "perk": [ CellDiff(3, 0, "B"), CellDiff(6, 0, "B"), CellDiff(13, 0, "B"), CellDiff(16, 0, "B") ],  // ears flare
             "breathe": [ CellDiff(3, 11, "B"), CellDiff(18, 11, "B") ],
             // v24: the white tail tip rides the wag (was cleared and the tail
             // extended in body tone — the fox's identity anchor vanished).
-            "idleA": [ CellDiff(16, 9, "."), CellDiff(19, 9, "W") ],
+            "idleA": [ CellDiff(18, 9, "B"), CellDiff(17, 9, "W") ],
             "idleB": [ CellDiff(5, 0, "."), CellDiff(3, 0, "B") ],
             "yawn": [ CellDiff(6, 3, "D"), CellDiff(7, 3, "D"), CellDiff(6, 4, "B"), CellDiff(7, 4, "B"),
                       CellDiff(12, 3, "D"), CellDiff(13, 3, "D"), CellDiff(12, 4, "B"), CellDiff(13, 4, "B"),
@@ -283,7 +283,7 @@ nonisolated enum AuthoredSprites {
             "idleB": [ CellDiff(6, 5, "B") ],
             "yawn": [ CellDiff(7, 1, "D"), CellDiff(8, 1, "D"), CellDiff(7, 2, "B"), CellDiff(8, 2, "B"),
                       CellDiff(11, 1, "D"), CellDiff(12, 1, "D"), CellDiff(11, 2, "B"), CellDiff(12, 2, "B"),
-                      CellDiff(8, 6, "B"), CellDiff(11, 6, "B") ],
+                      CellDiff(7, 6, "D"), CellDiff(8, 6, "D"), CellDiff(9, 6, "D"), CellDiff(10, 6, "D") ],
         ],
         paletteHex: [
             "B": "55D98A", "D": "2A9C5E", "K": "0C2018",
@@ -304,7 +304,7 @@ nonisolated enum AuthoredSprites {
             "..BBWKBBBBBB.AAAA...",
             "..BBKKBBBBBBBAAAA...",
             ".BBBBBBBBBBBBAAAAA..",
-            ".KBBBBBBBBBBBAAAAA..",
+            "KKBBBBBBBBBBBAAAAA..",
             ".DBBBBBBBBBBBBAAAA..",
             ".DWWWWWWWBBBBBAAA...",
             "..DWWWWWWBBBBBB.....",
@@ -318,8 +318,11 @@ nonisolated enum AuthoredSprites {
         patches: [
             "blink": [ CellDiff(4, 5, "B"), CellDiff(5, 5, "B") ],
             "sleepy": [ CellDiff(4, 4, "D"), CellDiff(5, 4, "D"), CellDiff(4, 5, "B"), CellDiff(5, 5, "B") ],
+            // v28: happy reads at a glance — closed eye plus a two-cell open
+            // mouth under the base 2-cell mouth (4 real diffs; the old (0,8)
+            // was a no-op against the v28 base row).
             "happy": [ CellDiff(4, 5, "B"), CellDiff(5, 5, "B"),
-                       CellDiff(0, 8, "K"), CellDiff(2, 9, "K") ],  // mouth open
+                       CellDiff(1, 9, "K"), CellDiff(2, 9, "K") ],
             // v24: clear the old pupil cells (5,5)/(5,6) so the eye slides
             // cleanly to x=3-4 instead of smearing 3-wide.
             "glanceL": [ CellDiff(5, 5, "B"), CellDiff(5, 6, "B"), CellDiff(3, 5, "W"),
@@ -330,7 +333,7 @@ nonisolated enum AuthoredSprites {
             "perk": [ CellDiff(5, 1, "B"), CellDiff(8, 1, "B"), CellDiff(4, 2, "B"), CellDiff(9, 2, "B") ],  // dorsal flare
             "breathe": [ CellDiff(0, 9, "B"), CellDiff(14, 12, "B") ],
             "idleA": [ CellDiff(14, 3, "."), CellDiff(15, 3, "A") ],
-            "idleB": [ CellDiff(1, 8, "B") ],
+            "idleB": [ CellDiff(2, 8, "K") ],
             "yawn": [ CellDiff(4, 4, "D"), CellDiff(5, 4, "D"), CellDiff(4, 5, "B"), CellDiff(5, 5, "B"),
                       CellDiff(0, 8, "K"), CellDiff(2, 8, "K") ],
         ],
@@ -365,15 +368,15 @@ nonisolated enum AuthoredSprites {
             "....................",
         ],
         patches: [
-            "blink": [ CellDiff(5, 5, "B"), CellDiff(6, 5, "B"), CellDiff(4, 6, "B") ],
+            "blink": [ CellDiff(4, 5, "B"), CellDiff(5, 5, "B"), CellDiff(6, 5, "B"), CellDiff(4, 6, "B") ],
             "sleepy": [ CellDiff(4, 5, "D"), CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(4, 6, "B") ],
-            "happy": [ CellDiff(5, 5, "B"), CellDiff(6, 5, "B"), CellDiff(4, 6, "B"), CellDiff(1, 7, "K") ],
+            "happy": [ CellDiff(4, 5, "B"), CellDiff(5, 5, "B"), CellDiff(6, 5, "B"), CellDiff(4, 6, "B"), CellDiff(1, 7, "K") ],
             "glanceL": [ CellDiff(6, 5, "B"), CellDiff(6, 6, "B") ],  // pupil narrows left
-            "glanceR": [ CellDiff(5, 5, "B"), CellDiff(5, 6, "B"), CellDiff(7, 5, "K"), CellDiff(7, 6, "K") ],
-            "quirk": [ CellDiff(5, 5, "B"), CellDiff(5, 6, "B"), CellDiff(7, 5, "K"), CellDiff(7, 6, "K") ],  // turret roll
+            "glanceR": [ CellDiff(4, 5, "B"), CellDiff(4, 6, "B"), CellDiff(5, 5, "W"), CellDiff(7, 5, "K"), CellDiff(7, 6, "K") ],
+            "quirk": [ CellDiff(19, 7, "."), CellDiff(18, 7, "D") ],  // coil tighten
             "perk": [ CellDiff(5, 0, "A"), CellDiff(7, 0, ".") ],  // casque tip sharpens
-            "breathe": [ CellDiff(1, 8, "B"), CellDiff(14, 8, "B") ],
-            "idleA": [ CellDiff(18, 7, "."), CellDiff(17, 7, "D") ],
+            "breathe": [ CellDiff(1, 8, "B"), CellDiff(1, 9, "B") ],
+            "idleA": [ CellDiff(7, 0, ".") ],  // casque edge notch
             "idleB": [ CellDiff(1, 7, "K") ],
             "yawn": [ CellDiff(4, 5, "D"), CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(4, 6, "B"),
                       CellDiff(5, 7, "K") ],
@@ -428,10 +431,12 @@ nonisolated enum AuthoredSprites {
                          CellDiff(12, 5, "B"), CellDiff(12, 6, "B") ],
             "quirk": [ CellDiff(0, 8, "D"), CellDiff(1, 8, "D"), CellDiff(1, 10, "."), CellDiff(2, 10, "."),
                        CellDiff(2, 11, "."), CellDiff(3, 11, ".") ],  // wing flap
-            "perk": [ CellDiff(7, 1, "B"), CellDiff(10, 1, "B") ],  // crest tuft rises
+            "perk": [ CellDiff(8, 1, "B"), CellDiff(9, 1, "B") ],  // crest tuft rises
             "breathe": [ CellDiff(4, 11, "B"), CellDiff(15, 11, "B") ],
             "idleA": [ CellDiff(0, 9, "."), CellDiff(2, 9, "D") ],
-            "idleB": [ CellDiff(8, 14, "D"), CellDiff(4, 14, ".") ],
+            // v28: idleB steps the left foot one cell left (edge cells swap)
+            // — still two separated foot masses, never a plank.
+            "idleB": [ CellDiff(7, 14, "."), CellDiff(3, 14, "D") ],
             "yawn": [ CellDiff(6, 4, "D"), CellDiff(7, 4, "D"), CellDiff(6, 5, "B"), CellDiff(7, 5, "B"),
                       CellDiff(11, 4, "D"), CellDiff(12, 4, "D"), CellDiff(11, 5, "B"), CellDiff(12, 5, "B"),
                       CellDiff(7, 8, "A"), CellDiff(10, 8, "A") ],

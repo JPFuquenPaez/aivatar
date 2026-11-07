@@ -285,14 +285,16 @@ final class BondRulesTests: XCTestCase {
         // and say why. RECORD MODE below reports the values to pin.
         let expected: [Archetype: UInt64] = [
             // Pinned 2026-11-07 (v17 re-pin): 600-tick idle sequence at
-            // bondLevel 3 (seed 20261106). Re-pinned because v17 fixed the
-            // blink act to hold 2 ticks — a 1-tick act was drained before it
-            // could render, so blinks are now visible in the sequence.
-            .ember: 11_200_920_742_000_823_231,
-            .willow: 6_518_389_219_467_205_937,
-            .compass: 12_327_888_753_096_917_402,
-            .prism: 11_134_013_506_434_280_832,
-            .nimbus: 10_051_580_212_754_643_760,
+            // bondLevel 3 (seed 20261106). Re-pinned 2026-11-07 (v28): the
+            // breathe hold widened to 4/24 ticks, blinks hold the profile's
+            // blinkTicks with a refractory, looks are 2-tick darts, and quirk
+            // wind-ups follow the anticipation dial — the sequence grammar
+            // changed deliberately, so all five hashes move.
+            .ember: 11_702_924_618_764_884_314,
+            .willow: 17_407_824_127_599_542_899,
+            .compass: 4_922_021_612_347_782_436,
+            .prism: 16_003_228_772_470_978_285,
+            .nimbus: 3_218_890_364_424_543_137,
         ]
         var recorded: [String] = []
         for archetype in Archetype.allCases {

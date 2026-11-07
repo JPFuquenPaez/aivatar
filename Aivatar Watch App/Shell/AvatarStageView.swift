@@ -203,56 +203,12 @@ struct AvatarStageView: View {
     }
 
     /// v12 presence pass + v18 F4 state model: publish the companion
-    /// snapshot (identity + presence state + derived one-line copy + the
-    /// timestamps the widget timeline derives its schedule from) to the
-    /// shared app group and ask WidgetKit to redraw — the complication
-    /// never polls; it refreshes when the app says so.
+    /// snapshot to the shared app group and ask WidgetKit to redraw — the
+    /// complication never polls; it refreshes when the app says so. The
+    /// write itself lives in the shared CompanionWidgetPublisher (v29) so
+    /// every surface (stage, rename in Settings) uses one path.
     private func publishCompanionWidgetState() {
-        let memory = CompanionMemoryStore().load()
-        let now = Date()
-        let lastEvent = memory?.lifeLog.last
-        let lastEventKind = lastEvent.flatMap { LifeKind.kind(forHash: $0.kindHash) }
-        let dayCount = memory.map { CompanionMemoryStore.dayDistance(from: $0.firstLaunch, to: now) + 1 } ?? 1
-        let presence = CompanionStateDerivation.presence(
-            now: now, lastSeen: memory?.lastSeen, lastEventAt: lastEvent?.at)
-        CompanionWidgetState.write(CompanionWidgetSnapshot(
-            archetypeRaw: archetype.rawValue,
-            name: stageName,
-            streakDays: memory?.streakDays ?? 1,
-            presence: presence,
-            line: CompanionStateDerivation.line(for: presence, lastEventKind: lastEventKind),
-            dayCount: dayCount,
-            animalName: archetype.animalName,
-            lastSeen: memory?.lastSeen,
-            lastEventAt: lastEvent?.at,
-            lastEventKindRaw: lastEventKind?.rawValue
-        ))
-        seedCompanionWidgetIcons()
-        WidgetCenter.shared.reloadAllTimelines()
-    }
-
-    /// Renders every archetype's icon into the shared container once —
-    /// v18: one PNG per (archetype, presence state) plus the v12 plain icon
-    /// (the icons only depend on the archetype+state; existing files kept).
-    private func seedCompanionWidgetIcons() {
-        guard let container = CompanionWidgetState.sharedContainer() else { return }
-        let icons = container.appendingPathComponent(CompanionWidgetState.iconsDirectoryName)
-        try? FileManager.default.createDirectory(at: icons, withIntermediateDirectories: true)
-        for archetype in Archetype.allCases {
-            if let url = CompanionWidgetState.iconURL(forArchetypeRaw: archetype.rawValue, container: container),
-               !FileManager.default.fileExists(atPath: url.path),
-               let png = CompanionIcon.pngData(for: archetype) {
-                try? png.write(to: url)
-            }
-            for state: IconState in [.asleep, .awake, .event] {
-                let presence = CompanionPresence(rawValue: state.rawValue) ?? .awake
-                guard let url = CompanionWidgetState.iconURL(
-                        forArchetypeRaw: archetype.rawValue, presence: presence, container: container),
-                      !FileManager.default.fileExists(atPath: url.path),
-                      let png = CompanionIcon.pngData(for: archetype, state: state) else { continue }
-                try? png.write(to: url)
-            }
-        }
+        CompanionWidgetPublisher.publish(archetype: archetype, name: stageName)
     }
 
     /// The visit record (A5d). The -absence launch argument (debug/E2E
@@ -332,69 +288,38 @@ struct AvatarStageView: View {
 
     private var stage: some View {
         GeometryReader { geometry in
-            ZStack(alignment: .bottom) {
-                if let director {
-                    SpriteStageRenderer(
-                        director: director,
-                        sprite: AuthoredSprites.sprite(for: archetype),
-                        forceAwake: AvatarStageView.forceAwake
-                    )
-                } else {
-                    Color.black
-                }
-                VStack(spacing: 2) {
-                    // v19 F5: the beat caption rides as text (Dynamic Type),
-                    // never as painter pixels.
-                    if let beatCaption {
-                        Text(beatCaption)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .transition(.opacity)
+            // v28: corner tells respect the rounded bezel's safe area; only
+            // the Canvas is full-bleed.
+            let insets = geometry.safeAreaInsets
+            // v28: the gesture/accessibility/sheet chain lives in its own
+            // builder — inlined here it exceeded the type-check budget.
+            stageChrome(
+                ZStack(alignment: .bottom) {
+                    if let director {
+                        SpriteStageRenderer(
+                            director: director,
+                            sprite: AuthoredSprites.sprite(for: archetype),
+                            forceAwake: AvatarStageView.forceAwake
+                        )
+                        // v28: companion switch rebuilds the renderer (no epoch hitch)
+                        .id(ObjectIdentifier(director))
+                    } else {
+                        Color.black
                     }
-                    Text(stageName)
-                        .font(.footnote)
-                    Text(isResting ? "resting" : "is here")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.bottom, 8)
-                .padding(.horizontal, 12)
-                if showRitualHint {
-                    Text(String(localized: "hint.slow_blink"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 34)
-                        .padding(.horizontal, 12)
-                        .transition(.opacity)
-                }
-                // v25: the one-time pages hint (workout + settings are crown pages).
-                if showPagesHint {
-                    Text(String(localized: "hint.pages"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 34)
-                        .padding(.horizontal, 12)
-                        .transition(.opacity)
-                }
-                // v21 F6: the one number Aivatar shows during its own
-                // workout — elapsed time, system monospaced digits.
-                if workoutActive {
-                    Text(WorkoutPageView.format(workoutElapsed))
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                        .padding(EdgeInsets(top: 6, leading: 0, bottom: 0, trailing: 10))
-                }
-                // v14: the visible listening tell — privacy is a design
-                // surface. One quiet waveform glyph while the mic is live.
-                if isListening {
-                    Image(systemName: "waveform")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .padding(EdgeInsets(top: 6, leading: 10, bottom: 0, trailing: 0))
-                }
-            }
+                    bottomBlock(insets: insets)
+                    cornerTells(insets: insets)
+                },
+                geometry: geometry
+            )
+        }
+    }
+
+    /// v28: the stage's interaction chrome — one accessibility element with a
+    /// state-based label, the tap/long-press gestures, the VoiceOver actions,
+    /// the lifecycle hooks, and the ceremony sheets — as a single builder so
+    /// `stage` stays within the compiler's type-check budget.
+    private func stageChrome<Content: View>(_ content: Content, geometry: GeometryProxy) -> some View {
+        content
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityText)
             .accessibilityHint("Double-tap to play. Touch and hold to share a slow blink.")
@@ -463,7 +388,8 @@ struct AvatarStageView: View {
                 if reduced, !Self.forceAwake, !farewellAwardedThisSession {
                     farewellAwardedThisSession = true
                     awardRitual(.farewellAcknowledged)
-                    director?.handleRitual(.farewellAcknowledged)
+                    // v28: no competing act — the farewell beat IS the visible
+                    // acknowledgment (one writer per queue).
                     HapticsChannel.shared.farewell()
                 } else if !reduced {
                     farewellAwardedThisSession = false
@@ -507,6 +433,11 @@ struct AvatarStageView: View {
                     wentToBackgroundAt = nil
                     // v17 F2: returning to the foreground is a poll point.
                     pollLifeSense()
+                    // v29: a wrist-raise wake refreshes the presence timestamp
+                    // (the complication's awake window) and republishes —
+                    // without counting a new session in the memory.
+                    CompanionMemoryStore().touchLastSeen()
+                    publishCompanionWidgetState()
                 } else if phase == .background {
                     wentToBackgroundAt = Date()
                 }
@@ -524,7 +455,6 @@ struct AvatarStageView: View {
                     celebrateNaming()
                 }
             }
-        }
     }
 
     /// v19 F5: selects and plays the morning beat (once per day). Also
@@ -798,6 +728,69 @@ struct AvatarStageView: View {
         context?.engine.handleEvent(.gesture(name: archetype.quirkGesture.rawValue))
         director?.handleEvent(.gesture(name: archetype.quirkGesture.rawValue))
         HapticsChannel.shared.react(to: archetype)
+    }
+
+    /// v28: the bottom text block (hints + beat caption + name + state) is
+    /// ONE layout owner, so hints can never collide with the name lines.
+    @ViewBuilder
+    private func bottomBlock(insets: EdgeInsets) -> some View {
+        VStack(spacing: 2) {
+            if showRitualHint {
+                Text(String(localized: "hint.slow_blink"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.25), value: showRitualHint)
+            }
+            // v25: the one-time pages hint (workout + settings are crown pages).
+            if showPagesHint {
+                Text(String(localized: "hint.pages"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.25), value: showPagesHint)
+            }
+            // v19 F5: the beat caption rides as text (Dynamic Type), never as
+            // painter pixels. v28: it's the moment's headline — footnote/primary.
+            if let beatCaption {
+                Text(beatCaption)
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.25), value: beatCaption != nil)
+            }
+            Text(stageName)
+                .font(.footnote)
+            // v28: "resting" only after the farewell beat completes.
+            Text(isResting && director?.resting == true ? "resting" : "is here")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.bottom, 8 + insets.bottom)
+        .padding(.horizontal, 12)
+    }
+
+    /// v28: corner tells (elapsed, waveform) inside the bezel safe area.
+    @ViewBuilder
+    private func cornerTells(insets: EdgeInsets) -> some View {
+        Group {
+            // v21 F6: the one number Aivatar shows during its own workout.
+            if workoutActive {
+                Text(WorkoutPageView.format(workoutElapsed))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(EdgeInsets(top: 6 + insets.top, leading: 0, bottom: 0, trailing: 10 + insets.trailing))
+            }
+            // v14: the visible listening tell — privacy is a design surface.
+            if isListening {
+                Image(systemName: "waveform")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(EdgeInsets(top: 6 + insets.top, leading: 10 + insets.leading, bottom: 0, trailing: 0))
+            }
+        }
     }
 
     private var accessibilityText: String {

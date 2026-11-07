@@ -313,6 +313,45 @@ reference mascot — the Mistral cat: a 16x14 logical grid, 5 colors,
 - Verify: `HapticsAndPostcardTests` — determinism + golden pins, seed
   sensitivity, caption lint/privacy, corrupt fallback, grid integrity.
 
+## 7.11 Sprite craft + stage composition (v28) — the second audit's fixes
+
+From the 4-subagent design audit (stage composition, sprite craft, motion
+grammar, widget/chrome). The cat-class evidence: authored cells, discrete
+poses, one focal story.
+
+- **Identity anchors are literal, not implied**: ember's white tail tip sits
+  at the tail's literal tip cell (x=18) and rides the wag in quirk/idleA —
+  a floating accent was the old bug. Compass keeps a 2-cell mouth in the BASE
+  row (it survives downsampling to the complication icon) and idleB no longer
+  erases it. Nimbus idleB steps one foot (edge-cell swap), never a plank;
+  the crest perk is a 2-cell tuft with no detached pixel. Prism's quirk is a
+  coil-tighten (distinct from glanceR); its breathe stays off the coil ring.
+  Willow's yawn is a clean 4-cell cavity, no orphaned ink.
+- **Expressions must read at a glance**: happy = closed eyes + a 2-cell open
+  mouth (>= 4 real diffs vs idle — `testHappyAddsASmile` enforces > 3).
+- **The profile grammar shapes the live stage**: blink holds
+  `SpriteDirector.blinkTicks(durationScale:)` (>= 2 ticks = 300 ms floor;
+  willow 1.8 -> 4 ticks, a watchable blink) with a 3-tick refractory; quirk
+  wind-ups follow `perkWindupTicks(anticipation:)` — any nonzero anticipation
+  earns >= 1 perk tick, exactly zero (willow) means no wind-up; looks are
+  2-tick darts, not 600 ms stares; breathe holds 4 of every 24 ticks (~25%
+  duty). A same-tick tap after a gaze plays dart-then-happy as one run.
+- **One focal story**: `play()` clears the self-play mote on any act except
+  the chase look — and a cleared mote gets a cooldown, never an instant
+  respawn (otherwise act-heavy high-bond idle would spawn motes faster than
+  low-bond idle and invert the gaze-bias bond signal).
+- **Stage composition**: corner tells (elapsed, listening waveform) respect
+  the bezel safe area; hints/caption/name/state live in ONE bottom block so
+  they can never collide; the farewell dim ramps over the LAST bloom ticks
+  (peak-end), keeping the goodbye warm through idle+blink; the Canvas skips
+  redraws when nothing visible changed (frame+overlay+mote+hue+ramp bucket
+  key) — OLED/battery discipline on long idle holds; companion switch
+  rebuilds the renderer via `.id(ObjectIdentifier(director))`.
+- Golden pins re-pinned deliberately with reason comments (idle hashes for
+  the two changed base grids; bond sequences and postcard first-frames for
+  the new act grammar). Verify: `CompanionSpriteTests`, `SpriteFixTests`,
+  `Life2Tests`, `BondRulesTests`, `WakeBeatTests`, `HapticsAndPostcardTests`.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,
