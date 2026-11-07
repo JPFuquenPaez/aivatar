@@ -548,6 +548,8 @@ struct AvatarStageView: View {
         for event in events {
             AvatarSession.shared.handleLifeEvent(event)
             logLifeEvent(event, now: now)
+            // v22 F7: a noticed life event gets one soft haptic (capped).
+            HapticsChannel.shared.play(.lifeEvent, archetype: archetype)
         }
     }
 

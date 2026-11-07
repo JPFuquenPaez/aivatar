@@ -22,6 +22,8 @@ struct SettingsView: View {
     /// v18 F3 weather: opt-in; current conditions fetched on visit, cached.
     @AppStorage("lifeSenseWeather") private var lifeSenseWeather = false
     @State private var showNaming = false
+    /// v22 F8: the postcard preview sheet.
+    @State private var showPostcard = false
 
     private var stageName: String {
         companionName.isEmpty ? archetype.displayName : companionName
@@ -105,6 +107,18 @@ struct SettingsView: View {
                     // or numbers of trust ("old friends" is the whole story).
                     Text(aboutLine)
                         .font(.footnote)
+                    // v22 F8: the deterministic postcard of this companion.
+                    Button {
+                        showPostcard = true
+                    } label: {
+                        HStack {
+                            Text("Postcard")
+                            Spacer()
+                            Image(systemName: "rectangle.portrait.on.rectangle.portrait")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityHint("Preview a shareable card of your companion")
                     Text("Aivatar is procedural — no clip files, everything you see is generated live from a shared rig.")
                         .font(.footnote)
                     Text("Tip: touch and hold your companion to share a slow blink — its trust ritual.")
@@ -115,6 +129,13 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .sheet(isPresented: $showNaming) {
                 NamingCeremonyView(archetype: archetype, isPresented: $showNaming, onName: nil)
+            }
+            // v22 F8: postcard preview.
+            .sheet(isPresented: $showPostcard) {
+                NavigationStack {
+                    PostcardPreviewView(archetype: archetype)
+                        .navigationTitle("Postcard")
+                }
             }
         }
     }

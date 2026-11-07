@@ -286,6 +286,33 @@ reference mascot — the Mistral cat: a 16x14 logical grid, 5 colors,
 - Verify: `WorkoutModeTests` — pace bands, split detection, recovery
   decisions, run grammar/cadence, split caps, L2, determinism.
 
+## 7.9 Haptic language (v22, Ambient Life F7) — felt, never noisy
+
+- **One vocabulary**: `HapticMoment` (ack/bond/lifeEvent/split/farewell/
+  greet/wake) -> `WKHapticType` per archetype. Same moment = same SHAPE
+  everywhere (one tick, the rising pair, one soft stop); only the flavor
+  differs. No CoreHaptics on watchOS — the WKInterfaceDevice set is the
+  honest ceiling, and haptics mark state transitions only, never loops.
+- **Caps are structural**: `HapticRateLimiter` (pure, clock-injected) —
+  <= 6/hour rolling, >= 1.5 s between any two — proven under adversarial
+  bursts. Every haptic is redundant with visual + VoiceOver.
+- Verify: `HapticsAndPostcardTests` — grammar parity/shape consistency,
+  limiter caps, postcard pins.
+
+## 7.10 Postcards (v22, Ambient Life F8) — determinism as the artifact
+
+- **A card of the REAL companion**: `PostcardComposer` runs a seed-picked
+  two-act moment through the same director+sprite path as the live stage;
+  identical (archetype, seed, memory snapshot) -> identical frame hashes
+  (pinned per archetype). Corrupt inputs degrade to the warm greeting —
+  a postcard never fails to compose. Captions are name/day/bond/weather
+  words only, <= 8 words, never life-log content.
+- **Export lands with the iPhone companion shell** (this project has no iOS
+  target yet); the watch-side preview (Settings -> About -> Postcard)
+  renders the real card. No server, no account, no feed.
+- Verify: `HapticsAndPostcardTests` — determinism + golden pins, seed
+  sensitivity, caption lint/privacy, corrupt fallback, grid integrity.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,
