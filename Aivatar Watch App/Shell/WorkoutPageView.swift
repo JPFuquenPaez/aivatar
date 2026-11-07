@@ -1,11 +1,15 @@
 import SwiftUI
 
-/// WorkoutPageView (v21, F6): the crown-scroll page that starts Aivatar's
-/// OWN workout session ("Run with Ember") — one row, one tap, platform
-/// chrome. During the run the stage shows the companion (run grammar) plus
+/// WorkoutPageView (v21 F6, v30 layout): the crown-scroll page that starts
+/// Aivatar's OWN workout session ("Run with Ember") — platform chrome, one
+/// decision. During the run the stage shows the companion (run grammar) plus
 /// a minimal elapsed-time corner; this page shows the honest controls.
 /// No metrics dashboard: the numbers live in Fitness afterwards — Aivatar
 /// shows presence, not data.
+/// v30: the column is vertically centered (v27 left a dead zone at the
+/// bottom of a 242 pt screen), the hero is the glow-disc, the elapsed chip
+/// is accent-tinted, and the name reads through @AppStorage like every
+/// other surface.
 struct WorkoutPageView: View {
     let archetype: Archetype
     let active: Bool
@@ -13,52 +17,61 @@ struct WorkoutPageView: View {
     let onStart: () -> Void
     let onStop: () -> Void
 
+    @AppStorage("companionName") private var companionName = ""
+
     private var name: String {
-        UserDefaults.standard.string(forKey: "companionName").flatMap { $0.isEmpty ? nil : $0 }
-            ?? archetype.displayName
+        companionName.isEmpty ? archetype.displayName : companionName
     }
 
     var body: some View {
         let accent = SetupTheme.accent(for: archetype)
-        VStack(spacing: 12) {
-            if active {
-                SetupTheme.iconDisc(for: archetype, size: 56)
-                Text(String(format: String(localized: "workout.running_with"), name))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Text(Self.format(elapsed))
-                    .font(.title2.monospacedDigit().weight(.semibold))
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 14)
-                    .background(Color.white.opacity(0.07))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .accessibilityLabel(String(format: String(localized: "workout.elapsed"), Self.format(elapsed)))
-                Button {
-                    onStop()
-                } label: {
-                    Label(String(localized: "workout.end_run"), systemImage: "stop.fill")
+        GeometryReader { geometry in
+            VStack(spacing: 12) {
+                Spacer(minLength: 0)
+                if active {
+                    SetupTheme.iconDisc(for: archetype, size: 48)
+                    Text(String(format: String(localized: "workout.running_with"), name))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text(Self.format(elapsed))
+                        .font(.title2.monospacedDigit().weight(.semibold))
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 14)
+                        .background(accent.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .accessibilityLabel(String(format: String(localized: "workout.elapsed"), Self.format(elapsed)))
+                    Spacer(minLength: 0)
+                    Button {
+                        onStop()
+                    } label: {
+                        Label(String(localized: "workout.end_run"), systemImage: "stop.fill")
+                    }
+                    .buttonStyle(.setupProminent(accentHex: "FF3B30"))
+                    .accessibilityHint(String(localized: "workout.end_hint"))
+                } else {
+                    SetupTheme.iconDisc(for: archetype, size: 72)
+                    Text(String(format: String(localized: "workout.run_with"), name))
+                        .font(.title3.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Button {
+                        onStart()
+                    } label: {
+                        Label(String(localized: "workout.start"), systemImage: "figure.run")
+                    }
+                    .buttonStyle(.setupProminent(accentHex: SetupTheme.accentHex(for: archetype)))
+                    .accessibilityHint(String(localized: "workout.start_hint"))
+                    Text(String(localized: "workout.sub"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
-                .buttonStyle(.setupProminent(tint: .red))
-                .accessibilityHint("Ends the workout and saves it to Health")
-            } else {
-                SetupTheme.iconDisc(for: archetype, size: 72)
-                Text(String(format: String(localized: "workout.run_with"), name))
-                    .font(.title3.weight(.semibold))
-                    .multilineTextAlignment(.center)
-                Button {
-                    onStart()
-                } label: {
-                    Label(String(localized: "workout.start"), systemImage: "figure.run")
-                }
-                .buttonStyle(.setupProminent(tint: accent))
-                .accessibilityHint("Starts a workout with your companion running beside you")
-                Text(String(localized: "workout.sub"))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8 + geometry.safeAreaInsets.bottom)
         }
-        .padding(.horizontal, 12)
     }
 
     /// mm:ss (system monospaced digits — the one number Aivatar shows).

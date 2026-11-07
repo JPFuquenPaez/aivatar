@@ -376,6 +376,67 @@ poses, one focal story.
 - **Motion leftover**: in workout mode a split cheer lands on the next
   stride boundary (`playOnStrideBoundary`) instead of snapping mid-stride.
 
+## 7.13 Setup surfaces 2.0 (v30) — one coherent system on OLED black
+
+From the three-agent audit of the setup surfaces (watchOS HIG/patterns,
+visual craft, copy & a11y). The surfaces now read as the same object as the
+stage instead of white slabs floating on black.
+
+- **One hue everywhere**: `SetupTheme.accentHex` is the sprite's body token
+  (`AuthoredSprites.sprite(for:).paletteHex["B"]`, cached once per archetype).
+  v27 mixed the engine palette (`#FF8A3D`) with the sprite body (`#FF9E4A`)
+  — icon and chrome sat in two hues. Side effect: every body token clears
+  WCAG 4.5:1 with black ink, so the compass button-contrast fail (4.36:1 on
+  the engine blue) disappears; `SetupThemeTests` pins accent==body and the
+  contrast floor per archetype.
+- **Glow-disc hero**: `SetupIconDisc` — flat disc at accent 0.12 + a soft
+  radial halo (0.22→0.10→clear; selected 0.34→0.12→clear) confined to a
+  1.6x-size circle (small lit area, OLED-safe). The icon stays
+  nearest-neighbor (`interpolation(.none)`); chrome carries the softness,
+  the sprite carries the hard edges. Selected = ring + check badge +
+  slightly stronger halo, with a 0.3 s bloom that is disabled under Reduce
+  Motion. Hero sizes: picker `min(h*0.30, 96)`, naming 56, workout 72/48,
+  settings card 48.
+- **Containers are accent-tinted** (`tint.opacity(0.08)`, radius 14
+  continuous) — the white-0.07 slabs are gone, including the postcard
+  frame. One solid-accent area per screen max: the primary button.
+- **Primary button**: full-width, `minHeight: 44`, semibold body label,
+  luminance-aware ink (`buttonForeground(on:)` — black 0.87 or white, pinned
+  by test), press = opacity + 0.975 scale with the motion dropped under
+  Reduce Motion. The `selected` variant (accent 15% bg + accent ink +
+  hairline ring) replaces v27's gray "your companion" button, which read as
+  disabled.
+- **Layout rhythm**: picker page = hero → name (`title3.semibold`,
+  lineLimit 1, minScale 0.7) → element tag (`caption2.semibold`, uppercase,
+  tracking 1.5, accent) → temperament (`footnote.secondary`, lineLimit 2) →
+  button pinned to the bottom with `8 + safeAreaInsets.bottom`; the workout
+  column is vertically centered; the naming sheet scrolls and prefills the
+  current name on rename, clamps names to 24 chars (one line on the stage),
+  and gives the clear/cancel controls 44 pt hit areas.
+- **Settings**: the List takes `.tint(accent)` (toggles were system blue);
+  the identity card is a tappable accent card (disc 48 + headline name +
+  about line + chevron) that opens the rename; every row has a chevron.
+- **Onboarding affordances**: the picker sheet in onboarding mode has a
+  quiet "Not now" (`cancellationAction` toolbar item) — HIG skippability;
+  the horizontal `.page` carousel is deliberate (app structure pages
+  vertically, choice carousels swipe horizontally).
+- **Copy & a11y localization (was the biggest leak)**: `animal.<raw>.{name,
+  element, temperament}` + `identity.full` (15+1 keys) now live in the app
+  AND widget strings tables and resolve per process bundle
+  (`AivatarShared/LocalizedAnimalCopy`); ~20 hardcoded English a11y strings
+  (settings hints, stage hint/actions/states, picker selected states, bond
+  announcement, workout hints) moved to `a11y.*`/`stage.*`/`bond.*`/
+  `workout.*_hint` keys; the postcard weather caption uses `weather.*`
+  instead of the raw English enum. Multi-arg keys (`about.day`,
+  `postcard.day`, `inline.line`, `rect.line`) are now positional
+  (`%1$@ … %2$d`) so fr word order can't swap arguments; five non-consent
+  strings were trimmed to the <= 8-word house voice (the two consent footers
+  keep their full privacy contract). `LocalizationTests` pins all 120 keys,
+  adds an en↔fr placeholder-sequence parity test and a word-count lint over
+  all `beat.*`/`presence.*`.
+- Debug hooks for captures: `-showPicker`, `-showNaming`, `-page N`.
+- No sprite/golden changes — chrome only; the smoke test is unchanged.
+
 ## Review workflow for any visual change
 
 1. Unit suite green (sprite + engine golden pins updated deliberately,

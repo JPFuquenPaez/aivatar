@@ -38,9 +38,10 @@ struct PostcardPreviewView: View {
     }
 
     var body: some View {
-        // v29: the preview rides the setup-surface card idiom and is big
-        // enough to read the pixel art (90x81 pt = 4.5x the 20x18 grid).
-        SetupTheme.card {
+        // v30: the preview rides the accent-tinted card idiom (was a white-0.07
+        // slab) and is big enough to read the pixel art (90x81 pt = 4.5x the
+        // 20x18 grid).
+        SetupTheme.card(tint: SetupTheme.accent(for: archetype)) {
             VStack(spacing: 10) {
                 if reduceMotion, let first = frames.first {
                     Image(decorative: first, scale: 1)

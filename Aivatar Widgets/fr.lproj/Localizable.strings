@@ -8,7 +8,26 @@
 "presence.ran_with" = "a couru avec toi";
 "presence.lap_done" = "tour fait";
 "presence.noticed_something" = "a remarqué quelque chose";
-"inline.line" = "%@ · %@";
-"rect.line" = "jour %d · %@";
+"inline.line" = "%1$@ · %2$@";
+"rect.line" = "jour %1$d · %2$@";
 "widget.name" = "Ton compagnon";
 "widget.description" = "Ton compagnon, présent sur le cadran.";
+
+/* Identité des animaux + ligne d'identité (v30) — miroir du bundle app. */
+"animal.ember.name" = "Renard";
+"animal.ember.element" = "terre & feu";
+"animal.ember.temperament" = "Joueur et chaleureux — toujours partant pour un coucou";
+"animal.willow.name" = "Grenouille";
+"animal.willow.element" = "amphibien";
+"animal.willow.temperament" = "Doux et patient — une présence calme à tes côtés";
+"animal.compass.name" = "Poisson";
+"animal.compass.element" = "eau";
+"animal.compass.temperament" = "Stable et précis — tient parole";
+"animal.prism.name" = "Caméléon";
+"animal.prism.element" = "reptile";
+"animal.prism.temperament" = "Curieux et joueur — une couleur par idée";
+"animal.nimbus.name" = "Oiseau";
+"animal.nimbus.element" = "air";
+"animal.nimbus.temperament" = "Attentif et vif — remarque tout en premier";
+"identity.full" = "%1$@ le %2$@";
+"widget.a11y" = "%1$@, %2$@";

@@ -128,9 +128,12 @@ struct CompanionWidgetView: View {
                     icon
                         .frame(width: 24, height: 24)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(snapshot.animalName.isEmpty
-                             ? snapshot.name
-                             : "\(snapshot.name) the \(snapshot.animalName)")
+                        // v30: the identity line is localized (was a hardcoded
+                        // English "the" + the English stored animalName) —
+                        // resolved from the archetype raw value so the widget
+                        // bundle's own strings table supplies the words.
+                        Text(String(format: String(localized: "identity.full"),
+                                    snapshot.name, LocalizedAnimalCopy.animalName(snapshot.archetypeRaw)))
                             .font(.footnote)
                             .lineLimit(1)
                         Text(CompanionStateDerivation.rectangularLine(
@@ -148,7 +151,7 @@ struct CompanionWidgetView: View {
                 icon
             }
         }
-        .accessibilityLabel("\(snapshot.name), \(stateLine)")
+        .accessibilityLabel(String(format: String(localized: "widget.a11y"), snapshot.name, stateLine))
         .containerBackground(for: .widget) { Color.black }
     }
 }

@@ -132,6 +132,12 @@ struct AvatarStageView: View {
                 ceremonyShown = true
                 showPicker = true
             }
+            // v30: -showNaming opens the naming ceremony directly (CI captures).
+            if args.contains("-showNaming") {
+                pickerCompleted = true
+                ceremonyShown = true
+                showNaming = true
+            }
             if let i = args.firstIndex(of: "-page"), i + 1 < args.count,
                let n = Int(args[i + 1]) {
                 tabSelection = n
@@ -322,7 +328,7 @@ struct AvatarStageView: View {
         content
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityText)
-            .accessibilityHint("Double-tap to play. Touch and hold to share a slow blink.")
+            .accessibilityHint(String(localized: "stage.hint"))
             // A5c: long-press is the SLOW-BLINK RITUAL (U8 — the trust
             // exchange: mutual gaze, then a blink you can watch happen).
             // The signature quirk stays on the VoiceOver named action and
@@ -366,12 +372,12 @@ struct AvatarStageView: View {
                 director?.handleRitual(.firstGreetingOfDay)
                 afterFirstInteraction()
             }
-            .accessibilityAction(named: "Play signature move") {
+            .accessibilityAction(named: String(localized: "a11y.action_quirk")) {
                 performQuirk()
             }
             // v16 F1/G6: the slow-blink ritual is never gesture-only — under
             // Reduce Motion L2 it is a VoiceOver custom action (bond accrues).
-            .accessibilityAction(named: "Share a slow blink") {
+            .accessibilityAction(named: String(localized: "a11y.action_slow_blink")) {
                 context?.engine.handleEvent(.gesture(name: "slowBlink"))
                 director?.handleEvent(.gesture(name: "slowBlink"))
                 awardRitual(.slowBlink)
@@ -444,9 +450,14 @@ struct AvatarStageView: View {
             }
             .sheet(isPresented: $showPicker) {
                 NavigationStack {
+                    // v30: onboarding mode gets a quiet "Not now" (the picker
+                    // is skippable); a skip dismisses and the onChange below
+                    // routes to the naming ceremony, as after a plain dismiss.
                     CompanionPickerView {
                         showPicker = false
                         if !namingCompleted { showNaming = true }
+                    } onSkip: {
+                        showPicker = false
                     }
                 }
             }
@@ -707,7 +718,7 @@ struct AvatarStageView: View {
         director?.bondLevel = award.newLevel
         if award.leveledUp {
             HapticsChannel.shared.bond()
-            announce("\(stageName) trusts you more")
+            announce(String(format: String(localized: "bond.announce"), stageName))
         }
     }
 
@@ -759,10 +770,15 @@ struct AvatarStageView: View {
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.25), value: beatCaption != nil)
             }
+            // v30: one line — a long custom name must never wrap into the
+            // state line below it.
             Text(stageName)
                 .font(.footnote)
+                .lineLimit(1)
             // v28: "resting" only after the farewell beat completes.
-            Text(isResting && director?.resting == true ? "resting" : "is here")
+            Text(isResting && director?.resting == true
+                 ? String(localized: "stage.tag_resting")
+                 : String(localized: "stage.tag_here"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -794,14 +810,15 @@ struct AvatarStageView: View {
     }
 
     private var accessibilityText: String {
-        let kind = "your \(archetype.animalName) companion"
+        // v30: localized state words (was hardcoded English).
+        let kind = String(format: String(localized: "stage.kind"), archetype.animalName)
         var text: String
         if isResting {
-            text = "\(stageName), \(kind), is resting"
+            text = "\(stageName), \(kind), \(String(localized: "stage.state_resting"))"
         } else if isListening {
-            text = "\(stageName), \(kind), is listening for sounds"
+            text = "\(stageName), \(kind), \(String(localized: "stage.state_listening"))"
         } else {
-            text = "\(stageName), \(kind), is calm"
+            text = "\(stageName), \(kind), \(String(localized: "stage.state_calm"))"
         }
         // v16 F1: bond level-ups are announced, not displayed.
         if !bondAnnouncement.isEmpty {

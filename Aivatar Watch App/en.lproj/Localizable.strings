@@ -28,15 +28,15 @@
 "workout.run_with" = "Run with %@";
 "workout.running_with" = "Running with %@";
 "workout.end_run" = "End run";
-"workout.sub" = "Your companion runs with you — splits cheer, no numbers here";
+"workout.sub" = "Runs with you — splits cheer, no numbers";
 "workout.elapsed" = "Elapsed time %@";
 
 /* Postcard (F8) */
-"postcard.day" = "%@ · day %d";
+"postcard.day" = "%1$@ · day %2$d";
 "postcard.old_friends" = "old friends";
 "postcard.weather_day" = "%@ day";
 "postcard.nav" = "Postcard";
-"postcard.preview" = "A card of %@, rendered from the same pixels as the stage.";
+"postcard.preview" = "A card of %@, same pixels as the stage.";
 
 /* Complication copy (shared derivation — mirrored in the widget bundle) */
 "presence.napping" = "napping";
@@ -48,11 +48,11 @@
 "presence.ran_with" = "ran with you";
 "presence.lap_done" = "lap done";
 "presence.noticed_something" = "noticed something";
-"inline.line" = "%@ · %@";
-"rect.line" = "day %d · %@";
+"inline.line" = "%1$@ · %2$@";
+"rect.line" = "day %1$d · %2$@";
 
 /* About line (F1) */
-"about.day" = "%@ · day %d";
+"about.day" = "%1$@ · day %2$d";
 
 /* Setup surfaces (v27) */
 "picker.choose" = "Choose the %@";
@@ -74,7 +74,7 @@
 "settings.animal" = "Animal";
 "settings.accessibility" = "Accessibility";
 "settings.reduce_motion" = "Reduce Motion";
-"settings.reduce_motion_footer" = "Stops idle gestures and sway; your companion holds still and blinks.";
+"settings.reduce_motion_footer" = "Stops idle gestures — still, gentle blinks only.";
 "settings.sounds" = "Listen for sounds";
 "settings.sounds_header" = "Sounds";
 "settings.sounds_footer" = "While Aivatar is open with the stage awake, its microphone listens for your voice and claps so your companion can react. Sounds are analyzed on the watch instantly and never recorded or saved.";
@@ -85,6 +85,70 @@
 "settings.life_sense_footer" = "While Aivatar is open, your companion can react to upcoming calendar events, to workouts and sleep saved in Health, and to the current weather at your location — read on this watch only, fetched at most once an hour. Event titles, health details, and weather are never stored beyond a hash, and nothing ever leaves the watch.";
 "settings.about" = "About";
 "settings.postcard" = "Postcard";
-"settings.about_copy" = "Aivatar is procedural — no clip files, everything you see is generated live from a shared rig.";
-"settings.tip" = "Tip: touch and hold your companion to share a slow blink — its trust ritual.";
+"settings.about_copy" = "Fully procedural — everything is generated live.";
+"settings.tip" = "Tip: touch and hold to share a slow blink.";
 "workout.start" = "Start run";
+
+
+/* Animal identity (v30) — presented copy, localized. Mirrored in the
+   widget bundle's tables (AivatarShared/LocalizedAnimalCopy resolves them
+   per process bundle). The codename ("Ember") stays untranslated: it is the
+   storage key and seed anchor, not presented prose. */
+"animal.ember.name" = "Fox";
+"animal.ember.element" = "land & fire";
+"animal.ember.temperament" = "Playful and warm — always up for a hello";
+"animal.willow.name" = "Frog";
+"animal.willow.element" = "amphibian";
+"animal.willow.temperament" = "Gentle and patient — a calm presence by your side";
+"animal.compass.name" = "Fish";
+"animal.compass.element" = "water";
+"animal.compass.temperament" = "Steady and precise — keeps its word";
+"animal.prism.name" = "Chameleon";
+"animal.prism.element" = "reptile";
+"animal.prism.temperament" = "Curious and playful — a new color for every idea";
+"animal.nimbus.name" = "Bird";
+"animal.nimbus.element" = "air";
+"animal.nimbus.temperament" = "Attentive and quick — notices everything first";
+"identity.full" = "%1$@ the %2$@";
+
+/* Weather class names (v30, postcard caption — was the raw English enum) */
+"weather.sunny" = "sunny";
+"weather.gray" = "gray";
+"weather.rain" = "rainy";
+"weather.wind" = "windy";
+"weather.cold" = "cold";
+"weather.hot" = "hot";
+"weather.unknown" = "mild";
+
+/* Accessibility labels & hints (v30 — was hardcoded English, leaked into
+   fr VoiceOver) */
+"a11y.identity_card" = "%1$@, %2$@. %3$@";
+"a11y.name_row" = "Name, currently %@";
+"a11y.animal_row" = "Companion, currently %@";
+"a11y.reduce_motion" = "Reduce Motion, stronger than the system setting";
+"a11y.reduce_motion_hint" = "Keeps your companion still with only a gentle blink";
+"a11y.sounds_hint" = "Reacts to your voice and claps while the app is open";
+"a11y.calendar_hint" = "Can notice when a calendar event is about to start";
+"a11y.health_hint" = "Can celebrate your saved workouts and notice your sleep";
+"a11y.weather_hint" = "Can notice the current weather where you are";
+"a11y.postcard_hint" = "Preview a shareable card of your companion";
+"a11y.picker_selected" = ", your current companion";
+"a11y.picker_button_selected" = "%@ is your companion";
+"a11y.action_quirk" = "Play signature move";
+"a11y.action_slow_blink" = "Share a slow blink";
+
+/* Stage VoiceOver + bottom tags (v30) */
+"stage.hint" = "Double-tap to play. Touch and hold to share a slow blink.";
+"stage.kind" = "your %@ companion";
+"stage.state_resting" = "is resting";
+"stage.state_listening" = "is listening for sounds";
+"stage.state_calm" = "is calm";
+"stage.tag_here" = "is here";
+"stage.tag_resting" = "resting";
+
+/* Bond announcement (v30) */
+"bond.announce" = "%@ trusts you more";
+
+/* Workout hints (v30) */
+"workout.start_hint" = "Starts a workout with your companion running beside you";
+"workout.end_hint" = "Ends the workout and saves it to Health";

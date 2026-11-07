@@ -1,33 +1,36 @@
 import SwiftUI
 
-/// Companion picker (v10): a visual, one-decision-per-screen carousel — the
-/// watchOS pattern for choosing a character. Replaces the Phase B text-list
-/// picker: on a 40-46 mm screen a choice must read at a glance, so each page
-/// leads with the rendered animal icon (the real avatar, Render/CompanionIcon),
-/// then the animal name and a one-line temperament (Tools/PIXEL_DESIGN.md v3;
-/// likable pole per §5 — no companion reads as a negative trait).
-///
-/// Layout rules (watchOS HIG): native vertical page TabView — the same paging
-/// gesture as stage -> settings, one companion per screen; text styles only
-/// (Dynamic Type); one full-width, 44 pt+ choose button per page; tapping
-/// chooses immediately (no Save step) with a haptic and a checkmark state.
-/// VoiceOver reads each page's art as one labeled element and the button as
-/// its own action. Used two ways: pushed from Settings (re-choosable) and as
-/// the one-time post-first-interaction onboarding sheet (v11: the first
-/// frame is the living stage; the ceremony follows the first tap, it never
-/// gates the stage).
+/// Companion picker (v30): a visual, one-decision-per-screen carousel — the
+/// watchOS onboarding idiom for choosing a character. The horizontal `.page`
+/// TabView is deliberate: the app STRUCTURE pages vertically (`.verticalPage`
+/// — stage / workout / settings), a choice carousel swipes horizontally.
+/// Each page leads with the rendered animal as a glow-disc hero (the real
+/// avatar, Render/CompanionIcon, pixel-crisp), then the animal name, the
+/// element tag, a one-line temperament, and a full-width 44 pt choose button
+/// pinned to the bottom. Tapping chooses immediately (no Save step) with a
+/// haptic, a selection bloom on the disc, and a selected state that reads
+/// selected (accent variant + check), never disabled.
+/// VoiceOver reads each page's art+text as one labeled element and the button
+/// as its own action. Used two ways: pushed from Settings (re-choosable) and
+/// as the one-time post-first-interaction onboarding sheet (the first frame
+/// is the living stage; the ceremony follows the first tap, it never gates
+/// the stage). In onboarding mode a quiet "Not now" skips the picker.
 struct CompanionPickerView: View {
     /// Non-nil in first-run onboarding mode: choosing completes onboarding
     /// and the closure lets the parent dismiss the sheet (and continue to
     /// the naming ceremony). Nil when pushed from Settings.
     var onChosenOnboarding: (() -> Void)?
+    /// v30: onboarding-only skip — dismisses without choosing; the parent
+    /// routes on as after a plain dismiss.
+    var onSkip: (() -> Void)?
 
     @AppStorage(ArchetypeSelection.storageKey) private var selection: Archetype = .ember
     @AppStorage("companionPickerCompleted") private var pickerCompleted = false
     @State private var page = 0
 
-    init(onChosenOnboarding: (() -> Void)? = nil) {
+    init(onChosenOnboarding: (() -> Void)? = nil, onSkip: (() -> Void)? = nil) {
         self.onChosenOnboarding = onChosenOnboarding
+        self.onSkip = onSkip
     }
 
     var body: some View {
@@ -39,6 +42,15 @@ struct CompanionPickerView: View {
         }
         .tabViewStyle(.page)
         .navigationTitle(String(localized: "picker.nav"))
+        .toolbar {
+            // v30: onboarding must be skippable (HIG) — a quiet text button,
+            // no dedicated key (reuses the ceremony's "Not now").
+            if let onSkip {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "naming.cancel")) { onSkip() }
+                }
+            }
+        }
         .onAppear {
             // Open on the current companion so the checkmark is visible.
             page = Archetype.allCases.firstIndex(of: selection) ?? 0
@@ -49,29 +61,35 @@ struct CompanionPickerView: View {
         let isSelected = archetype == selection
         let accent = SetupTheme.accent(for: archetype)
         return GeometryReader { geometry in
-            VStack(spacing: 10) {
-                Spacer(minLength: 2)
-                // v27: the companion in its tinted disc — selected pages get
-                // the accent ring + check badge; the icon is the hero.
-                SetupTheme.iconDisc(for: archetype, selected: isSelected,
-                                    size: min(geometry.size.height * 0.34, 84))
+            // v30 layout: hero -> name -> element -> temperament -> button
+            // pinned to the bottom (safe-area aware); the hero clamps so the
+            // column always fits a 40 mm screen at default type.
+            let hero = min(geometry.size.height * 0.30, 96)
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                SetupTheme.iconDisc(for: archetype, selected: isSelected, size: hero)
+                    .padding(.bottom, 14)
                 VStack(spacing: 4) {
                     Text(archetype.animal.name)
                         .font(.title3.weight(.semibold))
-                    Text(archetype.animal.element.uppercased())
-                        .font(.caption2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(archetype.animal.element)
+                        .font(.caption2.weight(.semibold))
+                        .textCase(.uppercase)
+                        .tracking(1.5)
                         .foregroundStyle(accent)
-                        .tracking(1)
                     Text(archetype.animal.temperament)
-                        .font(.caption2)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .padding(.horizontal, 10)
+                        .padding(.top, 2)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(archetype.fullName), \(archetype.animal.element). \(archetype.animal.temperament)\(isSelected ? ", your current companion" : "")")
-                Spacer(minLength: 2)
+                .accessibilityLabel("\(archetype.fullName), \(archetype.animal.element). \(archetype.animal.temperament)\(isSelected ? String(localized: "a11y.picker_selected") : "")")
+                Spacer(minLength: 0)
                 Button {
                     choose(archetype)
                 } label: {
@@ -82,19 +100,22 @@ struct CompanionPickerView: View {
                         systemImage: isSelected ? "checkmark.circle.fill" : "circle"
                     )
                 }
-                .buttonStyle(.setupProminent(tint: isSelected ? .gray : accent))
+                .buttonStyle(.setupProminent(accentHex: SetupTheme.accentHex(for: archetype),
+                                             selected: isSelected))
                 .accessibilityLabel(isSelected
-                                     ? "\(archetype.animal.name) is your companion"
+                                     ? String(format: String(localized: "a11y.picker_button_selected"), archetype.animal.name)
                                      : String(format: String(localized: "picker.choose"), archetype.animalName))
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .padding(.bottom, 8 + geometry.safeAreaInsets.bottom)
             }
+            .padding(.horizontal, 12)
         }
     }
 
     private func choose(_ archetype: Archetype) {
         selection = archetype
-        // Immediate confirmation: the archetype's own reaction haptic (§9
-        // haptics as an output channel) — the choice answers back.
+        // Immediate confirmation: the archetype's own reaction haptic — the
+        // choice answers back.
         HapticsChannel.shared.react(to: archetype)
         if onChosenOnboarding != nil {
             pickerCompleted = true
@@ -108,6 +129,6 @@ struct CompanionPickerView: View {
     NavigationStack { CompanionPickerView() }
 }
 #Preview("Picker onboarding") {
-    NavigationStack { CompanionPickerView(onChosenOnboarding: {}) }
+    NavigationStack { CompanionPickerView(onChosenOnboarding: {}, onSkip: {}) }
 }
 #endif

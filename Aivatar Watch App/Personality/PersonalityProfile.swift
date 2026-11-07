@@ -19,26 +19,21 @@ nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
     /// IS the animal. The codename above stays the persisted key (storage,
     /// seed anchor, profile id); the animal is the presented identity in the
     /// companion picker, the naming ceremony, and the accessibility label.
+    /// v30: the presented copy is LOCALIZED (`animal.<raw>.*` keys, resolved
+    /// via the shared LocalizedAnimalCopy so the widget bundle mirrors them);
+    /// engine behavior never keys on these strings.
     var animal: CompanionAnimal {
-        switch self {
-        case .ember:   return CompanionAnimal(name: "Fox", element: "land & fire",
-                                               temperament: "Playful and warm — always up for a hello")
-        case .willow:  return CompanionAnimal(name: "Frog", element: "amphibian",
-                                               temperament: "Gentle and patient — a calm presence by your side")
-        case .compass: return CompanionAnimal(name: "Fish", element: "water",
-                                               temperament: "Steady and precise — keeps its word")
-        case .prism:   return CompanionAnimal(name: "Chameleon", element: "reptile",
-                                               temperament: "Curious and playful — a new color for every idea")
-        case .nimbus:  return CompanionAnimal(name: "Bird", element: "air",
-                                               temperament: "Attentive and quick — notices everything first")
-        }
+        CompanionAnimal(
+            name: LocalizedAnimalCopy.name(rawValue),
+            element: LocalizedAnimalCopy.element(rawValue),
+            temperament: LocalizedAnimalCopy.temperament(rawValue))
     }
 
     /// Lowercase animal name for prose ("your fox companion").
     var animalName: String { animal.name.lowercased() }
 
-    /// "Ember the fox" — the presented full identity.
-    var fullName: String { "\(displayName) the \(animalName)" }
+    /// "Ember the fox" — the presented full identity (localized word order).
+    var fullName: String { LocalizedAnimalCopy.fullName(displayName: displayName, archetypeRaw: rawValue) }
 
     /// A5c farewell beat (U9 — peak-end rule): the wrist-drop goodbye is
     /// ONE soft micro-gesture, never a guilt gesture. Small clips only —

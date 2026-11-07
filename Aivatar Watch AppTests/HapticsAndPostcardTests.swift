@@ -105,7 +105,9 @@ final class HapticsAndPostcardTests: XCTestCase {
         let cap = PostcardComposer.caption(inputs(.ember))
         XCTAssertTrue(cap.contains("Ember"))
         XCTAssertTrue(cap.contains("day 23"))
-        XCTAssertTrue(cap.contains("rain day"))
+        // v30: the weather class is localized (weather.rain = "rainy"), so
+        // the en caption reads "rainy day" — was the raw enum "rain day".
+        XCTAssertTrue(cap.contains("rainy day"))
         XCTAssertLessThanOrEqual(cap.split(separator: " ").count, 8)
         let confidant = PostcardComposer.caption(PostcardInputs(
             archetypeRaw: "willow", seed: 1, name: "Willow", bondLevel: 5, dayCount: 40))

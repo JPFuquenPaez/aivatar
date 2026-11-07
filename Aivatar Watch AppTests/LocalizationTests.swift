@@ -30,6 +30,24 @@ final class LocalizationTests: XCTestCase {
         "settings.health", "settings.weather", "settings.life_sense",
         "settings.life_sense_footer", "settings.about", "settings.postcard",
         "settings.about_copy", "settings.tip",
+        // v30: animal identity, weather class names, a11y labels, stage
+        // VoiceOver, bond announcement, workout hints.
+        "animal.ember.name", "animal.ember.element", "animal.ember.temperament",
+        "animal.willow.name", "animal.willow.element", "animal.willow.temperament",
+        "animal.compass.name", "animal.compass.element", "animal.compass.temperament",
+        "animal.prism.name", "animal.prism.element", "animal.prism.temperament",
+        "animal.nimbus.name", "animal.nimbus.element", "animal.nimbus.temperament",
+        "identity.full",
+        "weather.sunny", "weather.gray", "weather.rain", "weather.wind",
+        "weather.cold", "weather.hot", "weather.unknown",
+        "a11y.identity_card", "a11y.name_row", "a11y.animal_row",
+        "a11y.reduce_motion", "a11y.reduce_motion_hint", "a11y.sounds_hint",
+        "a11y.calendar_hint", "a11y.health_hint", "a11y.weather_hint",
+        "a11y.postcard_hint", "a11y.picker_selected", "a11y.picker_button_selected",
+        "a11y.action_quirk", "a11y.action_slow_blink",
+        "stage.hint", "stage.kind", "stage.state_resting", "stage.state_listening",
+        "stage.state_calm", "stage.tag_here", "stage.tag_resting",
+        "bond.announce", "workout.start_hint", "workout.end_hint",
     ]
 
     func testEveryKeyResolvesInBaseBundle() {
@@ -69,5 +87,38 @@ final class LocalizationTests: XCTestCase {
         XCTAssertLessThanOrEqual(beat.split(separator: " ").count, 8, "house voice: <= 8 words")
         let rect = String(format: String(localized: "rect.line"), 23, "napping")
         XCTAssertTrue(rect.contains("23") && rect.contains("napping"))
+    }
+
+    /// v30: a fr value that drops or reorders a %@/%d placeholder would
+    /// silently corrupt (or crash) String(format:) at runtime. The placeholder
+    /// SEQUENCE must be identical in en and fr for every pinned key.
+    func testPlaceholderSequenceParityEnFr() throws {
+        let pattern = try NSRegularExpression(pattern: "%\\d*\\$?[@d]")
+        func placeholders(_ s: String) -> [String] {
+            pattern.matches(in: s, range: NSRange(s.startIndex..., in: s)).map {
+                String(s[Range($0.range, in: s)!])
+            }
+        }
+        guard let path = Bundle.main.path(forResource: "Localizable", ofType: "strings", inDirectory: "fr.lproj"),
+              let data = FileManager.default.contents(atPath: path),
+              let frTable = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String]
+        else {
+            return XCTFail("fr.lproj/Localizable.strings missing or unreadable in the bundle")
+        }
+        for key in keys {
+            let en = placeholders(String(localized: String.LocalizationValue(key)))
+            let fr = placeholders(frTable[key] ?? "")
+            XCTAssertEqual(en, fr, "\(key): placeholder sequence differs between en and fr")
+        }
+    }
+
+    /// v30: the house voice (<= 8 words) is linted over ALL glanceable copy
+    /// (beats + watch-face presence lines), not just one key.
+    func testHouseVoiceWordCountAcrossGlanceableCopy() {
+        for key in keys where key.hasPrefix("beat.") || key.hasPrefix("presence.") {
+            let value = String(localized: String.LocalizationValue(key))
+            XCTAssertLessThanOrEqual(value.split(separator: " ").count, 8,
+                                     "\(key): house voice is <= 8 words")
+        }
     }
 }

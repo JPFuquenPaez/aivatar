@@ -42,24 +42,43 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
+            // v30: the whole list is tinted with the companion's accent, so
+            // toggles, links and selection read as one brand, not system blue.
             List {
-                // v27: an identity card leads Settings — the companion in its
-                // tinted disc, its name, and the one gentle About line.
+                // v30: an identity card leads Settings — tappable (opens the
+                // rename), the companion in its glow-disc, its name, the one
+                // gentle About line, and a chevron. Accent-tinted card, not a
+                // bare clear row.
                 Section {
-                    HStack(spacing: 10) {
-                        SetupTheme.iconDisc(for: archetype, size: 44)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(stageName)
-                                .font(.headline)
-                            Text(aboutLine)
+                    Button {
+                        showNaming = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            SetupTheme.iconDisc(for: archetype, size: 48)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(stageName)
+                                    .font(.headline)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                Text(aboutLine)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
-                        Spacer()
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(SetupTheme.accent(for: archetype).opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .listRowBackground(Color.clear)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(stageName), \(archetype.fullName). \(aboutLine)")
+                    .accessibilityLabel(String(format: String(localized: "a11y.identity_card"),
+                                                stageName, archetype.fullName, aboutLine))
                 }
                 Section(String(localized: "settings.companion")) {
                     Button {
@@ -71,13 +90,17 @@ struct SettingsView: View {
                                 Spacer()
                                 Text(stageName)
                                     .foregroundStyle(.secondary)
+                                // v30: chevron like every other drill-in row.
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(.secondary)
+                                    .font(.caption2)
                             }
                         } icon: {
                             Image(systemName: "text.badge.star")
                                 .foregroundStyle(SetupTheme.accent(for: archetype))
                         }
                     }
-                    .accessibilityLabel("Name, currently \(stageName)")
+                    .accessibilityLabel(String(format: String(localized: "a11y.name_row"), stageName))
                     NavigationLink {
                         CompanionPickerView()
                     } label: {
@@ -92,13 +115,13 @@ struct SettingsView: View {
                             Image(systemName: "pawprint.fill")
                                 .foregroundStyle(SetupTheme.accent(for: archetype))
                         }
-                        .accessibilityLabel("Companion, currently \(archetype.fullName)")
+                        .accessibilityLabel(String(format: String(localized: "a11y.animal_row"), archetype.fullName))
                     }
                 }
                 Section {
                     Toggle(String(localized: "settings.reduce_motion"), isOn: $reduceMotionL2)
-                        .accessibilityLabel("Reduce Motion, stronger than the system setting")
-                        .accessibilityHint("Keeps your companion still with only a gentle blink")
+                        .accessibilityLabel(String(localized: "a11y.reduce_motion"))
+                        .accessibilityHint(String(localized: "a11y.reduce_motion_hint"))
                 } header: {
                     Text(String(localized: "settings.accessibility"))
                 } footer: {
@@ -110,7 +133,7 @@ struct SettingsView: View {
                 // footer — no hidden recording, no background listening.
                 Section {
                     Toggle(String(localized: "settings.sounds"), isOn: $listenForSounds)
-                        .accessibilityHint("Your companion reacts to your voice and claps while the app is open")
+                        .accessibilityHint(String(localized: "a11y.sounds_hint"))
                 } header: {
                     Text(String(localized: "settings.sounds_header"))
                 } footer: {
@@ -121,18 +144,18 @@ struct SettingsView: View {
                 // read, where, and what is never kept (G5 written down).
                 Section {
                     Toggle(String(localized: "settings.calendar"), isOn: $lifeSenseCalendar)
-                        .accessibilityHint("Your companion can notice when a calendar event is about to start")
+                        .accessibilityHint(String(localized: "a11y.calendar_hint"))
                         // v25 (audit M2): ask at the opt-in moment, not later.
                         .onChange(of: lifeSenseCalendar) { on in
                             if on { CalendarSenseBridge().requestAccessIfNeeded() }
                         }
                     Toggle(String(localized: "settings.health"), isOn: $lifeSenseHealth)
-                        .accessibilityHint("Your companion can celebrate your saved workouts and notice your sleep")
+                        .accessibilityHint(String(localized: "a11y.health_hint"))
                         .onChange(of: lifeSenseHealth) { on in
                             if on { HealthSenseBridge().requestAccessIfNeeded() }
                         }
                     Toggle(String(localized: "settings.weather"), isOn: $lifeSenseWeather)
-                        .accessibilityHint("Your companion can notice the current weather where you are")
+                        .accessibilityHint(String(localized: "a11y.weather_hint"))
                         .onChange(of: lifeSenseWeather) { on in
                             if on { WeatherSenseBridge().requestLocationAuthorizationIfNeeded() }
                         }
@@ -160,7 +183,7 @@ struct SettingsView: View {
                                 .foregroundStyle(SetupTheme.accent(for: archetype))
                         }
                     }
-                    .accessibilityHint("Preview a shareable card of your companion")
+                    .accessibilityHint(String(localized: "a11y.postcard_hint"))
                     Text(String(localized: "settings.about_copy"))
                         .font(.footnote)
                     Text(String(localized: "settings.tip"))
@@ -169,6 +192,9 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle(String(localized: "settings.nav"))
+            // v30: the whole list takes the companion's accent as its tint —
+            // toggles, links and selection read as one brand.
+            .tint(SetupTheme.accent(for: archetype))
             // v29: a rename republishes the complication immediately (the
             // watch face carries the name) — the shared publisher, same path
             // as the stage, not a hand-rolled copy.

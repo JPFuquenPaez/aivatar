@@ -63,7 +63,7 @@ echo "==> Capturing all five archetypes (fresh boot per attempt, up to 5 attempt
 # once, then a few throwaway boot/launch/screenshot cycles, so the measured
 # loop starts on a warm display.
 xcrun simctl shutdown "$UDID" 2>/dev/null || true
-xcrun simctl boot "$UDID"
+xcrun simctl boot "$UDID" 2>/dev/null || true  # v30: boot races (already-booting/invalid state) must not kill the harness under set -e
 sleep 5
 xcrun simctl install "$UDID" "$APP"
 installed=1
@@ -73,14 +73,14 @@ for w in 1 2 3; do
   xcrun simctl io "$UDID" screenshot "$WORK/warm.png" >/dev/null 2>&1 || true
   rm -f "$WORK/warm.png"
   xcrun simctl shutdown "$UDID" 2>/dev/null || true
-  xcrun simctl boot "$UDID"
+  xcrun simctl boot "$UDID" 2>/dev/null || true  # v30: boot races (already-booting/invalid state) must not kill the harness under set -e
   sleep 5
 done
 for a in ember willow compass prism nimbus; do
   got=0
   for attempt in 1 2 3 4 5; do
     xcrun simctl shutdown "$UDID" 2>/dev/null || true
-    xcrun simctl boot "$UDID"
+    xcrun simctl boot "$UDID" 2>/dev/null || true  # v30: boot races (already-booting/invalid state) must not kill the harness under set -e
     sleep 5
     if [ "$installed" = 0 ]; then
       xcrun simctl install "$UDID" "$APP"

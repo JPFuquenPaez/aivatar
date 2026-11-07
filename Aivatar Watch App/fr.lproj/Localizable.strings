@@ -26,15 +26,15 @@
 "workout.run_with" = "Courir avec %@";
 "workout.running_with" = "Course avec %@";
 "workout.end_run" = "Terminer la course";
-"workout.sub" = "Ton compagnon court avec toi — les tours encouragent, pas de chiffres ici";
+"workout.sub" = "Court avec toi — chaque tour est fêté";
 "workout.elapsed" = "Temps écoulé %@";
 
 /* Postcard (F8) */
-"postcard.day" = "%@ · jour %d";
+"postcard.day" = "%1$@ · jour %2$d";
 "postcard.old_friends" = "vieux amis";
 "postcard.weather_day" = "jour %@";
 "postcard.nav" = "Carte postale";
-"postcard.preview" = "Une carte de %@, dessinée avec les mêmes pixels que la scène.";
+"postcard.preview" = "Une carte de %@, mêmes pixels que la scène.";
 
 /* Complication copy */
 "presence.napping" = "fait la sieste";
@@ -46,11 +46,11 @@
 "presence.ran_with" = "a couru avec toi";
 "presence.lap_done" = "tour fait";
 "presence.noticed_something" = "a remarqué quelque chose";
-"inline.line" = "%@ · %@";
-"rect.line" = "jour %d · %@";
+"inline.line" = "%1$@ · %2$@";
+"rect.line" = "jour %1$d · %2$@";
 
 /* About line (F1) */
-"about.day" = "%@ · jour %d";
+"about.day" = "%1$@ · jour %2$d";
 
 /* Surfaces de réglage (v27) */
 "picker.choose" = "Choisir : %@";
@@ -72,7 +72,7 @@
 "settings.animal" = "Animal";
 "settings.accessibility" = "Accessibilité";
 "settings.reduce_motion" = "Réduire les mouvements";
-"settings.reduce_motion_footer" = "Arrête les gestes et le balancement ; ton compagnon reste immobile et cligne des yeux.";
+"settings.reduce_motion_footer" = "Plus de gestes, juste de doux clignements.";
 "settings.sounds" = "Écouter les sons";
 "settings.sounds_header" = "Sons";
 "settings.sounds_footer" = "tant qu'Aivatar est ouvert et l'écran allumé, son micro écoute ta voix et tes applaudissements pour que ton compagnon réagisse. Les sons sont analysés instantanément sur la montre et jamais enregistrés.";
@@ -83,6 +83,69 @@
 "settings.life_sense_footer" = "tant qu'Aivatar est ouvert, ton compagnon peut réagir aux événements à venir du calendrier, aux séances et au sommeil enregistrés dans Santé, et à la météo actuelle là où tu es — lu uniquement sur cette montre, récupéré au plus une fois par heure. Titres, détails de santé et météo ne sont jamais conservés au-delà d'un haché, et rien ne quitte la montre.";
 "settings.about" = "À propos";
 "settings.postcard" = "Carte postale";
-"settings.about_copy" = "Aivatar est procédural — aucun fichier d'animation, tout ce que tu vois est généré en direct.";
-"settings.tip" = "Astuce : touche longuement ton compagnon pour partager un clin d'œil lent — son rituel de confiance.";
+"settings.about_copy" = "Tout est procédural, généré en direct.";
+"settings.tip" = "Astuce : touche longue pour un clin d'œil lent.";
 "workout.start" = "Commencer";
+
+
+/* Identité des animaux (v30) — texte présenté, localisé. Miroiré dans les
+   tables du bundle widget (AivatarShared/LocalizedAnimalCopy résout selon le
+   bundle du processus). Le nom de code (« Ember ») reste en anglais : c'est
+   la clé de stockage et l'ancre de graine, pas du texte présenté. */
+"animal.ember.name" = "Renard";
+"animal.ember.element" = "terre & feu";
+"animal.ember.temperament" = "Joueur et chaleureux — toujours partant pour un coucou";
+"animal.willow.name" = "Grenouille";
+"animal.willow.element" = "amphibien";
+"animal.willow.temperament" = "Doux et patient — une présence calme à tes côtés";
+"animal.compass.name" = "Poisson";
+"animal.compass.element" = "eau";
+"animal.compass.temperament" = "Stable et précis — tient parole";
+"animal.prism.name" = "Caméléon";
+"animal.prism.element" = "reptile";
+"animal.prism.temperament" = "Curieux et joueur — une couleur par idée";
+"animal.nimbus.name" = "Oiseau";
+"animal.nimbus.element" = "air";
+"animal.nimbus.temperament" = "Attentif et vif — remarque tout en premier";
+"identity.full" = "%1$@ le %2$@";
+
+/* Noms des classes météo (v30, légende de la carte postale) */
+"weather.sunny" = "ensoleillé";
+"weather.gray" = "gris";
+"weather.rain" = "pluvieux";
+"weather.wind" = "venteux";
+"weather.cold" = "froid";
+"weather.hot" = "chaud";
+"weather.unknown" = "doux";
+
+/* Étiquettes et indices d'accessibilité (v30 — étaient en anglais codé en dur) */
+"a11y.identity_card" = "%1$@, %2$@. %3$@";
+"a11y.name_row" = "Nom : actuellement %@";
+"a11y.animal_row" = "Compagnon : actuellement %@";
+"a11y.reduce_motion" = "Réduire les mouvements, au-delà du réglage système";
+"a11y.reduce_motion_hint" = "Garde ton compagnon immobile, seuls les clignements restent";
+"a11y.sounds_hint" = "Réagit à ta voix et à tes applaudissements quand l'app est ouverte";
+"a11y.calendar_hint" = "Peut remarquer un événement de calendrier à venir";
+"a11y.health_hint" = "Peut fêter tes séances enregistrées et remarquer ton sommeil";
+"a11y.weather_hint" = "Peut remarquer la météo actuelle là où tu es";
+"a11y.postcard_hint" = "Aperçu d'une carte partageable de ton compagnon";
+"a11y.picker_selected" = ", ton compagnon actuel";
+"a11y.picker_button_selected" = "%@ est ton compagnon";
+"a11y.action_quirk" = "Jouer sa signature";
+"a11y.action_slow_blink" = "Partager un clin d'œil lent";
+
+/* VoiceOver de la scène + étiquettes du bas (v30) */
+"stage.hint" = "Toucher deux fois pour jouer. Touche longue pour un clin d'œil lent.";
+"stage.kind" = "ton compagnon %@";
+"stage.state_resting" = "se repose";
+"stage.state_listening" = "écoute les sons";
+"stage.state_calm" = "est calme";
+"stage.tag_here" = "est là";
+"stage.tag_resting" = "se repose";
+
+/* Annonce de lien (v30) */
+"bond.announce" = "%@ te fait plus confiance";
+
+/* Indices de la page course (v30) */
+"workout.start_hint" = "Lance une course avec ton compagnon à tes côtés";
+"workout.end_hint" = "Termine la course et l'enregistre dans Santé";

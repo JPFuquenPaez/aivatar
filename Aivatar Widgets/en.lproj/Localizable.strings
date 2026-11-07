@@ -10,7 +10,27 @@
 "presence.ran_with" = "ran with you";
 "presence.lap_done" = "lap done";
 "presence.noticed_something" = "noticed something";
-"inline.line" = "%@ · %@";
-"rect.line" = "day %d · %@";
+"inline.line" = "%1$@ · %2$@";
+"rect.line" = "day %1$d · %2$@";
 "widget.name" = "Your companion";
 "widget.description" = "Your companion, present on the watch face.";
+
+/* Animal identity + identity line (v30) — mirrored from the app bundle
+   (AivatarShared/LocalizedAnimalCopy resolves these in this bundle). */
+"animal.ember.name" = "Fox";
+"animal.ember.element" = "land & fire";
+"animal.ember.temperament" = "Playful and warm — always up for a hello";
+"animal.willow.name" = "Frog";
+"animal.willow.element" = "amphibian";
+"animal.willow.temperament" = "Gentle and patient — a calm presence by your side";
+"animal.compass.name" = "Fish";
+"animal.compass.element" = "water";
+"animal.compass.temperament" = "Steady and precise — keeps its word";
+"animal.prism.name" = "Chameleon";
+"animal.prism.element" = "reptile";
+"animal.prism.temperament" = "Curious and playful — a new color for every idea";
+"animal.nimbus.name" = "Bird";
+"animal.nimbus.element" = "air";
+"animal.nimbus.temperament" = "Attentive and quick — notices everything first";
+"identity.full" = "%1$@ the %2$@";
+"widget.a11y" = "%1$@, %2$@";
