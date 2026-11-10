@@ -370,6 +370,20 @@ struct AvatarStageView: View {
                         guard size.width > 0, size.height > 0 else { return }
                         let nx = Float((value.location.x - size.width / 2) / (size.width / 2))
                         let ny = Float((value.location.y - size.height / 2) / (size.height / 2))
+                        // E7 boop-the-face: resolve the touched cell with the
+                        // stage's own layout math and hit-test the face rect.
+                        // Accepted boop = happy-squint ack + 6-tick blush flush
+                        // + soft haptic; during the 90 s refractory (or a
+                        // workout/session) the tap falls through to the normal
+                        // reaction pool below — nothing is ever dead (U7).
+                        let cell = size.width / CGFloat(CompanionSprite.gridWidth)
+                        let top = size.height * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+                        let cx = Int(value.location.x / cell)
+                        let cy = Int((value.location.y - top) / cell)
+                        if SpriteStageMetadata.isFaceCell(archetype, x: cx, y: cy),
+                           director?.boopFace() == true {
+                            HapticsChannel.shared.boop()
+                        }
                         context?.engine.handleEvent(.gazeAt(x: nx, y: ny))
                         context?.engine.handleEvent(.tap)
                         director?.handleEvent(.gazeAt(x: nx, y: ny))

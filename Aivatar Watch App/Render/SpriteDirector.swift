@@ -64,8 +64,36 @@ nonisolated final class SpriteDirector {
         cells += transientTellCells
         return cells
     }
-    /// E7/E9 transient tells (blush / vapor) — extended by those PRs.
-    private var transientTellCells: [CompanionSprite.CellDiff] { [] }
+    /// E7/E9 transient tells (blush / vapor).
+    private var transientTellCells: [CompanionSprite.CellDiff] {
+        var cells: [CompanionSprite.CellDiff] = []
+        // E7: the happy-flush blush — 2 accent cells at face mid-height.
+        if blushTicksLeft > 0 { cells += SpriteStageMetadata.blushCells(archetype) }
+        return cells
+    }
+
+    // MARK: - E7 boop the face
+
+    /// Refractory between boops: 600 ticks = 90 s. During it, face taps route
+    /// to the normal reaction pool (nothing dead, U7).
+    static let boopRefractoryTicks = 600
+    /// The flush overlay lifetime: 6 ticks.
+    static let blushDurationTicks = 6
+    private var blushTicksLeft = 0
+    private var lastBoopTick = -1_000_000
+
+    /// A face tap landed (hit math done by the caller via SpriteStageMetadata).
+    /// Returns true when the boop was accepted: ack act (happy squint) plays
+    /// within <= 2 ticks and the 6-tick blush overlay starts. Suppressed while
+    /// resting, in a workout, or during a breath session.
+    @discardableResult
+    func boopFace() -> Bool {
+        guard !resting, !workoutMode, tick - lastBoopTick >= Self.boopRefractoryTicks else { return false }
+        lastBoopTick = tick
+        blushTicksLeft = Self.blushDurationTicks
+        play(.happy)
+        return true
+    }
 
     // MARK: - E5 bond ceremonies
 
@@ -260,6 +288,7 @@ nonisolated final class SpriteDirector {
         // E5: a due ceremony plays as soon as the queue is free (suppressed
         // during workouts — one intention at a time).
         if mementoDepositTicksLeft > 0 { mementoDepositTicksLeft -= 1 }
+        if blushTicksLeft > 0 { blushTicksLeft -= 1 }
         if !pendingCeremonies.isEmpty, !workoutMode,
            let i = pendingCeremonies.firstIndex(where: { $0.atTick <= tick }) {
             let ceremony = pendingCeremonies.remove(at: i)
