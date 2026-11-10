@@ -120,4 +120,10 @@ nonisolated enum BondRules {
     /// Level 5 ("confidant"): the companion keeps a small pixel memento of
     /// the naming day (interiority trace on the sprite grid).
     static func isConfidant(_ level: Int) -> Bool { level >= maxLevel }
+
+    /// Aivatar 2.0 E10 (inert until Phase 3 assets land): the sixth companion
+    /// unlocks at the confidant level. Pure derivation; the reveal beat and
+    /// picker page stay gated on `CompanionMemory.sixthRevealed`, which nothing
+    /// sets yet — no string, no art, no behavior change in this phase.
+    static func sixthCompanionUnlocked(_ level: Int) -> Bool { level >= maxLevel }
 }

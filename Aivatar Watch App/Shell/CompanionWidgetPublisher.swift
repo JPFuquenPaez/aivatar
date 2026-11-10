@@ -33,6 +33,9 @@ nonisolated enum CompanionWidgetPublisher {
         ))
         seedIcons()
         WidgetCenter.shared.reloadAllTimelines()
+        // Aivatar 2.0 platform pass: fitness relevance clue on workout events
+        // only (donated at publish time — never polled, G9).
+        RelevanceDonor.donateIfNeeded(lastEventKind: lastEventKind)
     }
 
     /// Renders every archetype's icon into the shared container (plain icon

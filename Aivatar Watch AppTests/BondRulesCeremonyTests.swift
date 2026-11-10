@@ -116,3 +116,17 @@ final class BondRulesCeremonyTests: XCTestCase {
         XCTAssertTrue(cells.contains { $0.x == 9 && $0.y == 16 && $0.symbol == "A" && $0.alpha < 1 })
     }
 }
+
+// MARK: - E10 inert unlock (ships without art/strings until Phase 3)
+
+extension BondRulesCeremonyTests {
+    func testSixthCompanionUnlockIsPureAndInert() {
+        XCTAssertFalse(BondRules.sixthCompanionUnlocked(1))
+        XCTAssertFalse(BondRules.sixthCompanionUnlocked(4))
+        XCTAssertTrue(BondRules.sixthCompanionUnlocked(5))
+        // The picker still shows exactly five companions (no art shipped).
+        XCTAssertEqual(Archetype.allCases.count, 5)
+        // And the reveal flag defaults off in legacy memory.
+        XCTAssertFalse(CompanionMemory(firstLaunch: base, lastSeen: base).sixthRevealed)
+    }
+}
