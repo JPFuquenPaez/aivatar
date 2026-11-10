@@ -346,6 +346,11 @@ struct AvatarStageView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityText)
             .accessibilityHint(String(localized: "stage.hint"))
+            // E6 double tap: the stage element is buttonlike and its PRIMARY
+            // action is "Play signature move" — the gesture-native twin of the
+            // VoiceOver named action below (same act path, same seed stream).
+            .accessibilityAddTraits(.isButton)
+            .handGestureShortcut(.primaryAction)
             // A5c: long-press is the SLOW-BLINK RITUAL (U8 — the trust
             // exchange: mutual gaze, then a blink you can watch happen).
             // The signature quirk stays on the VoiceOver named action and
@@ -395,13 +400,11 @@ struct AvatarStageView: View {
                         afterFirstInteraction()
                     }
             )
+            // E6: the default (primary) action is the signature move, so a
+            // double tap plays it; a plain touch tap still answers via the
+            // spatial gesture above.
             .accessibilityAction {
-                context?.engine.handleEvent(.tap)
-                director?.handleEvent(.tap)
-                HapticsChannel.shared.react(to: archetype)
-                awardRitual(.firstGreetingOfDay)
-                director?.handleRitual(.firstGreetingOfDay)
-                afterFirstInteraction()
+                performQuirk()
             }
             .accessibilityAction(named: String(localized: "a11y.action_quirk")) {
                 performQuirk()
