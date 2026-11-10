@@ -459,3 +459,67 @@ nonisolated enum AuthoredSprites {
         ]
     )
 }
+
+/// IconCuts (Aivatar 2.0, E1): the app icon's source of truth is a GRID, not
+/// a drawing. `emberFace` is a hand-authored 32x32 token grid (same 5-symbol
+/// ramp as the stage: K ink, D shade, B body, W paper, A accent). 32 is chosen
+/// because 1088 / 32 = 34 px per cell, an exact integer — the icon rasterizes
+/// nearest-neighbor at every size with zero interpolation. Composition rules
+/// (E1.1): head ~19 of 32 cells tall, optically centered; ear triangles
+/// >= 5 cells; W catchlight in the left eye block; paper muzzle; A reserved
+/// for the two ear-tip cells. No outline, no gradient, no dither.
+///
+/// The committed PNGs are produced ONLY by Tools/icon_export.swift from these
+/// rows (CI hash-pins the output); edit the grid here, never the PNGs.
+nonisolated enum IconCuts {
+    static let gridWidth = 32
+    static let gridHeight = 32
+
+    /// Ember fox head, 32x32. Rows are top-to-bottom, '.' clears a cell.
+    static let emberFace: [String] = [
+        "................................",
+        "................................",
+        "................................",
+        "........BAB..........BAB........",
+        "........BBB..........BBB........",
+        "........BBB..........BBB........",
+        "........BBB..........BBB........",
+        "........BBB..........BBB........",
+        ".......BBBBB........BBBBB.......",
+        "......BBBBBBBBBBBBBBBBBBBB......",
+        "......BBBBBBBBBBBBBBBBBBBB......",
+        "......BBBBBBBBBBBBBBBBBBBB......",
+        ".....BBBBBBBBBBBBBBBBBBBBBB.....",
+        ".....BBBBBBBBBBBBBBBBBBBBBB.....",
+        ".....BBBBBBBBBBBBBBBBBBBBBB.....",
+        "....BBBBBBBBBBBBBBBBBBBBBBBB....",
+        "....BBBBBBBBBBBBBBBBBBBBBBBB....",
+        "....BBBBWKBBBBBBBBBWKBBBBBBB....",
+        "....BBBBKKBBBBBBBBBKKBBBBBBB....",
+        "....BBBBBBBBBBBBBBBBBBBBBBBB....",
+        "....BBBBBBBBBBBBBBBBBBBBBBBB....",
+        "....BBBBBWWWWWWWWWWWWWWBBBBB....",
+        "....BBBBBWWWWWWWWWWWWWWBBBBB....",
+        "....BBBBBWWWWWWWWWWWWWWBBBBB....",
+        ".....BBBBWWWWWWKKWWWWWWBBBB.....",
+        ".....BBBBWWWWWWWWWWWWWWBBBB.....",
+        ".....BBBBWWWWWWWWWWWWWWBBBB.....",
+        ".......BBBBBDDDDDDDDBBBBB.......",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+    ]
+
+    /// The icon grid resolved to symbol cells (validated 32x32).
+    static func emberFaceSymbols() -> [[Character]] {
+        precondition(emberFace.count == gridHeight)
+        return emberFace.map { row in
+            precondition(row.count == gridWidth)
+            return Array(row)
+        }
+    }
+
+    /// Ember's stage palette reused for the icon (one hue family, 5 tokens).
+    static let emberFacePaletteHex: [Character: String] = AuthoredSprites.ember.paletteHex
+}

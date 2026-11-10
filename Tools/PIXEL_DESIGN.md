@@ -449,3 +449,30 @@ stage instead of white slabs floating on black.
    tone counts in the authored band.
 4. Screenshot eyeball pass at native AND zoomed-out (thumbnail) size.
    Numbers catch regressions; only eyes catch "ugly".
+
+---
+
+# v6 — the app icon is a grid too (Aivatar 2.0, E1)
+
+The icon is the one asset that cannot be generated at runtime, but its source
+of truth is still an authored grid, not a drawing:
+
+- `CompanionSprite.IconCuts.emberFace` is a hand-authored **32x32** token grid
+  (K/D/B/W/A). 32 because 1088 / 32 = **34 px per cell, exact** — the icon
+  rasterizes nearest-neighbor at every size with zero interpolation.
+- Composition: head ~19 of 32 cells tall, optically centered; ear triangles
+  >= 5 cells; W catchlight in the left eye block; paper muzzle; **A reserved
+  for the two ear-tip cells**. No outline, gradient, or dither. Two layers:
+  full-bleed `#000000` background (the system's circular mask cuts pure
+  black) + the transparent foreground head. Nothing pre-baked.
+- `Tools/icon_export.swift` is the **only writer** of the icon PNGs. It parses
+  the grid from the Swift source, renders `build/icon/AppIcon-{Background,
+  Foreground}.png` (1088^2) and the composed 1024^2 `AppIcon.png`, validates
+  (square layers, black background, <= 5 tokens, no alpha on the composed
+  icon), and prints SHA256 per output — **CI pins the hashes** (byte-stable:
+  same grid, same bytes).
+- Review gate (manual): 16 px and 24 px renders of the masked circle must
+  read "fox" by silhouette alone (ears + head + muzzle). `IconAssetTests`
+  pin the grid contract in code.
+- `AccentColor` = Ember's accent token (`paletteHex["A"]`, FFC800), pinned
+  within 1/255 by `asset_validator.swift` + `ProjectBootstrapTests`.

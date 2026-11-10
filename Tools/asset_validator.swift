@@ -283,8 +283,60 @@ for archetype in archetypes {
     }
 }
 
+// ---- Aivatar 2.0 E1: app icon + AccentColor pins ----
+// The appiconset lives at <repo>/Aivatar Watch App/Assets.xcassets — derive the
+// repo root from the AvatarAssets dir argument (…/<root>/Aivatar Watch App/AvatarAssets).
+let repoRoot = assetsDir.deletingLastPathComponent().deletingLastPathComponent()
+let xcassets = repoRoot.appendingPathComponent("Aivatar Watch App/Assets.xcassets")
+
+do {
+    let iconset = xcassets.appendingPathComponent("AppIcon.appiconset/Contents.json")
+    let data = try Data(contentsOf: iconset)
+    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let images = json["images"] as? [[String: Any]],
+       images.count == 1,
+       images[0]["size"] as? String == "1024x1024",
+       images[0]["idiom"] as? String == "universal",
+       images[0]["platform"] as? String == "watchos",
+       let filename = images[0]["filename"] as? String {
+        let png = xcassets.appendingPathComponent("AppIcon.appiconset/\(filename)")
+        if !FileManager.default.fileExists(atPath: png.path) {
+            fail("AppIcon.png missing from appiconset")
+        }
+    } else {
+        fail("AppIcon.appiconset must declare exactly one universal watchos 1024x1024 image")
+    }
+} catch {
+    fail("AppIcon.appiconset unreadable: \(error)")
+}
+
+do {
+    let accent = xcassets.appendingPathComponent("AccentColor.colorset/Contents.json")
+    let data = try Data(contentsOf: accent)
+    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let colors = json["colors"] as? [[String: Any]], !colors.isEmpty {
+        // Must match Ember's accent token (paletteHex["A"] = FFC800) within 1/255.
+        let target: (Float, Float, Float) = (1.0, Float(0xC8) / 255.0, 0.0)
+        let first = colors[0]
+        if let color = first["color"] as? [String: Any],
+           color["color-space"] as? String == "srgb",
+           let comps = color["components"] as? [String: String],
+           let r = Float(comps["red"] ?? ""), let g = Float(comps["green"] ?? ""), let b = Float(comps["blue"] ?? "") {
+            if abs(r - target.0) > 1.0 / 255 || abs(g - target.1) > 1.0 / 255 || abs(b - target.2) > 1.0 / 255 {
+                fail("AccentColor (\(r),\(g),\(b)) does not match ember accent FFC800 within 1/255")
+            }
+        } else {
+            fail("AccentColor first entry must be sRGB with numeric components")
+        }
+    } else {
+        fail("AccentColor.colorset must be populated (E1)")
+    }
+} catch {
+    fail("AccentColor.colorset unreadable: \(error)")
+}
+
 if failures.isEmpty {
-    print("ASSET-VALIDATOR OK: rig.json v1 + 5 profiles pass schema + parity checks")
+    print("ASSET-VALIDATOR OK: rig.json v1 + 5 profiles + app icon/AccentColor (E1) pass schema + parity checks")
     exit(0)
 }
 exit(1)
