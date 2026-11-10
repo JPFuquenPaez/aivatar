@@ -1,0 +1,135 @@
+{
+  "id": "lumen",
+  "traitVector": {
+    "extraversion": 0.5,
+    "agreeableness": 0.7,
+    "conscientiousness": 0.4,
+    "openness": 0.8,
+    "neuroticism": 0.3
+  },
+  "motionProfile": {
+    "gestureRatePerMin": 3.5,
+    "amplitudeScale": 0.7,
+    "tempoScale": 0.9,
+    "transitionDurationSec": [
+      0.5,
+      0.9
+    ],
+    "overshoot": 0.1
+  },
+  "gazeProfile": {
+    "blinkRatePerMin": 15,
+    "saccadeRatePerMin": 7,
+    "headPropensity": 0.3,
+    "idleGazeTargets": [
+      "user",
+      "away",
+      "up"
+    ]
+  },
+  "visualTokens": {
+    "dominantShape": "circle",
+    "accentShape": "star",
+    "palette": [
+      "#A78BFA",
+      "#EFE9FF",
+      "#14101F"
+    ],
+    "silhouetteWeights": {
+      "roundness": 0.85,
+      "angularity": 0.15
+    }
+  },
+  "speciesTokens": {
+    "bodyLight": "#A78BFA",
+    "bodyMid": "#6D5BD0",
+    "shadow": "#4A3D8F",
+    "face": "#171226",
+    "accentA": "#FFE9A8",
+    "accentB": "#9FD8FF",
+    "glow": "#EFE9FF"
+  },
+  "motionGrammar": {
+    "settleComplete": 0.8,
+    "drift": 0.6,
+    "anticipation": 0.3
+  },
+  "gazePolicy": "linger",
+  "blink": {
+    "durationScale": 1.2,
+    "variance": 0.3
+  },
+  "tell": "dust",
+  "quirkLoop": "stargazing",
+  "voiceStyle": "quiet, luminous, short",
+  "gesturePoolWeights": {
+    "wave": 0.05,
+    "bounce": 0.0,
+    "stretch": 0.2,
+    "spin": 0.0,
+    "nod": 0.1,
+    "tilt": 0.1,
+    "lookAround": 0.1,
+    "shiftWeight": 0.05,
+    "shiver": 0.0,
+    "doubleTake": 0.05,
+    "sparkle": 0.3,
+    "puff": 0.05,
+    "preen": 0.0,
+    "swayCatch": 0.0,
+    "tick": 0.0,
+    "mirror": 0.0,
+    "driftFloat": 0.0,
+    "slowBlink": 0.0
+  },
+  "quirks": [
+    "luminous wing shimmer"
+  ],
+  "assetVersion": "3.0.0",
+  "weatherDials": {
+    "classes": {
+      "sunny": {
+        "tempoScale": 0.8,
+        "amplitudeScale": 0.8,
+        "accentBias": -0.3,
+        "hueShiftDeg": 0
+      },
+      "gray": {
+        "tempoScale": 0.95,
+        "amplitudeScale": 0.9,
+        "accentBias": 0.1,
+        "hueShiftDeg": 0
+      },
+      "rain": {
+        "tempoScale": 1.0,
+        "amplitudeScale": 1.0,
+        "accentBias": 0.1,
+        "hueShiftDeg": 0
+      },
+      "wind": {
+        "tempoScale": 1.2,
+        "amplitudeScale": 1.2,
+        "accentBias": 0.2,
+        "hueShiftDeg": 0
+      },
+      "cold": {
+        "tempoScale": 0.9,
+        "amplitudeScale": 0.85,
+        "accentBias": 0.2,
+        "hueShiftDeg": 0
+      },
+      "hot": {
+        "tempoScale": 0.85,
+        "amplitudeScale": 0.8,
+        "accentBias": -0.2,
+        "hueShiftDeg": 0
+      },
+      "unknown": {
+        "tempoScale": 1.0,
+        "amplitudeScale": 1.0,
+        "accentBias": 0.0,
+        "hueShiftDeg": 0
+      }
+    }
+  }
+}

@@ -51,6 +51,7 @@ nonisolated enum BreathSessionController {
         case .compass: return .quirk       // the metronome settle
         case .prism: return .flick         // flicker-off
         case .nimbus: return .perk         // settle-fluff
+        case .lumen: return .slowBlink      // the night-blink settle
         }
     }
 

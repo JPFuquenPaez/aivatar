@@ -29,6 +29,16 @@ struct CompanionPickerView: View {
     @State private var page = 0
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    /// E10: the sixth companion (lumen) appears in the picker only once the
+    /// reveal has fired (confidant bond + sixthRevealed memory flag).
+    private var shownArchetypes: [Archetype] {
+        let memory = CompanionMemoryStore().load()
+        if let memory, BondRules.sixthCompanionUnlocked(memory.bondLevel), memory.sixthRevealed {
+            return Archetype.allCases
+        }
+        return Archetype.allCases.filter { $0 != .lumen }
+    }
+
     init(onChosenOnboarding: (() -> Void)? = nil, onSkip: (() -> Void)? = nil) {
         self.onChosenOnboarding = onChosenOnboarding
         self.onSkip = onSkip
@@ -36,7 +46,7 @@ struct CompanionPickerView: View {
 
     var body: some View {
         TabView(selection: $page) {
-            ForEach(Array(Archetype.allCases.enumerated()), id: \.offset) { index, archetype in
+            ForEach(Array(shownArchetypes.enumerated()), id: \.offset) { index, archetype in
                 page(archetype)
                     .tag(index)
             }
@@ -59,11 +69,11 @@ struct CompanionPickerView: View {
         }
         .onAppear {
             // Open on the current companion so the checkmark is visible.
-            page = Archetype.allCases.firstIndex(of: selection) ?? 0
+            page = shownArchetypes.firstIndex(of: selection) ?? 0
             // v31 debug/CI hook: -pickerPage N forces page N (captures).
             let args = ProcessInfo.processInfo.arguments
             if let i = args.firstIndex(of: "-pickerPage"), i + 1 < args.count,
-               let n = Int(args[i + 1]), Archetype.allCases.indices.contains(n) {
+               let n = Int(args[i + 1]), shownArchetypes.indices.contains(n) {
                 page = n
             }
         }

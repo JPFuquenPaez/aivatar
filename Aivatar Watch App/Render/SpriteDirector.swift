@@ -600,6 +600,7 @@ nonisolated final class SpriteDirector {
             case .compass: play(.quirk)              // the metronome answers
             case .prism: play(.look, direction: 1)   // the turret locks on you
             case .nimbus: play(.happy)                // the chirp
+            case .lumen: play(.slowBlink)             // the moth listens softly
             }
         }
     }
@@ -768,6 +769,7 @@ nonisolated final class SpriteDirector {
             case .compass: return .quirk      // taps the week grid
             case .prism: return .look         // inspects the new shape of the day
             case .nimbus: return .perk        // notices first — alert tick
+            case .lumen: return .happy        // drifts in, warm
             }
         case .workoutDone:
             switch archetype {
@@ -776,6 +778,7 @@ nonisolated final class SpriteDirector {
             case .compass: return .happy
             case .prism: return .happy
             case .nimbus: return .perk
+            case .lumen: return .slowBlink    // the night-blink
             }
         case .sleptWithWatch:
             return .slowBlink                 // "slept beside you" — the soft blink
@@ -797,6 +800,7 @@ nonisolated final class SpriteDirector {
         case .compass: return .perk       // metronome keeps the beat
         case .prism: return .look
         case .nimbus: return .perk
+        case .lumen: return .quirk        // the shimmer answers
         }
     }
 
@@ -838,6 +842,14 @@ nonisolated final class SpriteDirector {
             case .sunny: return .happy              // brighter pulse
             case .unknown: return nil
             default: return .look
+            }
+        case .lumen:
+            switch condition {
+            case .cold, .gray: return .slowBlink   // cozy night
+            case .wind: return .perk                // wings flutter
+            case .sunny, .hot: return .look         // hides from the light
+            case .unknown: return nil
+            default: return .quirk                  // the shimmer
             }
         }
     }
@@ -895,7 +907,7 @@ nonisolated final class SpriteDirector {
             let hold: Int
             let settle: Int
             switch gazePolicy {
-            case .soft: (hold, settle) = (4, 2)
+            case .soft, .linger: (hold, settle) = (4, 2)
             case .detectThenSettle: (hold, settle) = (2, 5)
             default: (hold, settle) = (2, 2)
             }

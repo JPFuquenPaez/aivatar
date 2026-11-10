@@ -34,7 +34,7 @@ final class SchemaFreezeTests: XCTestCase {
         // still load and fall back to neutral dials).
         let expectedVersions: [Archetype: String] = [
             .ember: "3.0.0", .willow: "3.0.0", .compass: "3.0.0",
-            .prism: "3.0.0", .nimbus: "3.0.0",
+            .prism: "3.0.0", .nimbus: "3.0.0", .lumen: "3.0.0",
         ]
         for archetype in Archetype.allCases {
             let profile = try PersonalityProfile.load(archetype, bundle: .main)
@@ -52,15 +52,15 @@ final class SchemaFreezeTests: XCTestCase {
         var policies: Set<String> = []
         var expectedTell: [Archetype: PersonalityTell] = [
             .ember: .spark, .willow: .leaf, .compass: .tick,
-            .prism: .flicker, .nimbus: .pulse,
+            .prism: .flicker, .nimbus: .pulse, .lumen: .dust,
         ]
         var expectedQuirk: [Archetype: QuirkLoop] = [
             .ember: .preen, .willow: .phototropism, .compass: .alignmentFidget,
-            .prism: .mirrorMoment, .nimbus: .weatherMap,
+            .prism: .mirrorMoment, .nimbus: .weatherMap, .lumen: .stargazing,
         ]
         var expectedPolicy: [Archetype: GazePolicy] = [
             .ember: .lock, .willow: .soft, .compass: .metricSweep,
-            .prism: .wander, .nimbus: .detectThenSettle,
+            .prism: .wander, .nimbus: .detectThenSettle, .lumen: .linger,
         ]
         for archetype in Archetype.allCases {
             let profile = try PersonalityProfile.load(archetype, bundle: .main)

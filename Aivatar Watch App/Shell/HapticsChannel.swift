@@ -36,6 +36,7 @@ nonisolated enum HapticGrammar {
             case .compass: return .click          // precise, deliberate: tick
             case .prism:   return .notification   // quirky, unpredictable
             case .nimbus:  return .directionDown  // reactive dart, startle edge
+            case .lumen:   return .success        // soft, luminous
             }
         case .bond:
             return .directionUp                   // pair: directionUp -> success
@@ -44,6 +45,7 @@ nonisolated enum HapticGrammar {
             case .nimbus, .ember: return .directionUp   // noticed-first
             case .willow, .compass: return .click       // gentle tick
             case .prism: return .notification
+            case .lumen: return .click
             }
         case .split:   return .success
         case .farewell: return .stop

@@ -183,6 +183,7 @@ nonisolated enum AuthoredSprites {
         case .compass: return compass
         case .prism: return prism
         case .nimbus: return nimbus
+        case .lumen: return lumen
         }
     }
 
@@ -463,7 +464,66 @@ nonisolated enum AuthoredSprites {
             "W": "F5F4EF", "A": "FFD84B",
         ]
     )
+    // MARK: LUMEN — moth (Aivatar 2.0, E10; night element, luminous)
+
+    static let lumen = CompanionSprite(
+        archetype: .lumen,
+        base: [
+            "......A.K..K.A......",
+            ".......KBBB.K.......",
+            ".......WKBBWK.......",
+            ".......KKBBKK.......",
+            "...BBB.BBBBB..BBB...",
+            "..BBBBB.BBB..BBBBB..",
+            ".BBBBBBB.BB.BBBBBBB.",
+            ".BBBBBBB.BB.BBBBBBB.",
+            "BBBBBBBB.BB.BBBBBBBB",
+            ".BBBBBBB.BB.BBBBBBB.",
+            ".BBBBBBB.BB.BBBBBBB.",
+            "..DDDDD..BB..DDDDD..",
+            "...BBB...DD...BBB...",
+            ".........DD.........",
+            "....................",
+            "....................",
+            "....................",
+            "...................."
+        ],
+        patches: [
+            "blink": [ CellDiff(7, 2, "B"), CellDiff(8, 2, "B"),
+                      CellDiff(11, 2, "B"), CellDiff(12, 2, "B") ],  // catchlight row closes; ink lid line stays
+            "sleepy": [ CellDiff(7, 2, "D"), CellDiff(8, 2, "D"), CellDiff(7, 3, "B"), CellDiff(8, 3, "B"),
+                        CellDiff(11, 2, "D"), CellDiff(12, 2, "D"), CellDiff(11, 3, "B"), CellDiff(12, 3, "B") ],
+            "happy": [ CellDiff(7, 2, "B"), CellDiff(8, 2, "B"), CellDiff(7, 3, "B"), CellDiff(8, 3, "B"),
+                       CellDiff(11, 2, "B"), CellDiff(12, 2, "B"), CellDiff(11, 3, "B"), CellDiff(12, 3, "B"),
+                       CellDiff(9, 4, "K"), CellDiff(10, 4, "K") ],  // closed eyes + smile
+            "glanceL": [ CellDiff(8, 2, "B"), CellDiff(8, 3, "B"), CellDiff(6, 2, "W"), CellDiff(7, 2, "K"),
+                         CellDiff(6, 3, "K"), CellDiff(7, 3, "K"),
+                         CellDiff(12, 2, "B"), CellDiff(12, 3, "B"), CellDiff(10, 2, "W"), CellDiff(11, 2, "K"),
+                         CellDiff(10, 3, "K"), CellDiff(11, 3, "K") ],
+            "glanceR": [ CellDiff(7, 2, "B"), CellDiff(7, 3, "B"), CellDiff(8, 2, "W"), CellDiff(9, 2, "K"),
+                         CellDiff(8, 3, "K"), CellDiff(9, 3, "K"),
+                         CellDiff(11, 2, "B"), CellDiff(11, 3, "B"), CellDiff(13, 2, "W"), CellDiff(12, 2, "K"),
+                         CellDiff(13, 3, "K"), CellDiff(12, 3, "K") ],
+            // the signature quirk: a luminous shimmer wave across the wings
+            "quirk": [ CellDiff(2, 6, "A"), CellDiff(3, 7, "A"), CellDiff(4, 8, "A"),
+                       CellDiff(17, 6, "A"), CellDiff(16, 7, "A"), CellDiff(15, 8, "A") ],
+            "perk": [ CellDiff(7, 1, "A"), CellDiff(12, 1, "A") ],  // antennae glow
+            "breathe": [ CellDiff(2, 12, "B"), CellDiff(17, 12, "B") ],
+            "idleA": [ CellDiff(1, 5, "B") ],
+            "idleB": [ CellDiff(18, 5, "B") ],
+            "yawn": [ CellDiff(7, 2, "D"), CellDiff(8, 2, "D"), CellDiff(7, 3, "B"), CellDiff(8, 3, "B"),
+                      CellDiff(11, 2, "D"), CellDiff(12, 2, "D"), CellDiff(11, 3, "B"), CellDiff(12, 3, "B"),
+                      CellDiff(9, 5, "K"), CellDiff(10, 5, "K") ],
+        ],
+        paletteHex: [
+            "B": "A78BFA", "D": "6D5BD0", "K": "171226",
+            "W": "F5F4EF", "A": "FFE9A8",
+        ]
+    )
+
 }
+
+
 
 /// IconCuts (Aivatar 2.0, E1): the app icon's source of truth is a GRID, not
 /// a drawing. `emberFace` is a hand-authored 32x32 token grid (same 5-symbol

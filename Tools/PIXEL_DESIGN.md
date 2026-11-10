@@ -476,3 +476,26 @@ of truth is still an authored grid, not a drawing:
   pin the grid contract in code.
 - `AccentColor` = Ember's accent token (`paletteHex["A"]`, FFC800), pinned
   within 1/255 by `asset_validator.swift` + `ProjectBootstrapTests`.
+
+---
+
+# v7 — the sixth companion (Aivatar 2.0 Phase 3, E10: lumen the moth)
+
+- Unlock is a pure gate: `BondRules.sixthCompanionUnlocked(level)` at
+  confidant (5) + the one-time `sixthRevealed` reveal beat ("Someone followed
+  your light", once per install, first visit of a day). The picker shows the
+  sixth page only after the reveal; until then `shownArchetypes` filters it.
+- Assets: `profile_lumen.json` (v3 dials, unique tell `dust`, quirk loop
+  `stargazing`, gaze policy `linger` — the schema-freeze registries in
+  `asset_validator.swift` and `SchemaFreezeTests` extend to six), an authored
+  20x18 moth grid (two wings separated from the body by negative space,
+  antennae with luminous A tips, 2x2 W-catchlight eyes) + 12 frame patches
+  (quirk = 6-cell luminous wing shimmer), stage metadata (face rect, shadow,
+  blush, vapor), and the legacy painter's moth plan (wings + antennae).
+- All per-archetype tables answer for lumen: director reaction/weather/sound
+  tables, haptic grammar, notification attention, breath contentment,
+  interiority presentation, wake-beat acts. Complications/icons/postcards are
+  automatic via `CompanionIcon`/`CompanionWidgetState.knownArchetypeRaws`.
+- Localized identity `animal.lumen.*` in app EN/FR + widget EN/FR mirrors.
+- `LumenCompanionTests` pins the parity contract; lumen goldens recorded for
+  idle grid, postcard, and bond-level-3 sequence.

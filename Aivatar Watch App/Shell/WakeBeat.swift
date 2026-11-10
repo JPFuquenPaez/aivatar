@@ -94,6 +94,8 @@ nonisolated enum WakeBeatSelector {
             let hour = Double(calendar.component(.hour, from: now))
                 + Double(calendar.component(.minute, from: now)) / 60
             memoryBeat = memory.usualHourEMA.map { abs(hour - $0) <= 1.0 } ?? false ? .barometer : nil
+        case .lumen:
+            memoryBeat = nil  // the moth has no unobserved trace yet
         }
         if let memoryBeat { return .memory(memoryBeat) }
 
@@ -119,6 +121,7 @@ nonisolated enum WakeBeatSelector {
             case .compass: return [.quirk]      // the metronome double
             case .prism: return [.quirk]        // the coil release
             case .nimbus: return [.perk]        // the puff
+            case .lumen: return [.quirk]        // the wing shimmer
             }
         case .lifeEvent(let kind):
             let event: LifeEvent = {

@@ -164,3 +164,8 @@
 "sit.session.breatheOut" = "Expire";
 "sit.session.done" = "%@ a médité avec toi";
 "sit.privacy.footer" = "Enregistre une minute de pleine conscience dans Santé, sur cette montre uniquement. Rien n'est envoyé.";
+
+/* Aivatar 2.0 Phase 3 — le sixième compagnon (E10) */
+"animal.lumen.name" = "Papillon de nuit";
+"animal.lumen.element" = "nuit";
+"animal.lumen.temperament" = "Discret et lumineux — attiré par ta lumière";

@@ -101,7 +101,7 @@ struct Profile: Decodable {
 
 let expressionChannels = ["joy", "sad", "surprise", "alert", "sleepy", "focus", "warm", "wry", "startle", "rest"]
 let gestures = ["wave", "bounce", "stretch", "spin", "nod", "tilt", "lookAround", "shiftWeight", "shiver", "doubleTake", "sparkle", "puff", "preen", "swayCatch", "tick", "mirror", "driftFloat", "slowBlink"]
-let archetypes = ["ember", "willow", "compass", "prism", "nimbus"]
+let archetypes = ["ember", "willow", "compass", "prism", "nimbus", "lumen"]
 
 var failures: [String] = []
 func fail(_ message: String) {
@@ -240,19 +240,19 @@ for archetype in archetypes {
             }
         }
         if let policy = profile.gazePolicy {
-            let valid = ["lock", "soft", "metricSweep", "wander", "detectThenSettle"]
+            let valid = ["lock", "soft", "metricSweep", "wander", "detectThenSettle", "linger"]
             if !valid.contains(policy) {
                 fail("profile_\(archetype): gazePolicy \(policy) not in \(valid)")
             }
         }
         if let tell = profile.tell {
-            let valid = ["spark", "leaf", "tick", "flicker", "pulse"]
+            let valid = ["spark", "leaf", "tick", "flicker", "pulse", "dust"]
             if !valid.contains(tell) {
                 fail("profile_\(archetype): tell \(tell) not in \(valid)")
             }
         }
         if let quirkLoop = profile.quirkLoop {
-            let valid = ["preen", "phototropism", "alignmentFidget", "mirrorMoment", "weatherMap"]
+            let valid = ["preen", "phototropism", "alignmentFidget", "mirrorMoment", "weatherMap", "stargazing"]
             if !valid.contains(quirkLoop) {
                 fail("profile_\(archetype): quirkLoop \(quirkLoop) not in \(valid)")
             }
@@ -336,7 +336,7 @@ do {
 }
 
 if failures.isEmpty {
-    print("ASSET-VALIDATOR OK: rig.json v1 + 5 profiles + app icon/AccentColor (E1) pass schema + parity checks")
+    print("ASSET-VALIDATOR OK: rig.json v1 + profiles + app icon/AccentColor (E1) pass schema + parity checks")
     exit(0)
 }
 exit(1)

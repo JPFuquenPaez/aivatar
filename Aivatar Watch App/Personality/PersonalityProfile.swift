@@ -3,7 +3,7 @@ import Foundation
 /// The five personality archetypes (§5). One shared skeleton; each archetype
 /// contributes a PersonalityProfile + ArchetypeVisualSet.
 nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
-    case ember, willow, compass, prism, nimbus
+    case ember, willow, compass, prism, nimbus, lumen
 
     var displayName: String {
         switch self {
@@ -12,6 +12,7 @@ nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
         case .compass: return "Compass"
         case .prism: return "Prism"
         case .nimbus: return "Nimbus"
+        case .lumen: return "Lumen"
         }
     }
 
@@ -45,6 +46,7 @@ nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
         case .compass: return .nod     // a level acknowledgment
         case .prism: return .wave      // a loose, friendly flip-wave
         case .nimbus: return .nod       // a quiet settle-nod
+        case .lumen: return .slowBlink  // a soft night-blink goodbye
         }
     }
 
@@ -65,6 +67,7 @@ nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
         case .compass: return .lookAround  // "metronomic saccade rhythm"
         case .prism: return .doubleTake    // "double-take gaze"
         case .nimbus: return .shiver       // "reactive micro-startles"
+        case .lumen: return .sparkle       // "luminous wing shimmer" (spark-class)
         }
     }
 }
@@ -178,6 +181,7 @@ nonisolated enum GazePolicy: String, Codable, Sendable {
     case metricSweep     // Compass: lighthouse sweep at metronomic intervals
     case wander           // Prism: inspects corners/hands, double-takes
     case detectThenSettle // Nimbus: fast dart, then the longest settle
+    case linger           // Lumen: slow drift toward the light, long holds
 }
 
 /// Blink grammar (v3: rate lives in gazeProfile; shape lives here).
@@ -198,6 +202,7 @@ nonisolated enum PersonalityTell: String, Codable, Sendable {
     case tick    // Compass: one metronome bob of approval
     case flicker // Prism: chromatic shift across accents on delight
     case pulse   // Nimbus: slow luminous wave after any event
+    case dust    // Lumen: a single dust mote drifts past (within mote budget)
 }
 
 /// The unobserved idle quirk loop (v3 §0 interiority / quirk; data-driven
@@ -208,6 +213,7 @@ nonisolated enum QuirkLoop: String, Codable, Sendable {
     case alignmentFidget  // Compass: nudges something crooked to symmetry
     case mirrorMoment     // Prism: studies its reflection, adjusts a patch
     case weatherMap       // Nimbus: drift syncs with live weather (port-fed)
+    case stargazing       // Lumen: lingers on the brightest cell of the room
 }
 
 /// PersonalityProfile (§5): one JSON per archetype, frozen at end of A1

@@ -480,6 +480,21 @@ nonisolated final class AvatarSpritePainter {
                 AnimalDeco(kind: "triangle", w: 7, h: 4.5, bone: "chest", x: -21, y: 2, rot: 0.5, role: .primary, id: "fin"),
                 AnimalDeco(kind: "triangle", w: 7, h: 4.5, bone: "chest", x: 21, y: 2, rot: -0.5, role: .primary, id: "fin"),
             ]
+        case .lumen:
+            // MOTH (night): slim body + head, two broad leaf wings, antennae.
+            slots["torsoChest"] = AnimalSlot(kind: "puff", w: 1.3, h: 0.7, role: .primary)
+            slots["torsoUpper"] = AnimalSlot(kind: "puff", w: 1.1, h: 0.55, role: .primary)
+            slots["torsoLower"] = AnimalSlot(kind: "puff", w: 0.9, h: 0.5, role: .primary)
+            slots["head"] = AnimalSlot(kind: "circle", w: 1.0, h: 0.9, role: .primary)
+            slots["jaw"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageA"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageA2"] = AnimalSlot(kind: "rect", w: 0, h: 0, role: nil)
+            slots["appendageB"] = AnimalSlot(kind: "leaf", w: 2.6, h: 1.8, role: .primary)
+            slots["appendageB2"] = AnimalSlot(kind: "leaf", w: 2.6, h: 1.8, role: .primary)
+            decos = [
+                AnimalDeco(kind: "rect", w: 2, h: 8, bone: "head", x: -3, y: -20, rot: 0.3, role: .face, id: "antenna"),
+                AnimalDeco(kind: "rect", w: 2, h: 8, bone: "head", x: 3, y: -20, rot: -0.3, role: .face, id: "antenna"),
+            ]
         case .nimbus:
             // BIRD (air): round body + head, ink beak, ONE swept wing on
             // the left (asymmetry), tail feathers, two ink feet.
@@ -529,6 +544,7 @@ nonisolated final class AvatarSpritePainter {
         case .willow: d = -6.0    // frog: wide-set domes
         case .compass: d = 3.0    // fish: close-set
         case .nimbus: d = 2.5     // bird
+        case .lumen: d = 2.0      // moth: close-set
         case .prism: d = 1.0      // chameleon
         }
         switch slotName {

@@ -99,7 +99,7 @@ nonisolated enum CompanionStateDerivation {
     /// v31: the known archetype raw values — a corrupt-but-well-formed
     /// snapshot (e.g. "dragon") must never reach the strings tables or the
     /// icon paths (an unknown key would echo the raw key into the UI).
-    static let knownArchetypeRaws: [String] = ["ember", "willow", "compass", "prism", "nimbus"]
+    static let knownArchetypeRaws: [String] = ["ember", "willow", "compass", "prism", "nimbus", "lumen"]
 
     /// The raw value if known, else the default — call at every consumer edge.
     static func sanitizedArchetypeRaw(_ raw: String) -> String {

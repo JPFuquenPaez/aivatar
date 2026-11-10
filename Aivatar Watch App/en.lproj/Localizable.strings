@@ -167,3 +167,8 @@
 "sit.session.breatheOut" = "Breathe out";
 "sit.session.done" = "%@ sat with you";
 "sit.privacy.footer" = "Logs one mindful minute to Health, on this watch only. Nothing is sent anywhere.";
+
+/* Aivatar 2.0 Phase 3 — the sixth companion (E10) */
+"animal.lumen.name" = "Moth";
+"animal.lumen.element" = "night";
+"animal.lumen.temperament" = "Quiet and luminous — drawn to your light";

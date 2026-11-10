@@ -34,3 +34,8 @@
 "animal.nimbus.temperament" = "Attentive and quick — notices everything first";
 "identity.full" = "%1$@ the %2$@";
 "widget.a11y" = "%1$@, %2$@";
+
+/* Aivatar 2.0 Phase 3 — the sixth companion (E10) */
+"animal.lumen.name" = "Moth";
+"animal.lumen.element" = "night";
+"animal.lumen.temperament" = "Quiet and luminous — drawn to your light";

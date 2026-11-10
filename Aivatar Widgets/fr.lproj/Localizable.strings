@@ -31,3 +31,8 @@
 "animal.nimbus.temperament" = "Attentif et vif — remarque tout en premier";
 "identity.full" = "%1$@ le %2$@";
 "widget.a11y" = "%1$@, %2$@";
+
+/* Aivatar 2.0 Phase 3 — le sixième compagnon (E10) */
+"animal.lumen.name" = "Papillon de nuit";
+"animal.lumen.element" = "nuit";
+"animal.lumen.temperament" = "Discret et lumineux — attiré par ta lumière";

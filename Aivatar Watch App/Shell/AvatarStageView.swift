@@ -307,6 +307,9 @@ struct AvatarStageView: View {
             if summary.nearUsualHour {
                 play("driftFloat")
             }
+        case .lumen:
+            // The moth was already circling the light when you arrived.
+            play("sparkle")
         }
     }
 
@@ -529,6 +532,21 @@ struct AvatarStageView: View {
             $0.kindHash == LifeKind.hash(of: .weatherClass) && $0.dayIndex == dayIndex
         }).last, let ch = w.classHash, let klass = ConditionClass.fromHash(ch) {
             director.setCondition(klass)
+        }
+        // E10: the sixth companion's one-time reveal beat — a confidant bond
+        // earns "Someone followed your light" on the first visit of a day.
+        if BondRules.sixthCompanionUnlocked(memory.bondLevel), !memory.sixthRevealed {
+            memory.sixthRevealed = true
+            director.playSequence([.quirk, .happy])
+            WakeBeatSelector.markShown(&memory, now: now)
+            store.save(memory)
+            let caption = String(localized: "beat.sixth.title")
+            beatCaption = caption
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                if beatCaption == caption { beatCaption = nil }
+            }
+            return
         }
         guard let beat = WakeBeatSelector.beat(memory: memory, archetype: archetype, now: now) else { return }
         director.playSequence(WakeBeatSelector.acts(for: beat, archetype: archetype))

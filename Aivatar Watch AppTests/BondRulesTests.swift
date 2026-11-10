@@ -295,6 +295,7 @@ final class BondRulesTests: XCTestCase {
             .compass: 3_425_083_962_399_002_162,
             .prism: 9_864_322_153_773_428_036,
             .nimbus: 499_010_127_866_336_243,
+            .lumen: 7_893_875_153_974_737_327,
         ]
         var recorded: [String] = []
         for archetype in Archetype.allCases {

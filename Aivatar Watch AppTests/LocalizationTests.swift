@@ -37,6 +37,7 @@ final class LocalizationTests: XCTestCase {
         "animal.compass.name", "animal.compass.element", "animal.compass.temperament",
         "animal.prism.name", "animal.prism.element", "animal.prism.temperament",
         "animal.nimbus.name", "animal.nimbus.element", "animal.nimbus.temperament",
+        "animal.lumen.name", "animal.lumen.element", "animal.lumen.temperament",
         "identity.full",
         "weather.sunny", "weather.gray", "weather.rain", "weather.wind",
         "weather.cold", "weather.hot", "weather.unknown",

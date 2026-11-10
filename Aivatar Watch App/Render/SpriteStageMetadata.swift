@@ -63,6 +63,14 @@ nonisolated enum SpriteStageMetadata {
                 blushL: (3, 5), blushR: (15, 5),
                 vapor: [(9, 0), (10, 0)]
             )
+        case .lumen:
+            // Moth: eyes rows 2-3 cols 6-13 (antennae row 0); body bottom row 13.
+            return AnimalMeta(
+                faceRect: (6, 1, 8, 4),
+                shadowRow: 14, shadowWidth: 12,
+                blushL: (6, 4), blushR: (13, 4),
+                vapor: [(9, 0), (10, 0)]
+            )
         }
     }
 

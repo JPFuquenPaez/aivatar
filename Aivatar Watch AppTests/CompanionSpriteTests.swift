@@ -97,6 +97,7 @@ final class CompanionSpriteTests: XCTestCase {
             .compass: 13_422_192_436_272_290_303,
             .prism: 1_588_146_895_759_741_354,
             .nimbus: 5_552_407_490_590_961_342,
+            .lumen: 15_613_248_097_422_517_119,
         ]
         var actual: [Archetype: UInt64] = [:]
         var recorded: [String] = []

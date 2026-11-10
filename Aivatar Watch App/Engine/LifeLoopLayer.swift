@@ -117,6 +117,11 @@ nonisolated final class LifeLoopLayer {
             wanderInterval = 100
             wanderEase = 0.035
             wanderAmp = 1.6
+        case .linger:
+            // Lumen: slow drift toward the light, long holds.
+            wanderInterval = 150
+            wanderEase = 0.02
+            wanderAmp = 0.9
         }
     }
 
@@ -217,7 +222,7 @@ nonisolated final class LifeLoopLayer {
                 headFollow = 0.03
                 gazeHoldFrames = 150 // the period is the hold
             }
-        case .lock, .soft, .wander, .detectThenSettle:
+        case .lock, .soft, .wander, .detectThenSettle, .linger:
             guard saccadeAllowed, rng.nextFloat() < saccadeP * (gazePolicy == .detectThenSettle ? 1.3 : 1.0) else { break }
             let pick = min(rng.nextFloat() * Float(gazeTargets.count), Float(gazeTargets.count - 1))
             var target = gazeTargets[Int(pick)]
@@ -247,6 +252,10 @@ nonisolated final class LifeLoopLayer {
                 // Fastest dart of the five, then the longest settle.
                 gazeSpeed = 0.5 + rng.nextFloat() * 0.15
                 gazeHoldFrames = 30 + Int(rng.nextFloat() * 15)
+            case .linger:
+                // Lumen: slow drift, the longest soft hold.
+                gazeSpeed = 0.06 + rng.nextFloat() * 0.05
+                gazeHoldFrames = 40 + Int(rng.nextFloat() * 15)
             default:
                 break
             }

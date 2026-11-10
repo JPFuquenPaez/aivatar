@@ -87,6 +87,7 @@ final class HapticsAndPostcardTests: XCTestCase {
             .compass: 5_708_430_803_773_449_336,
             .prism: 14_174_554_351_663_265_186,
             .nimbus: 11_416_384_784_677_474_054,
+            .lumen: 1_557_286_761_931_598_275,
         ]
         var recorded: [String] = []
         for archetype in Archetype.allCases {

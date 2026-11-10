@@ -394,6 +394,13 @@ nonisolated final class AvatarEngine {
                 startTell(frames: 15)
             }
             prevDelightLevel = delight
+        case .dust:
+            // Lumen: a single dust mote drifts past — idle-scheduled, within
+            // the mote budget, dedicated stream like Willow's leaf.
+            if tellFramesLeft == 0, !idleClipActive, !reactionClipActive,
+               tellRng.nextFloat() < 1.0 / 1800.0 {
+                startTell(frames: 24)
+            }
         case .leaf:
             // One leaf falls; Willow catches it and puts it back — an
             // unobserved idle loop, scheduled stochastically (~ every 50 s

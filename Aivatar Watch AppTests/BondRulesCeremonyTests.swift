@@ -124,8 +124,8 @@ extension BondRulesCeremonyTests {
         XCTAssertFalse(BondRules.sixthCompanionUnlocked(1))
         XCTAssertFalse(BondRules.sixthCompanionUnlocked(4))
         XCTAssertTrue(BondRules.sixthCompanionUnlocked(5))
-        // The picker still shows exactly five companions (no art shipped).
-        XCTAssertEqual(Archetype.allCases.count, 5)
+        // Six archetypes exist in code; the picker gates lumen behind the flag.
+        XCTAssertEqual(Archetype.allCases.count, 6)
         // And the reveal flag defaults off in legacy memory.
         XCTAssertFalse(CompanionMemory(firstLaunch: base, lastSeen: base).sixthRevealed)
     }

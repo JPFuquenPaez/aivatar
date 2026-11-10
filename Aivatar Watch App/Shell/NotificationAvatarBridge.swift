@@ -39,6 +39,7 @@ final class NotificationAvatarBridge: NSObject, UNUserNotificationCenterDelegate
         case .compass: return .lookAround // scans the room, focused
         case .prism: return .doubleTake  // curious double-take
         case .nimbus: return .puff       // alert swell
+        case .lumen: return .sparkle     // a soft glow
         }
     }
 
