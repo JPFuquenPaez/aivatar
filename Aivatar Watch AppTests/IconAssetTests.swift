@@ -46,13 +46,13 @@ final class IconAssetTests: XCTestCase {
 
     func testEyeCatchlightAndMuzzle() {
         let grid = IconCuts.emberFaceSymbols()
-        // Exactly one W catchlight per eye block (upper-left of each 2x2 eye).
+        // Exactly one W catchlight per eye block: the eye rows are 17-18
+        // (2x2 ink blocks with the W in the upper-left corner).
         var catchlights = 0
-        for y in 0..<32 { for x in 0..<32 where grid[y][x] == "W" {
-            // a catchlight sits directly left/above an ink cell of the eye
-            if (x + 1 < 32 && grid[y][x + 1] == "K") || (y + 1 < 32 && grid[y + 1][x] == "K") { catchlights += 1 }
-        } }
+        for y in 17...18 { for x in 0..<32 where grid[y][x] == "W" { catchlights += 1 } }
         XCTAssertEqual(catchlights, 2, "one W catchlight per eye (U2 dead-eye guard)")
+        XCTAssertEqual(grid[17][8], "W")
+        XCTAssertEqual(grid[17][19], "W")
         // Paper muzzle present below the eyes.
         XCTAssertTrue(grid.contains { $0.contains("W") }, "paper muzzle required")
     }

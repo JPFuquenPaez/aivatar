@@ -295,6 +295,7 @@ nonisolated final class SpriteDirector {
         tick += 1
         if resting { return }
         if vaporOnTicksLeft > 0 { vaporOnTicksLeft -= 1 }  // E9.2 puff lifetime
+        if blushTicksLeft > 0 { blushTicksLeft -= 1 }      // E7 flush lifetime
         // E8 session grammar runs instead of the idle schedule entirely.
         if sessionMode { stepSession(); return }
         // E2 preview: mood pinned calm, no motes/yawn/lonely; the dwell quirk
@@ -308,7 +309,6 @@ nonisolated final class SpriteDirector {
         // E5: a due ceremony plays as soon as the queue is free (suppressed
         // during workouts — one intention at a time).
         if mementoDepositTicksLeft > 0 { mementoDepositTicksLeft -= 1 }
-        if blushTicksLeft > 0 { blushTicksLeft -= 1 }
         if !pendingCeremonies.isEmpty, !workoutMode, !sessionMode,
            let i = pendingCeremonies.firstIndex(where: { $0.atTick <= tick }) {
             let ceremony = pendingCeremonies.remove(at: i)
@@ -442,7 +442,10 @@ nonisolated final class SpriteDirector {
                 }
                 if moteTicksLeft <= 0 {
                     moteCell = nil
-                    nextMoteTick = tick + Int(Float(200 + rng.nextInt(200)) * weatherMoteMul)
+                    // F1: a bonded companion glances away less — mote self-play
+                    // (the glance at the mote) scales down with bond too.
+                    nextMoteTick = tick + Int(Float(200 + rng.nextInt(200)) * weatherMoteMul
+                                              / BondRules.glanceAwayMultiplier(bondLevel))
                 }
             } else if tick >= nextMoteTick {
                 let edge = rng.nextInt(4)
@@ -691,7 +694,6 @@ nonisolated final class SpriteDirector {
 
     private func stepSession() {
         let elapsed = tick - sessionStartTick
-        if blushTicksLeft > 0 { blushTicksLeft -= 1 }
         if mementoDepositTicksLeft > 0 { mementoDepositTicksLeft -= 1 }
         if !queue.isEmpty {
             queue[0].ticks -= 1

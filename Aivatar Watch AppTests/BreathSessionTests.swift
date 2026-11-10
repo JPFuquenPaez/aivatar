@@ -53,6 +53,14 @@ final class BreathSessionTests: XCTestCase {
 
     // MARK: - Director session grammar
 
+    /// Lock-guarded capture box for the @Sendable onSessionEnded callback.
+    private final class EndBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _value = -1
+        var value: Int { lock.lock(); defer { lock.unlock() }; return _value }
+        func set(_ v: Int) { lock.lock(); _value = v; lock.unlock() }
+    }
+
     private func director(_ archetype: Archetype = .ember) throws -> SpriteDirector {
         let profile = try PersonalityProfile.load(archetype)
         return SpriteDirector(profile: profile, seed: 20261010)
@@ -60,8 +68,8 @@ final class BreathSessionTests: XCTestCase {
 
     func testSessionRunsExactly400TicksThenEnds() throws {
         let d = try director()
-        var endedAt = -1
-        d.onSessionEnded = { elapsed in endedAt = elapsed }
+        let box = EndBox()
+        d.onSessionEnded = { box.set($0) }
         d.setSessionMode(true)
         XCTAssertTrue(d.sessionMode)
         var sawBreathe = false, sawIdle = false
@@ -74,7 +82,7 @@ final class BreathSessionTests: XCTestCase {
         }
         XCTAssertTrue(sawBreathe && sawIdle, "inhale/exhale alternation present")
         XCTAssertFalse(d.sessionMode, "session auto-ends at 400 ticks")
-        XCTAssertEqual(endedAt, 400)
+        XCTAssertEqual(box.value, 400)
         // Contentment act plays right after the end.
         XCTAssertNotEqual(d.currentFrame, "idle")
     }
@@ -98,26 +106,26 @@ final class BreathSessionTests: XCTestCase {
 
     func testTapEndsSessionImmediatelyAndStillAnswers() throws {
         let d = try director()
-        var endedAt = -1
-        d.onSessionEnded = { endedAt = $0 }
+        let box = EndBox()
+        d.onSessionEnded = { box.set($0) }
         d.setSessionMode(true)
         for t in 1...50 { d.advance(toTick: t) }
         d.handleEvent(.tap)  // ends the session...
         XCTAssertFalse(d.sessionMode)
-        XCTAssertEqual(endedAt, 50, "tap ends the session at once (G1)")
+        XCTAssertEqual(box.value, 50, "tap ends the session at once (G1)")
         d.advance(toTick: 51)
         XCTAssertTrue(d.pendingActTicks > 0 || d.currentFrame != "idle", "...and the tap still answers")
     }
 
     func testShortSessionDoesNotLogButEnds() throws {
         let d = try director()
-        var endedAt = -1
-        d.onSessionEnded = { endedAt = $0 }
+        let box = EndBox()
+        d.onSessionEnded = { box.set($0) }
         d.setSessionMode(true)
         for t in 1...100 { d.advance(toTick: t) }
         d.handleEvent(.sleep)  // wrist drop
-        XCTAssertEqual(endedAt, 100)
-        XCTAssertFalse(BreathSessionController.shouldLog(elapsedTicks: endedAt))
+        XCTAssertEqual(box.value, 100)
+        XCTAssertFalse(BreathSessionController.shouldLog(elapsedTicks: box.value))
     }
 
     func testBoopSuppressedDuringSession() throws {

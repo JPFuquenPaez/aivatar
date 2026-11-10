@@ -54,8 +54,9 @@ final class FaceBoopTests: XCTestCase {
         XCTAssertTrue(d.boopFace())
         var blushTicks = 0
         for t in 6...20 {
-            d.advance(toTick: t)
+            // Sample the overlay as rendered at this tick, before stepping.
             if d.transientOverlayCells.contains(where: { $0.symbol == "A" }) { blushTicks += 1 }
+            d.advance(toTick: t)
         }
         XCTAssertEqual(blushTicks, SpriteDirector.blushDurationTicks, "flush lives exactly 6 ticks")
     }

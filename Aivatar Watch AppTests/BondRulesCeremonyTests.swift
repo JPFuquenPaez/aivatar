@@ -102,9 +102,9 @@ final class BondRulesCeremonyTests: XCTestCase {
         XCTAssertNil(d.mementoDepositAlpha)
         d.depositMemento()
         var alphas: [Float] = []
-        for t in 1...4 {
-            d.advance(toTick: t)
+        for _ in 1...4 {
             if let a = d.mementoDepositAlpha { alphas.append(a) }
+            d.advance(toTick: d.tick + 1)
         }
         XCTAssertEqual(alphas, [0.25, 0.5, 0.75, 1.0])
         d.advance(toTick: 5)

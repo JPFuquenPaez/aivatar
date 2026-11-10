@@ -44,13 +44,13 @@ final class NamingDayTests: XCTestCase {
     func testFeb29HonoredOnMar1InNonLeapYear() {
         // Naming on 2024-02-29 (leap); 2026-03-01 is not a leap year -> honored.
         let naming = Date(timeIntervalSince1970: 1_709_164_800)  // 2024-02-29 00:00 UTC
-        let mar1_2026 = Date(timeIntervalSince1970: 1_772_236_800)  // 2026-03-01 00:00 UTC
+        let mar1_2026 = Date(timeIntervalSince1970: 1_772_323_200)  // 2026-03-01 00:00 UTC
         XCTAssertTrue(WakeBeatSelector.isAnniversary(namingDay: naming, now: mar1_2026, calendar: utc))
         // ...but not on 2028-03-01 (2028 IS a leap year).
-        let mar1_2028 = Date(timeIntervalSince1970: 1_835_308_800)  // 2028-03-01 00:00 UTC
+        let mar1_2028 = Date(timeIntervalSince1970: 1_835_481_600)  // 2028-03-01 00:00 UTC
         XCTAssertFalse(WakeBeatSelector.isAnniversary(namingDay: naming, now: mar1_2028, calendar: utc))
         // And the real anniversary still matches in a leap year.
-        let feb29_2028 = Date(timeIntervalSince1970: 1_835_251_200)  // 2028-02-29 00:00 UTC
+        let feb29_2028 = Date(timeIntervalSince1970: 1_835_395_200)  // 2028-02-29 00:00 UTC
         XCTAssertTrue(WakeBeatSelector.isAnniversary(namingDay: naming, now: feb29_2028, calendar: utc))
     }
 
@@ -83,9 +83,9 @@ final class NamingDayTests: XCTestCase {
     }
 
     func testAnniversaryCaptionAndActs() {
-        XCTAssertEqual(WakeBeatSelector.text(for: .namingAnniversary(years: 1), name: "Ember"),
+        XCTAssertEqual(WakeBeatCaption.text(for: .namingAnniversary(years: 1), name: "Ember"),
                        String(format: String(localized: "beat.namingday.title"), "Ember"))
-        let cap2 = WakeBeatSelector.text(for: .namingAnniversary(years: 3), name: "Ember")
+        let cap2 = WakeBeatCaption.text(for: .namingAnniversary(years: 3), name: "Ember")
         XCTAssertNotNil(cap2)
         XCTAssertLessThanOrEqual(cap2!.split(separator: " ").count, 8, "house voice")
         XCTAssertFalse(WakeBeatSelector.acts(for: .namingAnniversary(years: 1), archetype: .willow).isEmpty)

@@ -81,8 +81,9 @@ nonisolated enum BondRules {
         let previousLevel = level(forXP: memory.bondXP)
         memory.bondXP += gained
         let newLevel = level(forXP: memory.bondXP)
-        // E5: levels crossed by THIS award (against the pre-award level).
-        let newlyCrossed = (previousLevel + 1...newLevel).map { $0 }
+        // E5: levels crossed by THIS award (against the pre-award level);
+        // empty when no threshold was crossed (a range needs lo <= hi).
+        let newlyCrossed = newLevel > previousLevel ? Array(previousLevel + 1...newLevel) : []
         return BondAward(xpGained: gained, newXP: memory.bondXP,
                          previousLevel: previousLevel, newLevel: newLevel,
                          newlyCrossedLevels: newlyCrossed)

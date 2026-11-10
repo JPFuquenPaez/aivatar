@@ -150,6 +150,7 @@ final class WakeBeatTests: XCTestCase {
                 case .slowBlink: return "idle"
                 case .look: return "glanceR"
                 case .perk: return "perk"
+                case .flick: return "perk"   // the 1-tick idle micro-flick renders the perk frame
                 case .blink, .farewell: return "idle"
                 }
             }

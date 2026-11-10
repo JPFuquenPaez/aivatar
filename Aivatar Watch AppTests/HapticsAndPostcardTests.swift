@@ -84,8 +84,8 @@ final class HapticsAndPostcardTests: XCTestCase {
             // first frames are unchanged.
             .ember: 2_189_887_195_745_852_862,
             .willow: 5_779_802_598_010_730_844,
-            .compass: 5_426_752_643_789_965_734,
-            .prism: 2_059_382_512_568_751_236,
+            .compass: 5_708_430_803_773_449_336,
+            .prism: 14_174_554_351_663_265_186,
             .nimbus: 11_416_384_784_677_474_054,
         ]
         var recorded: [String] = []

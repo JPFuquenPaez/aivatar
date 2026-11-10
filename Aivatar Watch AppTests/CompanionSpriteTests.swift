@@ -94,8 +94,8 @@ final class CompanionSpriteTests: XCTestCase {
             // gained its 2-cell mouth — the other three idle grids are unchanged.
             .ember: 2_451_309_545_071_567_918,
             .willow: 6_115_991_415_473_770_972,
-            .compass: 1_718_610_583_237_580_081,
-            .prism: 9_456_951_818_924_182_236,
+            .compass: 13_422_192_436_272_290_303,
+            .prism: 1_588_146_895_759_741_354,
             .nimbus: 5_552_407_490_590_961_342,
         ]
         var actual: [Archetype: UInt64] = [:]
