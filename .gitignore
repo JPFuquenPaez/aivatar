@@ -10,3 +10,6 @@ Tools/spike-*.png
 Tools/launch-*.png
 Tools/probe-*.png
 Tools/final-*.png
+
+# Generated icon layers (Tools/icon_export.swift output; AppIcon.png in the appiconset is the committed composed icon)
+build/icon/
