@@ -153,3 +153,17 @@
 "workout.start_hint" = "Starts a workout with your companion running beside you";
 "workout.error" = "Health access is off — enable it in the iPhone Health app";
 "workout.end_hint" = "Ends the workout and saves it to Health";
+
+/* Aivatar 2.0 (E3/E4/E5/E8/E10) */
+"beat.namingday.title" = "One year of %@";
+"beat.namingday.caption" = "%@ celebrated naming %@";
+"beat.sixth.title" = "Someone followed your light";
+"beat.sixth.caption" = "%@ came to stay";
+"ceremony.level5.caption" = "old friends";
+"sit.entry.title" = "Sit with %@";
+"sit.entry.hint" = "Starts a one-minute breath session together";
+"sit.session.hint" = "Breathe with %@";
+"sit.session.breatheIn" = "Breathe in";
+"sit.session.breatheOut" = "Breathe out";
+"sit.session.done" = "%@ sat with you";
+"sit.privacy.footer" = "Logs one mindful minute to Health, on this watch only. Nothing is sent anywhere.";

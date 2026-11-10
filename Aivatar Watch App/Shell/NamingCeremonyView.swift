@@ -11,6 +11,18 @@ import SwiftUI
 /// a 44 pt clear button, a full-width 44 pt commit, and a quiet 44 pt-hit
 /// cancel — all inside a ScrollView so large Dynamic Type never clips, with
 /// the bottom content above the safe area.
+/// PerkThrottle (E3): pure, tick-injectable throttle for the naming perk —
+/// one perk per >= 20-tick (3 s) window while the field is focused.
+nonisolated struct PerkThrottle: Sendable {
+    static let windowTicks = 20
+    private var lastPerkTick = -1_000_000
+    mutating func allow(tick: Int) -> Bool {
+        guard tick - lastPerkTick >= Self.windowTicks else { return false }
+        lastPerkTick = tick
+        return true
+    }
+}
+
 struct NamingCeremonyView: View {
     let archetype: Archetype
     @Binding var isPresented: Bool
@@ -18,6 +30,10 @@ struct NamingCeremonyView: View {
     @AppStorage("namingCompleted") private var namingCompleted = false
     @State private var draft = ""
     @FocusState private var focused: Bool
+    /// E3: live hero's director (held via callback) + the perk throttle.
+    @State private var previewDirector: SpriteDirector?
+    @State private var perkThrottle = PerkThrottle()
+    @State private var appearDate = Date()
 
     /// Called when a name is committed so the stage can celebrate.
     var onName: ((String) -> Void)?
@@ -39,8 +55,17 @@ struct NamingCeremonyView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 10) {
-                    SetupTheme.iconDisc(for: archetype, size: 56)
+                    // E3 "it hears you": the hero is alive — while you type,
+                    // the companion perks (looks up at the name), throttled to
+                    // once per 20 ticks (3 s).
+                    LiveCompanionPreviewView(archetype: archetype, size: 56,
+                                             onDirectorChange: { previewDirector = $0 })
                         .padding(.top, 6)
+                        .onChange(of: draft) { _ in
+                            guard focused else { return }
+                            let tick = Int(Date().timeIntervalSince(appearDate) / SpriteDirector.tickDuration)
+                            if perkThrottle.allow(tick: tick) { previewDirector?.playPerk() }
+                        }
                     Text(String(format: String(localized: "naming.title"), archetype.animalName))
                         .font(.title3.weight(.semibold))
                         .multilineTextAlignment(.center)
@@ -106,6 +131,7 @@ struct NamingCeremonyView: View {
             .onAppear {
                 // v30: rename path prefills the current name.
                 if draft.isEmpty { draft = companionName }
+                appearDate = Date()
                 focused = true
             }
         }
@@ -121,6 +147,10 @@ struct NamingCeremonyView: View {
     private func commit() {
         let name = Self.resolvedName(draft, fallback: archetype.displayName)
         companionName = name
+        // E3/E4: the naming day is persisted on commit (the anniversary anchor).
+        var memory = CompanionMemoryStore().load() ?? CompanionMemory()
+        memory.namingDay = Date()
+        CompanionMemoryStore().save(memory)
         onName?(name)
         finish()
     }

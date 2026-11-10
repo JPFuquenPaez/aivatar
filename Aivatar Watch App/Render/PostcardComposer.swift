@@ -18,10 +18,13 @@ nonisolated struct PostcardInputs: Codable, Sendable, Equatable {
     var dayCount: Int
     var streakDays: Int
     var weatherClassRaw: String?
+    /// Aivatar 2.0 E4: true on the naming-day anniversary — the card carries a
+    /// 3x3 accent stamp in the top corner. Optional so legacy payloads decode.
+    var anniversary: Bool?
 
     init(archetypeRaw: String, seed: UInt64, name: String,
          bondLevel: Int = 1, dayCount: Int = 1, streakDays: Int = 0,
-         weatherClassRaw: String? = nil) {
+         weatherClassRaw: String? = nil, anniversary: Bool? = nil) {
         self.archetypeRaw = archetypeRaw
         self.seed = seed
         self.name = name
@@ -29,6 +32,22 @@ nonisolated struct PostcardInputs: Codable, Sendable, Equatable {
         self.dayCount = dayCount
         self.streakDays = streakDays
         self.weatherClassRaw = weatherClassRaw
+        self.anniversary = anniversary
+    }
+}
+
+/// E4: the anniversary stamp — a 3x3 accent block in the card's top-right
+/// corner, composed from the same seeded inputs and FNV-hash-pinned like the
+/// frames themselves.
+nonisolated enum PostcardStamp {
+    static func cells() -> [CompanionSprite.CellDiff] {
+        var cells: [CompanionSprite.CellDiff] = []
+        for y in 0..<3 {
+            for x in 17..<20 {
+                cells.append(CompanionSprite.CellDiff(x, y, "A"))
+            }
+        }
+        return cells
     }
 }
 
@@ -76,10 +95,13 @@ nonisolated enum PostcardComposer {
         let pool: [SpriteDirector.SpriteAct] = [.quirk, .happy, .slowBlink, .perk]
         director.playSequence([pool[rng.nextInt(pool.count)], pool[rng.nextInt(pool.count)]])
         let sprite = AuthoredSprites.sprite(for: archetype)
-        let overlay = sprite.interiorityDiffs(
+        var overlay = sprite.interiorityDiffs(
             InteriorityTuning(sproutGrowth: 1, streakDays: inputs.streakDays,
                               trinketPresent: false,
                               confidantMemento: BondRules.isConfidant(director.bondLevel)))
+        if inputs.anniversary == true {
+            overlay += PostcardStamp.cells()
+        }
         var out: [[[Character]]] = []
         for _ in 0..<frameCount {
             director.advance(toTick: director.tick + 1)

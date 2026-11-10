@@ -9,6 +9,8 @@ import Foundation
 nonisolated enum WakeBeat: Equatable, Sendable {
     /// A real-life event within the lookback (workout, calendar, sleep).
     case lifeEvent(kind: LifeKind)
+    /// Aivatar 2.0 E4: today is the naming-day anniversary (years since).
+    case namingAnniversary(years: Int)
     /// Today's weather class (ambience, never a forecast).
     case weather(ConditionClass)
     /// The companion's own unobserved trace (per archetype).
@@ -31,6 +33,25 @@ nonisolated enum WakeBeatSelector {
     /// late yesterday — the morning beat may reference last evening).
     static let lifeEventLookbackSec: TimeInterval = 18 * 3_600
 
+    /// E4: pure anniversary match — today matches the naming day's month/day.
+    /// A Feb 29 naming is honored on Mar 1 in non-leap years.
+    static func isAnniversary(namingDay: Date, now: Date, calendar: Calendar = .current) -> Bool {
+        let named = calendar.dateComponents([.month, .day, .year], from: namingDay)
+        let today = calendar.dateComponents([.month, .day, .year], from: now)
+        if named.month == today.month, named.day == today.day { return true }
+        if named.month == 2, named.day == 29,
+           today.month == 3, today.day == 1,
+           let year = today.year, !(year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) {
+            return true  // non-leap year: Feb 29 -> Mar 1
+        }
+        return false
+    }
+
+    /// Whole years between the naming day and now (>= 1 on an anniversary).
+    static func anniversaryYears(namingDay: Date, now: Date, calendar: Calendar = .current) -> Int {
+        max(1, calendar.dateComponents([.year], from: namingDay, to: now).year ?? 1)
+    }
+
     /// The beat for this visit, or nil when today's beat was already shown
     /// (later visits get the short wake — no replay nagging, G4).
     static func beat(memory: CompanionMemory, archetype: Archetype,
@@ -47,7 +68,13 @@ nonisolated enum WakeBeatSelector {
             return .lifeEvent(kind: kind)
         }
 
-        // 2. Today's weather (a known class only).
+        // 2. E4: the naming-day anniversary (a pending life event still wins).
+        if let namingDay = memory.namingDay,
+           isAnniversary(namingDay: namingDay, now: now, calendar: calendar) {
+            return .namingAnniversary(years: anniversaryYears(namingDay: namingDay, now: now, calendar: calendar))
+        }
+
+        // 3. Today's weather (a known class only).
         if let entry = memory.lifeLog.filter({
             $0.kindHash == lifeKind && $0.dayIndex == dayIndex
         }).last,
@@ -56,7 +83,7 @@ nonisolated enum WakeBeatSelector {
             return .weather(klass)
         }
 
-        // 3. The archetype's own memory trace.
+        // 4. The archetype's own memory trace.
         let memoryBeat: MemoryBeat?
         switch archetype {
         case .ember: memoryBeat = memory.rehearsalLevel >= 1 ? .rehearsal : nil
@@ -84,6 +111,24 @@ nonisolated enum WakeBeatSelector {
         switch beat {
         case .warm:
             return [.happy]
+        case .namingAnniversary:
+            // The archetype's one "big" signature act (<= 33 ticks total).
+            switch archetype {
+            case .ember: return [.quirk]        // the fox's spin-class show
+            case .willow: return [.slowBlink]   // slow blink + croak
+            case .compass: return [.quirk]      // the metronome double
+            case .prism: return [.quirk]        // the coil release
+            case .nimbus: return [.perk]        // the puff
+            }
+        case .namingAnniversary:
+            // The archetype's one "big" signature act (<= 33 ticks total).
+            switch archetype {
+            case .ember: return [.quirk]        // the fox's spin-class show
+            case .willow: return [.slowBlink]   // slow blink + croak
+            case .compass: return [.quirk]      // the metronome double
+            case .prism: return [.quirk]        // the coil release
+            case .nimbus: return [.perk]        // the puff
+            }
         case .lifeEvent(let kind):
             let event: LifeEvent = {
                 switch kind {
@@ -120,6 +165,12 @@ nonisolated enum WakeBeatCaption {
         switch beat {
         case .warm:
             return nil
+        case .namingAnniversary(let years):
+            // "One year of Ember" / "Ember celebrated naming Ember" (2+ years).
+            if years <= 1 {
+                return String(format: String(localized: "beat.namingday.title"), name)
+            }
+            return String(format: String(localized: "beat.namingday.caption"), name, name)
         case .lifeEvent(let kind):
             switch kind {
             case .calendarSoon: return String(format: String(localized: "beat.noticed_day"), name)

@@ -150,3 +150,17 @@
 "workout.start_hint" = "Lance une course avec ton compagnon à tes côtés";
 "workout.error" = "Accès à Santé désactivé — active-le dans l’app Santé de l’iPhone";
 "workout.end_hint" = "Termine la course et l'enregistre dans Santé";
+
+/* Aivatar 2.0 (E3/E4/E5/E8/E10) */
+"beat.namingday.title" = "Un an avec %@";
+"beat.namingday.caption" = "%@ a fêté le nom de %@";
+"beat.sixth.title" = "Quelqu'un a suivi ta lumière";
+"beat.sixth.caption" = "%@ est venu rester";
+"ceremony.level5.caption" = "vieux amis";
+"sit.entry.title" = "Reste avec %@";
+"sit.entry.hint" = "Lance une minute de respiration ensemble";
+"sit.session.hint" = "Respire avec %@";
+"sit.session.breatheIn" = "Inspire";
+"sit.session.breatheOut" = "Expire";
+"sit.session.done" = "%@ a médité avec toi";
+"sit.privacy.footer" = "Enregistre une minute de pleine conscience dans Santé, sur cette montre uniquement. Rien n'est envoyé.";

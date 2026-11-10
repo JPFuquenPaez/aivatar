@@ -48,6 +48,13 @@ final class LocalizationTests: XCTestCase {
         "stage.hint", "stage.kind", "stage.state_resting", "stage.state_listening",
         "stage.state_calm", "stage.tag_here", "stage.tag_resting",
         "bond.announce", "workout.start_hint", "workout.end_hint", "workout.error",
+        // Aivatar 2.0 (E3/E4/E5/E8/E10).
+        "beat.namingday.title", "beat.namingday.caption",
+        "beat.sixth.title", "beat.sixth.caption",
+        "ceremony.level5.caption",
+        "sit.entry.title", "sit.entry.hint", "sit.session.hint",
+        "sit.session.breatheIn", "sit.session.breatheOut", "sit.session.done",
+        "sit.privacy.footer",
     ]
 
     func testEveryKeyResolvesInBaseBundle() {

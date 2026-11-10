@@ -34,7 +34,9 @@ struct PostcardPreviewView: View {
             bondLevel: memory?.bondLevel ?? 1,
             dayCount: memory.map { CompanionMemoryStore.dayDistance(from: $0.firstLaunch, to: now) + 1 } ?? 1,
             streakDays: memory?.streakDays ?? 0,
-            weatherClassRaw: weatherRaw)
+            weatherClassRaw: weatherRaw,
+            // E4: the anniversary stamp rides today's card.
+            anniversary: memory?.namingDay.map { WakeBeatSelector.isAnniversary(namingDay: $0, now: now) })
     }
 
     var body: some View {

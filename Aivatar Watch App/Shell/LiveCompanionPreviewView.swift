@@ -23,6 +23,12 @@ struct LiveCompanionPreviewView: View {
     /// The picker's current page index — any page change resets the dwell
     /// counter, re-arming the once-per-visit quirk.
     var page: Int = 0
+    /// E3: lets a parent (the naming ceremony) hold the live director to send
+    /// a perk while the user types. Nil when no director is alive.
+    var onDirectorChange: ((SpriteDirector?) -> Void)? = nil
+
+    /// E3: trigger the perk act on the live preview director.
+    func triggerPerk() { director?.playPerk() }
 
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @AppStorage("reduceMotionL2") private var reduceMotionL2 = false
@@ -69,9 +75,11 @@ struct LiveCompanionPreviewView: View {
             let d = SpriteDirector(profile: profile, seed: Self.previewSeed(archetype))
             d.previewMode = true
             director = d
+            onDirectorChange?(d)
         }
         .onDisappear {
             director = nil  // teardown: no surviving director ticks after the page/sheet
+            onDirectorChange?(nil)
         }
         .onChange(of: page) { _ in
             director?.resetPreviewDwell()

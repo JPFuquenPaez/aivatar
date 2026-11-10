@@ -516,6 +516,10 @@ nonisolated final class SpriteDirector {
         }
     }
 
+    /// E3: the naming-ceremony perk — the companion looks up at the name being
+    /// written. Existing `perk` frame, no new vocabulary.
+    func playPerk() { play(.perk) }
+
     var accessibilityMode: MotionAccessibilityMode {
         get { mode }
         set { mode = newValue }
