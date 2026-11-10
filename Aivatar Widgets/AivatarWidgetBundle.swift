@@ -26,6 +26,9 @@ struct CompanionEntry: TimelineEntry {
     /// widget process (memory budget on the smallest watch).
     let iconData: Data?
     let plainIconData: Data?
+    /// v31: Smart Stack relevance (watchOS 26), derived purely from presence
+    /// + event kind (CompanionStateDerivation.relevanceScore — unit-tested).
+    let relevance: TimelineEntryRelevance?
 }
 
 struct CompanionProvider: TimelineProvider {
@@ -33,7 +36,8 @@ struct CompanionProvider: TimelineProvider {
         let snapshot = CompanionWidgetState.readSnapshot() ?? .default()
         return CompanionEntry(date: .now, snapshot: snapshot, presence: snapshot.presence,
                               iconData: iconData(for: snapshot.archetypeRaw, presence: snapshot.presence),
-                              plainIconData: plainIconData(for: snapshot.archetypeRaw))
+                              plainIconData: plainIconData(for: snapshot.archetypeRaw),
+                              relevance: Self.relevance(for: snapshot.presence, snapshot: snapshot))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CompanionEntry) -> Void) {
@@ -65,7 +69,16 @@ struct CompanionProvider: TimelineProvider {
             now: date, lastSeen: snapshot.lastSeen, lastEventAt: snapshot.lastEventAt)
         return CompanionEntry(date: date, snapshot: snapshot, presence: presence,
                               iconData: iconData(for: snapshot.archetypeRaw, presence: presence),
-                              plainIconData: plainIconData(for: snapshot.archetypeRaw))
+                              plainIconData: plainIconData(for: snapshot.archetypeRaw),
+                              relevance: Self.relevance(for: presence, snapshot: snapshot))
+    }
+
+    /// v31: relevance from the entry's presence + the snapshot's last event.
+    private static func relevance(for presence: CompanionPresence,
+                                  snapshot: CompanionWidgetSnapshot) -> TimelineEntryRelevance? {
+        let kind = snapshot.lastEventKindRaw.flatMap { LifeKind(rawValue: $0) }
+        return TimelineEntryRelevance(score: Float(CompanionStateDerivation.relevanceScore(
+            presence: presence, lastEventKind: kind)))
     }
 
     /// v29: one small file read per entry — the per-state icon PNG the app
@@ -133,7 +146,8 @@ struct CompanionWidgetView: View {
                         // resolved from the archetype raw value so the widget
                         // bundle's own strings table supplies the words.
                         Text(String(format: String(localized: "identity.full"),
-                                    snapshot.name, LocalizedAnimalCopy.animalName(snapshot.archetypeRaw)))
+                                    snapshot.name, LocalizedAnimalCopy.animalName(
+                                        CompanionStateDerivation.sanitizedArchetypeRaw(snapshot.archetypeRaw))))
                             .font(.footnote)
                             .lineLimit(1)
                         Text(CompanionStateDerivation.rectangularLine(

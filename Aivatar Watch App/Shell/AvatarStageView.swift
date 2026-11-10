@@ -35,9 +35,8 @@ struct AvatarStageView: View {
     /// v11: the slow-blink ritual hint is surfaced once, after the first
     /// touch — a hidden gesture needs one visible invitation.
     @AppStorage("ritualHintShown") private var ritualHintShown = false
-    /// v25 (audit M4): one-time hint that crown paging reaches the workout
-    /// page and Settings — shown once, after onboarding.
-    @AppStorage("pagesHintShown") private var pagesHintShown = false
+    /// v25 (audit M4) + v31: hint that crown paging reaches the workout page
+    /// and Settings — now gated on the first workout, not a once-ever flag.
     @State private var showPagesHint = false
     /// v14 sonic presence: the user's sound-listening preference, the
     /// once-per-install in-context permission ask, and the live tell.
@@ -89,6 +88,14 @@ struct AvatarStageView: View {
     @State private var workoutBridge: WorkoutCompanionBridge?
     @State private var workoutActive = false
     @State private var workoutElapsed: TimeInterval = 0
+    /// v31: an honest inline error when a workout cannot start (Health access
+    /// off/unavailable) — the old silent no-op left the button dead.
+    @State private var workoutError = false
+    /// v31: "run with" pill on the stage after a recent saved workout, until
+    /// the user's first run (the pages hint gates on the same flag).
+    @AppStorage("workoutEverStarted") private var workoutEverStarted = false
+    /// v31: previous tab page, to derive crown-paging deltas.
+    @State private var lastTabSelection = 0
 
     init(archetype: Archetype? = nil) {
         launchOverride = archetype
@@ -107,11 +114,20 @@ struct AvatarStageView: View {
             stage
             // v21 F6: the workout page rides the same crown paging.
             WorkoutPageView(archetype: archetype, active: workoutActive,
-                            elapsed: workoutElapsed,
+                            elapsed: workoutElapsed, error: workoutError,
                             onStart: startWorkout, onStop: stopWorkout)
             SettingsView(archetype: archetype)
         }
         .tabViewStyle(.verticalPage(transitionStyle: .automatic))
+        // v31: the crown's paging is answered on stage — a glance in the
+        // paging direction (the director maps |delta| >= 2 to a perk).
+        .onChange(of: tabSelection) { new in
+            let delta = new - lastTabSelection
+            lastTabSelection = new
+            guard delta != 0 else { return }
+            context?.engine.handleEvent(.crownTick(delta: Float(delta)))
+            director?.handleEvent(.crownTick(delta: Float(delta)))
+        }
         .onAppear {
             buildContextIfNeeded()
             if soundSource == nil {
@@ -206,6 +222,7 @@ struct AvatarStageView: View {
         playMorningBeatIfNeeded()
         lastStreakDays = summary.streakDays
         publishCompanionWidgetState()
+        refreshRunPill()
     }
 
     /// v12 presence pass + v18 F4 state model: publish the companion
@@ -413,12 +430,15 @@ struct AvatarStageView: View {
             }
             // Dismissing the picker without choosing still leads to naming.
             .onChange(of: showPicker) { visible in
-                if !visible, launchOverride == nil, !pickerCompleted, !namingCompleted {
-                    showNaming = true
+                let routesToNaming = !visible && launchOverride == nil && !pickerCompleted && !namingCompleted
+                if routesToNaming {
+                    // v31: defer one tick so the picker sheet fully dismisses
+                    // before the naming sheet presents — no sheet-swap flash.
+                    DispatchQueue.main.async { showNaming = true }
                 }
                 // v25: the ceremony sequence closed — now the deferred mic
                 // ask may run (in-context, once, never racing a sheet).
-                if !visible, !showNaming { syncSoundPresence() }
+                if !visible, !routesToNaming { syncSoundPresence() }
             }
             .onChange(of: showNaming) { visible in
                 if !visible { syncSoundPresence() }
@@ -455,7 +475,10 @@ struct AvatarStageView: View {
                     // routes to the naming ceremony, as after a plain dismiss.
                     CompanionPickerView {
                         showPicker = false
-                        if !namingCompleted { showNaming = true }
+                        if !namingCompleted {
+                            // v31: same one-tick defer as the dismiss path.
+                            DispatchQueue.main.async { showNaming = true }
+                        }
                     } onSkip: {
                         showPicker = false
                     }
@@ -558,6 +581,8 @@ struct AvatarStageView: View {
             classHash: classHash))
         store.save(memory)
         publishCompanionWidgetState()
+        // v31: a fresh workoutDone may earn the stage's "Run with" pill.
+        refreshRunPill()
     }
 
     // MARK: - Workout mode (v21, F6)
@@ -569,6 +594,7 @@ struct AvatarStageView: View {
     @MainActor
     private func startWorkout() {
         guard !workoutActive else { return }
+        workoutError = false
         let bridge = WorkoutCompanionBridge()
         workoutBridge = bridge
         Task { @MainActor in
@@ -576,24 +602,29 @@ struct AvatarStageView: View {
                 try await bridge.start(activityRaw: Int(HKWorkoutActivityType.running.rawValue))
                 workoutActive = true
                 workoutElapsed = 0
+                workoutEverStarted = true
                 director?.setWorkoutMode(true)
                 Task { @MainActor in
                     await runMetricsLoop(bridge: bridge, startedAt: Date())
                 }
             } catch {
                 workoutBridge = nil
-                // Health data unavailable or denied: no session, no pretend.
+                // Health data unavailable or denied: no session, no pretend —
+                // v31: say so inline instead of leaving the button dead.
+                workoutError = true
             }
         }
     }
 
     /// 10 s metrics cadence while the workout runs (G9: throttled, never a
     /// stream). Splits cheer with one haptic; everything goes to the director.
+    /// v31: the UI poll pauses in background (the HKWorkoutSession itself
+    /// keeps the session alive; only the on-screen elapsed pauses).
     @MainActor
     private func runMetricsLoop(bridge: WorkoutCompanionBridge, startedAt: Date) async {
         while workoutActive {
             try? await Task.sleep(nanoseconds: 10_000_000_000)
-            guard workoutActive else { break }
+            guard workoutActive, scenePhase == .active else { continue }
             workoutElapsed = Date().timeIntervalSince(startedAt)
             for event in bridge.pollMetrics() {
                 if case .split = event { HapticsChannel.shared.split() }
@@ -616,6 +647,7 @@ struct AvatarStageView: View {
             } catch {
                 workoutActive = false
                 director?.setWorkoutMode(false)
+                refreshRunPill()
             }
         }
     }
@@ -677,10 +709,10 @@ struct AvatarStageView: View {
                 try? await Task.sleep(nanoseconds: 4_500_000_000)
                 showRitualHint = false
             }
-        } else if !pagesHintShown {
-            // v25 (audit M4): one-time hint that crown paging reaches the
-            // workout page and Settings.
-            pagesHintShown = true
+        } else if !workoutEverStarted {
+            // v25 (audit M4) + v31: the pages hint (crown paging reaches the
+            // workout page and Settings) now repeats until the user's FIRST
+            // workout — the workout page must not stay invisible.
             showPagesHint = true
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 4_500_000_000)
@@ -741,11 +773,39 @@ struct AvatarStageView: View {
         HapticsChannel.shared.react(to: archetype)
     }
 
+    /// v31: a recent saved workout (lifeLog, <= 7 days) with no active run
+    /// earns a contextual "Run with <name>" pill on the stage that jumps to
+    /// the workout page — page 2 stops being hidden after the first run.
+    @State private var showRunPill = false
+
+    private func refreshRunPill() {
+        guard let memory = CompanionMemoryStore().load() else { showRunPill = false; return }
+        let today = CompanionMemoryStore.dayIndex(of: Date())
+        showRunPill = !workoutActive && memory.lifeLog.contains {
+            $0.kindHash == LifeKind.hash(of: .workoutDone) && today - $0.dayIndex <= 7
+        }
+    }
+
     /// v28: the bottom text block (hints + beat caption + name + state) is
     /// ONE layout owner, so hints can never collide with the name lines.
     @ViewBuilder
     private func bottomBlock(insets: EdgeInsets) -> some View {
         VStack(spacing: 2) {
+            if showRunPill, tabSelection == 0 {
+                Text(String(format: String(localized: "workout.run_with"), stageName))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(SetupTheme.accent(for: archetype))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(SetupTheme.accent(for: archetype).opacity(0.15))
+                    .clipShape(Capsule())
+                    // High priority so the stage's spatial tap doesn't eat it.
+                    .highPriorityGesture(TapGesture().onEnded { tabSelection = 1 })
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(String(format: String(localized: "workout.run_with"), stageName))
+                    .accessibilityHint(String(localized: "workout.start_hint"))
+                    .padding(.bottom, 2)
+            }
             if showRitualHint {
                 Text(String(localized: "hint.slow_blink"))
                     .font(.caption2)

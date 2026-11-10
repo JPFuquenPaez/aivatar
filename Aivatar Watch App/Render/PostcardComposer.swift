@@ -48,8 +48,13 @@ nonisolated enum PostcardComposer {
            let klass = ConditionClass(rawValue: weatherClassRaw), klass != .unknown {
             // v30: the class name is localized (was the raw English enum,
             // leaking into fr captions as "jour rain").
-            parts.append(String(format: String(localized: "postcard.weather_day"),
-                                NSLocalizedString("weather.\(klass.rawValue)", comment: "weather class name")))
+            let weatherKey = "weather.\(klass.rawValue)"
+            let weatherName = NSLocalizedString(weatherKey, comment: "weather class name")
+            #if DEBUG
+            // v31: a missing weather key must fail loudly, not echo the key.
+            assert(weatherName != weatherKey, "missing localization for \(weatherKey)")
+            #endif
+            parts.append(String(format: String(localized: "postcard.weather_day"), weatherName))
         }
         return parts.joined(separator: " · ")
     }

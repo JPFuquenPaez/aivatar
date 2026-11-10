@@ -14,6 +14,8 @@ struct WorkoutPageView: View {
     let archetype: Archetype
     let active: Bool
     let elapsed: TimeInterval
+    /// v31: set when a start failed (Health access off) — shown inline.
+    let error: Bool
     let onStart: () -> Void
     let onStop: () -> Void
 
@@ -39,7 +41,10 @@ struct WorkoutPageView: View {
                         .padding(.horizontal, 14)
                         .background(accent.opacity(0.08))
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .accessibilityLabel(String(format: String(localized: "workout.elapsed"), Self.format(elapsed)))
+                        // v31: VoiceOver reads whole minutes, not a label that
+                        // churns every 10 s.
+                        .accessibilityLabel(String(format: String(localized: "workout.elapsed"),
+                                                    Self.format(Double(Int(elapsed / 60) * 60))))
                     Spacer(minLength: 0)
                     Button {
                         onStop()
@@ -62,6 +67,13 @@ struct WorkoutPageView: View {
                     }
                     .buttonStyle(.setupProminent(accentHex: SetupTheme.accentHex(for: archetype)))
                     .accessibilityHint(String(localized: "workout.start_hint"))
+                    if error {
+                        // v31: honest failure — Health access is off.
+                        Text(String(localized: "workout.error"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                     Text(String(localized: "workout.sub"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -82,6 +94,7 @@ struct WorkoutPageView: View {
 }
 
 #if DEBUG
-#Preview { WorkoutPageView(archetype: .ember, active: false, elapsed: 0, onStart: {}, onStop: {}) }
-#Preview { WorkoutPageView(archetype: .willow, active: true, elapsed: 754, onStart: {}, onStop: {}) }
+#Preview { WorkoutPageView(archetype: .ember, active: false, elapsed: 0, error: false, onStart: {}, onStop: {}) }
+#Preview { WorkoutPageView(archetype: .willow, active: true, elapsed: 754, error: false, onStart: {}, onStop: {}) }
+#Preview { WorkoutPageView(archetype: .compass, active: false, elapsed: 0, error: true, onStart: {}, onStop: {}) }
 #endif

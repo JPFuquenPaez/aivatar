@@ -83,11 +83,52 @@ final class SpriteFixTests: XCTestCase {
 
     func testCompassMouthNeverVanishes() {
         let base = grid(.compass, "idle")
-        XCTAssertEqual(base[8][0], "K")
-        XCTAssertEqual(base[8][1], "K", "v28: two-cell mouth survives downsampling")
+        // v31: the mouth moved one cell off the bezel edge (x=1-2, was x=0-1).
+        XCTAssertEqual(base[8][1], "K")
+        XCTAssertEqual(base[8][2], "K", "v28/v31: two-cell mouth survives downsampling")
+        XCTAssertEqual(base[8][0], ".", "v31: snout no longer touches the left bezel edge")
         let idleB = grid(.compass, "idleB")
-        XCTAssertEqual(idleB[8][0], "K", "idleB no longer erases the mouth")
-        XCTAssertEqual(idleB[8][1], "K")
+        XCTAssertEqual(idleB[8][2], "K", "idleB no longer erases the mouth")
+        XCTAssertEqual(idleB[8][1], "B", "v31: idleB narrows the mouth by one cell instead of erasing")
+    }
+
+    /// v31: a patch that produces zero real diffs against the base grid is an
+    /// invisible act (prism's quirk was exactly this) — every non-idle frame
+    /// of every animal must move at least one cell.
+    func testEveryNonIdleFrameDiffersFromBase() {
+        let frameIDs = ["blink", "sleepy", "happy", "glanceL", "glanceR",
+                        "quirk", "perk", "breathe", "idleA", "idleB", "yawn"]
+        for archetype in Archetype.allCases {
+            let sprite = AuthoredSprites.sprite(for: archetype)
+            let base = sprite.symbols(frameID: "idle")
+            for id in frameIDs {
+                let frame = sprite.symbols(frameID: id)
+                var diffs = 0
+                for y in 0..<CompanionSprite.gridHeight {
+                    for x in 0..<CompanionSprite.gridWidth where frame[y][x] != base[y][x] {
+                        diffs += 1
+                    }
+                }
+                XCTAssertGreaterThanOrEqual(diffs, 1,
+                    "\(archetype.rawValue) \(id): patch is a zero-diff no-op against the base grid")
+            }
+        }
+    }
+
+    /// v31: prism's signature quirk visibly contracts the coil (the old patch
+    /// was a zero-diff no-op — it rendered as plain idle).
+    func testPrismQuirkTightensTheCoil() {
+        let base = grid(.prism, "idle")
+        let q = grid(.prism, "quirk")
+        for y in 5...7 {
+            XCTAssertEqual(base[y][17], ".", "base hole at x=17 row \(y)")
+            XCTAssertEqual(q[y][17], "D", "quirk fills x=17 row \(y) — the coil contracts")
+        }
+        // The v31 base has a 2-cell-thick coil right edge (x=18-19).
+        for y in 5...7 {
+            XCTAssertEqual(base[y][18], "D")
+            XCTAssertEqual(base[y][19], "D")
+        }
     }
 
     func testNimbusFeetStaySeparatedAndCrestIsOneTuft() {

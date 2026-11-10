@@ -27,6 +27,7 @@ struct CompanionPickerView: View {
     @AppStorage(ArchetypeSelection.storageKey) private var selection: Archetype = .ember
     @AppStorage("companionPickerCompleted") private var pickerCompleted = false
     @State private var page = 0
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(onChosenOnboarding: (() -> Void)? = nil, onSkip: (() -> Void)? = nil) {
         self.onChosenOnboarding = onChosenOnboarding
@@ -54,6 +55,12 @@ struct CompanionPickerView: View {
         .onAppear {
             // Open on the current companion so the checkmark is visible.
             page = Archetype.allCases.firstIndex(of: selection) ?? 0
+            // v31 debug/CI hook: -pickerPage N forces page N (captures).
+            let args = ProcessInfo.processInfo.arguments
+            if let i = args.firstIndex(of: "-pickerPage"), i + 1 < args.count,
+               let n = Int(args[i + 1]), Archetype.allCases.indices.contains(n) {
+                page = n
+            }
         }
     }
 
@@ -61,10 +68,14 @@ struct CompanionPickerView: View {
         let isSelected = archetype == selection
         let accent = SetupTheme.accent(for: archetype)
         return GeometryReader { geometry in
-            // v30 layout: hero -> name -> element -> temperament -> button
+            // v30/v31 layout: hero -> name -> element -> temperament -> button
             // pinned to the bottom (safe-area aware); the hero clamps so the
-            // column always fits a 40 mm screen at default type.
-            let hero = min(geometry.size.height * 0.30, 96)
+            // column always fits a 40 mm screen — v31 bumps the hero and
+            // shrinks it at accessibility type sizes (a TabView page cannot
+            // scroll).
+            let hero = dynamicTypeSize.isAccessibilitySize
+                ? min(geometry.size.height * 0.26, 72)
+                : min(geometry.size.height * 0.34, 104)
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
                 SetupTheme.iconDisc(for: archetype, selected: isSelected, size: hero)

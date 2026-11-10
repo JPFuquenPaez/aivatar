@@ -111,12 +111,15 @@ struct NamingCeremonyView: View {
         }
     }
 
+    /// v31: pure and testable — trim, clamp to 24 chars (one stage line,
+    /// never wraps into the state line), fall back to the codename.
+    static func resolvedName(_ draft: String, fallback: String) -> String {
+        let clamped = String(draft.trimmingCharacters(in: .whitespacesAndNewlines).prefix(24))
+        return clamped.isEmpty ? fallback : clamped
+    }
+
     private func commit() {
-        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        // v30: a watch-stage name must fit one line — clamp, never wrap into
-        // the state line below it.
-        let clamped = String(trimmed.prefix(24))
-        let name = clamped.isEmpty ? archetype.displayName : clamped
+        let name = Self.resolvedName(draft, fallback: archetype.displayName)
         companionName = name
         onName?(name)
         finish()

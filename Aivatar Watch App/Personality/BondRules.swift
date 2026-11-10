@@ -103,6 +103,13 @@ nonisolated enum BondRules {
         level >= 4 ? 18 : 12
     }
 
+    /// v31: bond level 3+ earns an occasional idle slow-blink directed at the
+    /// user (per minute, on the 150 ms clock) — a positive "looks at you"
+    /// beat to complement the reduced glance-away. Zero below level 3.
+    static func lookAtYouPerMin(_ level: Int) -> Float {
+        level >= 3 ? 0.1 : 0
+    }
+
     /// Level 5 ("confidant"): the companion keeps a small pixel memento of
     /// the naming day (interiority trace on the sprite grid).
     static func isConfidant(_ level: Int) -> Bool { level >= maxLevel }

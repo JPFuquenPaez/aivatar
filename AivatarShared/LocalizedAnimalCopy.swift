@@ -14,16 +14,33 @@ nonisolated enum LocalizedAnimalCopy {
     // with a dynamic key it would return the key itself. NSLocalizedString
     // looks up dynamic keys (and resolves against the process's main bundle,
     // so the widget extension reads its own mirrored table).
+    //
+    // v31: NSLocalizedString returns the KEY on a miss — in DEBUG we assert
+    // so a typo'd or missing key fails loudly instead of echoing into the UI.
+    private static func lookup(_ key: String, comment: String) -> String {
+        let value = NSLocalizedString(key, comment: comment)
+        #if DEBUG
+        assert(value != key, "missing localization for key \(key)")
+        #endif
+        return value
+    }
+
+    /// True when the raw value is one of the five known archetypes — callers
+    /// guard with this before building dynamic keys.
+    static func isKnown(_ archetypeRaw: String) -> Bool {
+        CompanionStateDerivation.knownArchetypeRaws.contains(archetypeRaw)
+    }
+
     static func name(_ archetypeRaw: String) -> String {
-        NSLocalizedString("animal.\(archetypeRaw).name", comment: "animal species name")
+        lookup("animal.\(archetypeRaw).name", comment: "animal species name")
     }
 
     static func element(_ archetypeRaw: String) -> String {
-        NSLocalizedString("animal.\(archetypeRaw).element", comment: "animal element")
+        lookup("animal.\(archetypeRaw).element", comment: "animal element")
     }
 
     static func temperament(_ archetypeRaw: String) -> String {
-        NSLocalizedString("animal.\(archetypeRaw).temperament", comment: "animal temperament line")
+        lookup("animal.\(archetypeRaw).temperament", comment: "animal temperament line")
     }
 
     /// Lowercase animal name for prose ("your fox companion").

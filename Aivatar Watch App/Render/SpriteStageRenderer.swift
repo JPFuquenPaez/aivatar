@@ -146,7 +146,11 @@ struct SpriteStageRenderer: View {
         // frame plays (sprout / week grid / trinket).
         let overlay = sprite.interiorityDiffs(director.interiority)
         let rampBucket = farewellPending ? Int(date.timeIntervalSince(farewellStartedAt ?? date) / 0.15) : -1
-        let key = "\(director.currentFrame)|\(overlay.count)|\(director.moteCell?.x ?? -1),\(director.moteCell?.y ?? -1)|\(director.weatherHueShiftDeg)|\(rampBucket)"
+        // v31: the overlay joins the key by CONTENT, not count — a streakDays
+        // change 3->4 keeps count but changes symbols, and the week grid must
+        // not stay stale until the next frame change.
+        let overlayKey = overlay.map { "\($0.x),\($0.y),\($0.symbol)" }.joined()
+        let key = "\(director.currentFrame)|\(overlayKey)|\(director.moteCell?.x ?? -1),\(director.moteCell?.y ?? -1)|\(director.weatherHueShiftDeg)|\(rampBucket)"
         if key == lastDrawKey { return }
         lastDrawKey = key
         drawFrame(ctx: ctx, size: size, frameID: director.currentFrame,

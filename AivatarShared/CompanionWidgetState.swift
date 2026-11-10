@@ -96,6 +96,32 @@ nonisolated enum CompanionStateDerivation {
     /// G9 power cap: at most this many timeline entries per reload.
     static let timelineCap = 12
 
+    /// v31: the known archetype raw values — a corrupt-but-well-formed
+    /// snapshot (e.g. "dragon") must never reach the strings tables or the
+    /// icon paths (an unknown key would echo the raw key into the UI).
+    static let knownArchetypeRaws: [String] = ["ember", "willow", "compass", "prism", "nimbus"]
+
+    /// The raw value if known, else the default — call at every consumer edge.
+    static func sanitizedArchetypeRaw(_ raw: String) -> String {
+        knownArchetypeRaws.contains(raw) ? raw : "ember"
+    }
+
+    /// v31 (watchOS 26 Smart Stack): the entry's relevance score, derived
+    /// purely from presence + event kind so it is unit-testable. Event beats
+    /// awake beats asleep; live workout/split events are the most relevant.
+    static func relevanceScore(presence: CompanionPresence, lastEventKind: LifeKind?) -> Double {
+        switch presence {
+        case .event:
+            switch lastEventKind {
+            case .workoutLive, .split: return 1.0
+            case .workoutDone, .calendarSoon: return 0.95
+            default: return 0.9
+            }
+        case .awake: return 0.6
+        case .asleep: return 0.1
+        }
+    }
+
     /// State from raw inputs. Priority: event > awake > asleep. Windows are
     /// strict (<) so the expiry anchor lands exactly on the revert.
     static func presence(now: Date, lastSeen: Date?, lastEventAt: Date?) -> CompanionPresence {
@@ -184,7 +210,9 @@ nonisolated enum CompanionWidgetState {
         forArchetypeRaw raw: String,
         container: URL? = nil
     ) -> URL? {
-        (container ?? sharedContainer())?
+        // v31: sanitize — a corrupt raw value must not become a file name.
+        let raw = CompanionStateDerivation.sanitizedArchetypeRaw(raw)
+        return (container ?? sharedContainer())?
             .appendingPathComponent(iconsDirectoryName)
             .appendingPathComponent("\(raw).png")
     }
@@ -198,6 +226,7 @@ nonisolated enum CompanionWidgetState {
         container: URL? = nil
     ) -> URL? {
         guard let presence else { return iconURL(forArchetypeRaw: raw, container: container) }
+        let raw = CompanionStateDerivation.sanitizedArchetypeRaw(raw)
         return (container ?? sharedContainer())?
             .appendingPathComponent(iconsDirectoryName)
             .appendingPathComponent("\(raw)-\(presence.rawValue).png")

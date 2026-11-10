@@ -304,10 +304,13 @@ nonisolated enum AuthoredSprites {
             "..BBWKBBBBBB.AAAA...",
             "..BBKKBBBBBBBAAAA...",
             ".BBBBBBBBBBBBAAAAA..",
-            "KKBBBBBBBBBBBAAAAA..",
+            // v31: mouth shifted one cell off the left bezel edge (was x=0),
+            // and the tail fan reaches one row lower (A at x=15-16, row 11)
+            // so the fish fills its grid and centers its mass.
+            ".KKBBBBBBBBBBAAAAA..",
             ".DBBBBBBBBBBBBAAAA..",
             ".DWWWWWWWBBBBBAAA...",
-            "..DWWWWWWBBBBBB.....",
+            "..DWWWWWWBBBBBBAA...",
             "...DDDDDDDDBBB......",
             ".....DDDD...........",
             "....................",
@@ -329,13 +332,16 @@ nonisolated enum AuthoredSprites {
                          CellDiff(4, 5, "K"), CellDiff(3, 6, "K") ],
             "glanceR": [ CellDiff(4, 5, "B"), CellDiff(4, 6, "B"), CellDiff(5, 5, "W"), CellDiff(6, 5, "K"),
                          CellDiff(5, 6, "K"), CellDiff(6, 6, "K") ],
-            "quirk": [ CellDiff(14, 3, "."), CellDiff(16, 4, "A"), CellDiff(13, 5, ".") ],  // fin flick
+            // v31: (13,5) was a no-op against the base — the fin flick now
+            // clears (14,5) instead; idleB/yawn mouth cells follow the
+            // v31 mouth shift (x=1-2).
+            "quirk": [ CellDiff(14, 3, "."), CellDiff(16, 4, "A"), CellDiff(14, 5, ".") ],  // fin flick
             "perk": [ CellDiff(5, 1, "B"), CellDiff(8, 1, "B"), CellDiff(4, 2, "B"), CellDiff(9, 2, "B") ],  // dorsal flare
             "breathe": [ CellDiff(0, 9, "B"), CellDiff(14, 12, "B") ],
             "idleA": [ CellDiff(14, 3, "."), CellDiff(15, 3, "A") ],
-            "idleB": [ CellDiff(2, 8, "K") ],
+            "idleB": [ CellDiff(1, 8, "B") ],
             "yawn": [ CellDiff(4, 4, "D"), CellDiff(5, 4, "D"), CellDiff(4, 5, "B"), CellDiff(5, 5, "B"),
-                      CellDiff(0, 8, "K"), CellDiff(2, 8, "K") ],
+                      CellDiff(0, 8, "K"), CellDiff(3, 8, "K") ],
         ],
         paletteHex: [
             "B": "3E8EF7", "D": "1F5FA8", "K": "0C1524",
@@ -353,9 +359,11 @@ nonisolated enum AuthoredSprites {
             "....ABBBBBB.........",
             "....BBBBBBBB...DDD..",
             "...BBBBBBBBB.....DDD",
-            "..BBWKKBBBBBB.D...D.",
-            "..BBWKKBBBBBB.D...D.",
-            "..KKKBBBBBBBBDD...D.",
+            // v31: the coil's right edge is now 2 cells thick (x=18-19) so
+            // the ring survives downsampling to the 32 px icon.
+            "..BBWKKBBBBBB.D...DD",
+            "..BBWKKBBBBBB.D...DD",
+            "..KKKBBBBBBBBDD...DD",
             "..BBBBBBBBBBBD.DDD..",
             "..BBBBBBBBBBBDD.....",
             "..BBBBBBBBBBBDD.....",
@@ -373,7 +381,11 @@ nonisolated enum AuthoredSprites {
             "happy": [ CellDiff(4, 5, "B"), CellDiff(5, 5, "B"), CellDiff(6, 5, "B"), CellDiff(4, 6, "B"), CellDiff(1, 7, "K") ],
             "glanceL": [ CellDiff(6, 5, "B"), CellDiff(6, 6, "B") ],  // pupil narrows left
             "glanceR": [ CellDiff(4, 5, "B"), CellDiff(4, 6, "B"), CellDiff(5, 5, "W"), CellDiff(7, 5, "K"), CellDiff(7, 6, "K") ],
-            "quirk": [ CellDiff(19, 7, "."), CellDiff(18, 7, "D") ],  // coil tighten
+            // v31: the old quirk was a zero-diff no-op ((18,7) was already D,
+            // (19,7) already '.') — the signature move rendered as plain idle.
+            // Now the coil visibly contracts: the hole (x=15-17) narrows to
+            // x=15-16. 3 real diffs, inside the patch budget.
+            "quirk": [ CellDiff(17, 5, "D"), CellDiff(17, 6, "D"), CellDiff(17, 7, "D") ],  // coil tighten
             "perk": [ CellDiff(5, 0, "A"), CellDiff(7, 0, ".") ],  // casque tip sharpens
             "breathe": [ CellDiff(1, 8, "B"), CellDiff(1, 9, "B") ],
             "idleA": [ CellDiff(7, 0, ".") ],  // casque edge notch

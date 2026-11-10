@@ -105,7 +105,7 @@ struct SetupIconDisc: View {
             // lit area stays small (OLED discipline).
             Circle()
                 .fill(RadialGradient(
-                    colors: [accent.opacity(selected ? 0.34 : 0.22), accent.opacity(0.10), .clear],
+                    colors: [accent.opacity(selected ? 0.34 : 0.24), accent.opacity(0.10), .clear],
                     center: .center, startRadius: size * 0.12, endRadius: size * 0.80))
                 .frame(width: size * 1.6, height: size * 1.6)
             Circle()

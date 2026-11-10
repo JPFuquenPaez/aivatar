@@ -54,10 +54,20 @@ nonisolated final class SpriteDirector {
     private let blinkP: Float
     private let glanceP: Float
     private let eventP: Float
+    /// v31: the low-rate idle micro-flick (ear/perk flick) — deterministic
+    /// Bernoulli, tempo-scaled like the quirk rate.
+    private let flickP: Float
     /// v28: the profile's blink grammar + anticipation now shape the live
     /// stage (they were only consumed by the frozen vector engine).
     private let blinkTicks: Int
+    /// v31: blink.variance drives occasional double-blinks (per-animal
+    /// blink character: nimbus bursts, compass almost never).
+    private let blinkVariance: Float
     private let perkWindupTicks: Int
+    /// v31: the gaze policy shapes idle glances (compass sweeps on a
+    /// metronome, willow holds long soft looks, prism alternates corners,
+    /// nimbus darts then settles longest).
+    private let gazePolicy: GazePolicy
     private var lastBlinkTick = -100
     private var lastGazeTick = -1
     private var lastGazeDir = 0
@@ -137,10 +147,13 @@ nonisolated final class SpriteDirector {
         blinkP = profile.gazeProfile.blinkRatePerMin / Self.ticksPerMinute
         glanceP = profile.gazeProfile.saccadeRatePerMin / Self.ticksPerMinute * 0.35
         eventP = 0.8 / Self.ticksPerMinute * profile.motionProfile.tempoScale
+        flickP = 0.25 / Self.ticksPerMinute * profile.motionProfile.tempoScale
         // 300 ms is the visibility floor at the 150 ms clock; willow's
         // 1.8 durationScale -> 4 ticks (a watchable blink), ember 0.7 -> 2.
         blinkTicks = Self.blinkTicks(durationScale: profile.blink?.durationScale ?? 1)
+        blinkVariance = profile.blink?.variance ?? 0
         perkWindupTicks = Self.perkWindupTicks(anticipation: profile.motionGrammar?.anticipation ?? 0)
+        gazePolicy = profile.gazePolicy ?? .lock
         weatherDials = profile.weatherDials
         nextMoteTick = 140 + rng.nextInt(160)
     }
@@ -171,8 +184,8 @@ nonisolated final class SpriteDirector {
             if queue[0].ticks <= 0 { queue.removeFirst() }
             return
         }
-        // Idle schedule (draw order fixed: blink, glance, quirk). A firing
-        // act preempts the floor frame; draws only run on idle ticks.
+        // Idle schedule (draw order fixed: blink, glance, quirk, flick). A
+        // firing act preempts the floor frame; draws only run on idle ticks.
         scheduledIdle = scheduledIdleFrame()
         // v16 F1: bond biases the idle schedule — higher bond, more signature
         // quirks, fewer glances away (the companion looks at you more).
@@ -183,13 +196,41 @@ nonisolated final class SpriteDirector {
         if rng.nextFloat() < blinkP, tick - lastBlinkTick >= 3 {
             lastBlinkTick = tick
             play(.blink)
-        } else if mode != .reduceMotionL2, !workoutMode, rng.nextFloat() < glanceP * glanceMul {
-            play(.look, direction: rng.nextFloat() < 0.5 ? -1 : 1)
+        } else if mode != .reduceMotionL2, !workoutMode,
+                  rng.nextFloat() < glanceP * glanceMul || compassSweepDue() {
+            // v31: the gaze policy shapes the glance — compass sweeps on a
+            // deterministic 600-tick metronome, prism alternates corners.
+            let direction: Int
+            switch gazePolicy {
+            case .metricSweep: direction = (tick / 600) % 2 == 0 ? 1 : -1
+            case .wander: direction = lastGazeDir == 1 ? -1 : 1
+            default: direction = rng.nextFloat() < 0.5 ? -1 : 1
+            }
+            lastGazeDir = direction
+            // v31 F1: a bonded companion (L3+) occasionally answers with a
+            // watchable slow-blink instead of a glance-away.
+            if BondRules.lookAtYouPerMin(bondLevel) > 0,
+               rng.nextFloat() < BondRules.lookAtYouPerMin(bondLevel) / Self.ticksPerMinute {
+                play(.slowBlink)
+            } else {
+                play(.look, direction: direction)
+            }
             actCount += 1
         } else if mode == .full, !workoutMode, rng.nextFloat() < eventP * eventMul {
             play(.quirk)
             actCount += 1
+        } else if mode == .full, !workoutMode, rng.nextFloat() < flickP {
+            // v31: idle micro-flick — a 1-tick perk reads as an ear flick at
+            // this rate, not an alert. Negligible motion-budget cost.
+            play(.flick)
+            actCount += 1
         }
+    }
+
+    /// v31: compass's metricSweep policy — a deterministic lighthouse sweep
+    /// every 600 ticks (90 s), no RNG.
+    private func compassSweepDue() -> Bool {
+        gazePolicy == .metricSweep && tick > 0 && tick % 600 == 0
     }
 
     /// The life floor between acts: one breath every ~2.7 s (2-tick
@@ -297,9 +338,16 @@ nonisolated final class SpriteDirector {
             } else {
                 play(.happy)
             }
-        case .crownTick:
+        case .crownTick(let delta):
             markInteraction()
-            play(.happy)
+            // v31: crown paging is answered on stage — a glance in the paging
+            // direction, or a perk for a fast multi-page flick. Existing
+            // frames only; input-driven, so zero idle-budget cost.
+            if abs(delta) >= 2 {
+                play(.perk)
+            } else {
+                play(.look, direction: delta > 0 ? 1 : -1)
+            }
         case .wake:
             markInteraction()
             resting = false
@@ -586,6 +634,8 @@ nonisolated final class SpriteDirector {
     /// Act vocabulary: discrete beats over frame ids.
     nonisolated enum SpriteAct: Sendable {
         case blink, happy, quirk, look, slowBlink, farewell, perk
+        /// v31: the idle micro-flick — a 1-tick perk (ear flick / startle).
+        case flick
     }
 
     /// Life-event kinds (v17 F2) — the cooldown/log unit.
@@ -598,6 +648,12 @@ nonisolated final class SpriteDirector {
     /// drained before it can render, so blinks were invisible.
     private func frames(for act: SpriteAct, direction: Int = 0) -> [(frame: String, ticks: Int)] {
         if act == .blink {
+            // v31: blink.variance — a chance of a double-blink (blink, gap,
+            // blink), the per-animal blink character (nimbus bursts, compass
+            // almost never). The refractory still guards the Bernoulli path.
+            if blinkVariance > 0, rng.nextFloat() < blinkVariance {
+                return [("blink", blinkTicks), ("idle", 1), ("blink", blinkTicks), ("idle", 1)]
+            }
             return [("blink", blinkTicks), ("idle", 1)]
         }
         let bodyGated = mode == .reduceMotionL2
@@ -606,6 +662,9 @@ nonisolated final class SpriteDirector {
             return [("blink", blinkTicks), ("idle", 1)]
         case .happy:
             return [("happy", 2), ("idle", 2)]
+        case .flick:
+            // v31: 1-tick perk — reads as an ear flick at the idle rate.
+            return [("perk", 1), ("idle", 1)]
         case .quirk:
             // Anticipation from the profile (v28): ember 0.9 -> 2-tick wind-up,
             // willow 0.0 -> none; follow-through settles for 2 ticks.
@@ -617,8 +676,17 @@ nonisolated final class SpriteDirector {
             q += [("quirk", 2), ("idle", 2)]
             return q
         case .look:
-            // v28: dart-and-hold (2 ticks) instead of a 600 ms stare.
-            return [(direction < 0 ? "glanceL" : "glanceR", 2), ("idle", 2)]
+            // v28: dart-and-hold instead of a 600 ms stare. v31: the gaze
+            // policy shapes the hold — willow's soft look holds 4 ticks,
+            // nimbus darts then settles longest (5 idle ticks).
+            let hold: Int
+            let settle: Int
+            switch gazePolicy {
+            case .soft: (hold, settle) = (4, 2)
+            case .detectThenSettle: (hold, settle) = (2, 5)
+            default: (hold, settle) = (2, 2)
+            }
+            return [(direction < 0 ? "glanceL" : "glanceR", hold), ("idle", settle)]
         case .slowBlink:
             return [("idle", 3), ("blink", 6), ("idle", 2)]
         case .perk:

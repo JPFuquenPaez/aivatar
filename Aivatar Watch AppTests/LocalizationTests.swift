@@ -47,7 +47,7 @@ final class LocalizationTests: XCTestCase {
         "a11y.action_quirk", "a11y.action_slow_blink",
         "stage.hint", "stage.kind", "stage.state_resting", "stage.state_listening",
         "stage.state_calm", "stage.tag_here", "stage.tag_resting",
-        "bond.announce", "workout.start_hint", "workout.end_hint",
+        "bond.announce", "workout.start_hint", "workout.end_hint", "workout.error",
     ]
 
     func testEveryKeyResolvesInBaseBundle() {

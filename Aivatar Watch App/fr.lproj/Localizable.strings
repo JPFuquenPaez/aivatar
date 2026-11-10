@@ -14,7 +14,7 @@
 "beat.seeks_shade" = "%@ cherche l'ombre";
 "beat.rehearsed" = "%@ a répété une danse";
 "beat.watered" = "%@ a arrosé la pousse";
-"beat.finished_audit" = "%@ a fini l'audit";
+"beat.finished_audit" = "%@ a fini le bilan";
 "beat.found_trinket" = "%@ a trouvé un trésor";
 "beat.saw_coming" = "%@ t'a vu arriver";
 
@@ -148,4 +148,5 @@
 
 /* Indices de la page course (v30) */
 "workout.start_hint" = "Lance une course avec ton compagnon à tes côtés";
+"workout.error" = "Accès à Santé désactivé — active-le dans l’app Santé de l’iPhone";
 "workout.end_hint" = "Termine la course et l'enregistre dans Santé";

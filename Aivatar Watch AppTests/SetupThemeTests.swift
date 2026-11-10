@@ -48,8 +48,11 @@ final class SetupThemeTests: XCTestCase {
             XCTAssertEqual(archetype.animalName, archetype.animal.name.lowercased())
             XCTAssertTrue(archetype.fullName.contains(archetype.displayName))
         }
-        // en base values (test host runs in en).
-        XCTAssertEqual(Archetype.ember.animal.name, "Fox")
-        XCTAssertEqual(Archetype.ember.fullName, "Ember the fox")
+        // v31: locale-proof — compare against the same tables, not en literals.
+        XCTAssertEqual(Archetype.ember.animal.name,
+                       NSLocalizedString("animal.ember.name", comment: "animal species name"))
+        XCTAssertEqual(Archetype.ember.fullName,
+                       String(format: NSLocalizedString("identity.full", comment: "full identity"),
+                              "Ember", Archetype.ember.animalName))
     }
 }

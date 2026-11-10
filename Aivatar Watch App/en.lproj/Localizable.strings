@@ -151,4 +151,5 @@
 
 /* Workout hints (v30) */
 "workout.start_hint" = "Starts a workout with your companion running beside you";
+"workout.error" = "Health access is off — enable it in the iPhone Health app";
 "workout.end_hint" = "Ends the workout and saves it to Health";
