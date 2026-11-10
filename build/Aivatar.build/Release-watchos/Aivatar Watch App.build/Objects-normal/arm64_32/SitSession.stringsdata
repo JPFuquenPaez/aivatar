@@ -1,0 +1,40 @@
+{
+  "source": "/Users/juanpablofuquenpaez/aivatar/Aivatar/Aivatar Watch App/Shell/SitSession.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "sit.session.hint",
+        "location": {
+          "startingColumn": 52,
+          "startingLine": 43
+        }
+      },
+      {
+        "comment": "",
+        "key": "sit.session.breatheIn",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 108
+        }
+      },
+      {
+        "comment": "",
+        "key": "sit.session.breatheOut",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 109
+        }
+      },
+      {
+        "comment": "",
+        "key": "sit.session.done",
+        "location": {
+          "startingColumn": 52,
+          "startingLine": 76
+        }
+      }
+    ]
+  },
+  "version": 1
+}

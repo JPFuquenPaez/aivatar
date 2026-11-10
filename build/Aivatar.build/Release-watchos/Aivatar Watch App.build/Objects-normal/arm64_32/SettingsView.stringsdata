@@ -1,0 +1,288 @@
+{
+  "source": "/Users/juanpablofuquenpaez/aivatar/Aivatar/Aivatar Watch App/Shell/SettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "about.day",
+        "location": {
+          "startingColumn": 53,
+          "startingLine": 39
+        }
+      },
+      {
+        "comment": "",
+        "key": "postcard.old_friends",
+        "location": {
+          "startingColumn": 62,
+          "startingLine": 40
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.nav",
+        "location": {
+          "startingColumn": 48,
+          "startingLine": 212
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.companion",
+        "location": {
+          "startingColumn": 43,
+          "startingLine": 83
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.about",
+        "location": {
+          "startingColumn": 43,
+          "startingLine": 186
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.identity_card",
+        "location": {
+          "startingColumn": 74,
+          "startingLine": 80
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.name_row",
+        "location": {
+          "startingColumn": 74,
+          "startingLine": 103
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.name",
+        "location": {
+          "startingColumn": 56,
+          "startingLine": 89
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.animal_row",
+        "location": {
+          "startingColumn": 78,
+          "startingLine": 118
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.animal",
+        "location": {
+          "startingColumn": 56,
+          "startingLine": 109
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.reduce_motion",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 122
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.reduce_motion",
+        "location": {
+          "startingColumn": 63,
+          "startingLine": 123
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.reduce_motion_hint",
+        "location": {
+          "startingColumn": 62,
+          "startingLine": 124
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.accessibility",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 126
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.reduce_motion_footer",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 128
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.sounds",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 135
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.sounds_hint",
+        "location": {
+          "startingColumn": 62,
+          "startingLine": 136
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.sounds_header",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 138
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.sounds_footer",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 140
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.calendar",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 146
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.calendar_hint",
+        "location": {
+          "startingColumn": 62,
+          "startingLine": 147
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.health",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 152
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.health_hint",
+        "location": {
+          "startingColumn": 62,
+          "startingLine": 153
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.weather",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 157
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.weather_hint",
+        "location": {
+          "startingColumn": 62,
+          "startingLine": 158
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.life_sense",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 163
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.life_sense_footer",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 165
+        }
+      },
+      {
+        "comment": "",
+        "key": "sit.entry.hint",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 181
+        }
+      },
+      {
+        "comment": "",
+        "key": "sit.entry.title",
+        "location": {
+          "startingColumn": 67,
+          "startingLine": 174
+        }
+      },
+      {
+        "comment": "",
+        "key": "sit.privacy.footer",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 183
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.postcard_hint",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 204
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.about_copy",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 205
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.tip",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 207
+        }
+      },
+      {
+        "comment": "",
+        "key": "settings.postcard",
+        "location": {
+          "startingColumn": 56,
+          "startingLine": 193
+        }
+      },
+      {
+        "comment": "",
+        "key": "postcard.nav",
+        "location": {
+          "startingColumn": 60,
+          "startingLine": 229
+        }
+      }
+    ]
+  },
+  "version": 1
+}

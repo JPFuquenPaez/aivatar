@@ -1,0 +1,72 @@
+{
+  "source": "/Users/juanpablofuquenpaez/aivatar/Aivatar/Aivatar Watch App/Shell/CompanionPickerView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "picker.nav",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 60
+        }
+      },
+      {
+        "comment": "",
+        "key": "naming.cancel",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 66
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.picker_selected",
+        "location": {
+          "startingColumn": 154,
+          "startingLine": 127
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.picker_button_selected",
+        "location": {
+          "startingColumn": 73,
+          "startingLine": 142
+        }
+      },
+      {
+        "comment": "",
+        "key": "picker.choose",
+        "location": {
+          "startingColumn": 73,
+          "startingLine": 143
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@, %@. %@%@",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 127
+        }
+      },
+      {
+        "comment": "",
+        "key": "picker.current",
+        "location": {
+          "startingColumn": 49,
+          "startingLine": 134
+        }
+      },
+      {
+        "comment": "",
+        "key": "picker.choose",
+        "location": {
+          "startingColumn": 64,
+          "startingLine": 135
+        }
+      }
+    ]
+  },
+  "version": 1
+}

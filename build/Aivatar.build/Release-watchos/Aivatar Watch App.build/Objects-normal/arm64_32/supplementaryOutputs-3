@@ -1,0 +1,12 @@
+{
+  "/Users/juanpablofuquenpaez/aivatar/Aivatar/Aivatar Watch App/AvatarCore/AvatarClock.swift" : {
+    "abi-baseline-json" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Watch App.build/Objects-normal/arm64_32/Aivatar_Watch_App.abi.json",
+    "const-values" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Watch App.build/Objects-normal/arm64_32/Aivatar Watch App-primary.swiftconstvalues",
+    "dependencies" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Watch App.build/Objects-normal/arm64_32/Aivatar Watch App-primary.d",
+    "diagnostics" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Watch App.build/Objects-normal/arm64_32/Aivatar Watch App-primary.dia",
+    "objc-header" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Watch App.build/Objects-normal/arm64_32/Aivatar_Watch_App-Swift.h",
+    "swiftdoc" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Watch App.build/Objects-normal/arm64_32/Aivatar_Watch_App.swiftdoc",
+    "swiftmodule" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Watch App.build/Objects-normal/arm64_32/Aivatar_Watch_App.swiftmodule",
+    "swiftsourceinfo" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Watch App.build/Objects-normal/arm64_32/Aivatar_Watch_App.swiftsourceinfo"
+  }
+}

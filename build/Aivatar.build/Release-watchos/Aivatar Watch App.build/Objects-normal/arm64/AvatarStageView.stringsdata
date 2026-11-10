@@ -1,0 +1,144 @@
+{
+  "source": "/Users/juanpablofuquenpaez/aivatar/Aivatar/Aivatar Watch App/Shell/AvatarStageView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "beat.sixth.title",
+        "location": {
+          "startingColumn": 45,
+          "startingLine": 543
+        }
+      },
+      {
+        "comment": "",
+        "key": "stage.hint",
+        "location": {
+          "startingColumn": 50,
+          "startingLine": 356
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.action_quirk",
+        "location": {
+          "startingColumn": 59,
+          "startingLine": 417
+        }
+      },
+      {
+        "comment": "",
+        "key": "a11y.action_slow_blink",
+        "location": {
+          "startingColumn": 59,
+          "startingLine": 422
+        }
+      },
+      {
+        "comment": "",
+        "key": "stage.kind",
+        "location": {
+          "startingColumn": 53,
+          "startingLine": 957
+        }
+      },
+      {
+        "comment": "",
+        "key": "stage.state_resting",
+        "location": {
+          "startingColumn": 64,
+          "startingLine": 960
+        }
+      },
+      {
+        "comment": "",
+        "key": "stage.state_listening",
+        "location": {
+          "startingColumn": 64,
+          "startingLine": 962
+        }
+      },
+      {
+        "comment": "",
+        "key": "stage.state_calm",
+        "location": {
+          "startingColumn": 64,
+          "startingLine": 964
+        }
+      },
+      {
+        "comment": "",
+        "key": "ceremony.level5.caption",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 809
+        }
+      },
+      {
+        "comment": "",
+        "key": "bond.announce",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 815
+        }
+      },
+      {
+        "comment": "",
+        "key": "workout.run_with",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 857
+        }
+      },
+      {
+        "comment": "",
+        "key": "workout.run_with",
+        "location": {
+          "startingColumn": 74,
+          "startingLine": 867
+        }
+      },
+      {
+        "comment": "",
+        "key": "workout.start_hint",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 868
+        }
+      },
+      {
+        "comment": "",
+        "key": "hint.slow_blink",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 872
+        }
+      },
+      {
+        "comment": "",
+        "key": "hint.pages",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 880
+        }
+      },
+      {
+        "comment": "",
+        "key": "stage.tag_resting",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 923
+        }
+      },
+      {
+        "comment": "",
+        "key": "stage.tag_here",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 924
+        }
+      }
+    ]
+  },
+  "version": 1
+}

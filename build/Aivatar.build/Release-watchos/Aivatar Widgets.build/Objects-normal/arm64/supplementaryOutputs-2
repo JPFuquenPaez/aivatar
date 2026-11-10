@@ -1,0 +1,12 @@
+{
+  "/Users/juanpablofuquenpaez/aivatar/Aivatar/AivatarShared/CompanionWidgetState.swift" : {
+    "abi-baseline-json" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/Aivatar_Widgets.abi.json",
+    "const-values" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/Aivatar Widgets-primary.swiftconstvalues",
+    "dependencies" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/Aivatar Widgets-primary.d",
+    "diagnostics" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/Aivatar Widgets-primary.dia",
+    "objc-header" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/Aivatar_Widgets-Swift.h",
+    "swiftdoc" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/Aivatar_Widgets.swiftdoc",
+    "swiftmodule" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/Aivatar_Widgets.swiftmodule",
+    "swiftsourceinfo" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/Aivatar_Widgets.swiftsourceinfo"
+  }
+}

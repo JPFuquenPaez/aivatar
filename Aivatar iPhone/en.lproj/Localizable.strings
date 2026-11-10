@@ -1,0 +1,23 @@
+/* Aivatar iPhone shell — English (base). */
+"phone.title" = "Aivatar";
+"phone.share" = "Share postcard";
+"phone.empty" = "Open Aivatar on your Apple Watch to meet your companion.";
+"phone.card.subtitle" = "day %1$d · %2$@";
+
+/* Shared derivation keys used on this surface (mirrored from the app/widget). */
+"presence.napping" = "napping";
+"presence.awake" = "awake";
+"presence.noticed_day" = "noticed your day";
+"presence.celebrated_workout" = "celebrated your workout";
+"presence.slept_beside" = "slept beside you";
+"presence.checked_sky" = "checked the sky";
+"presence.ran_with" = "ran with you";
+"presence.lap_done" = "lap done";
+"presence.noticed_something" = "noticed something";
+"identity.full" = "%1$@ the %2$@";
+"animal.ember.name" = "Fox";
+"animal.willow.name" = "Frog";
+"animal.compass.name" = "Fish";
+"animal.prism.name" = "Chameleon";
+"animal.nimbus.name" = "Bird";
+"animal.lumen.name" = "Moth";

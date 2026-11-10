@@ -84,9 +84,19 @@
 			path = AivatarShared;
 			sourceTree = "<group>";
 		};
+		A1C0000000000000000000P1 /* Aivatar iPhone */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Aivatar iPhone";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A1C0000000000000000000F1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 		85E29356307AC6A3002CF04C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
@@ -111,6 +121,7 @@
 				85E2935D307AC6A3002CF04C /* Aivatar Watch App */,
 				A1B0000000000000000000W1 /* Aivatar Widgets */,
 				A1B0000000000000000000W2 /* AivatarShared */,
+				A1C0000000000000000000P1 /* Aivatar iPhone */,
 				A1A0000000000000000000X2 /* Aivatar Watch AppTests */,
 				85E29354307AC6A3002CF04C /* Products */,
 			);
@@ -134,6 +145,8 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 85E2936A307AC6A3002CF04C /* Build configuration list for PBXNativeTarget "Aivatar" */;
 			buildPhases = (
+				A1C0000000000000000000S1 /* Sources */,
+				A1C0000000000000000000F1 /* Frameworks */,
 				85E29351307AC6A3002CF04C /* Resources */,
 				85E29369307AC6A3002CF04C /* Embed Watch Content */,
 			);
@@ -142,10 +155,14 @@
 			dependencies = (
 				85E2935C307AC6A3002CF04C /* PBXTargetDependency */,
 			);
+			fileSystemSynchronizedGroups = (
+				A1C0000000000000000000P1 /* Aivatar iPhone */,
+				A1B0000000000000000000W2 /* AivatarShared */,
+			);
 			name = Aivatar;
 			productName = Aivatar;
 			productReference = 85E29353307AC6A3002CF04C /* Aivatar.app */;
-			productType = "com.apple.product-type.application.watchapp2-container";
+			productType = "com.apple.product-type.application";
 		};
 		85E29358307AC6A3002CF04C /* Aivatar Watch App */ = {
 			isa = PBXNativeTarget;
@@ -293,6 +310,11 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		A1C0000000000000000000S1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 		85E29355307AC6A3002CF04C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
@@ -527,9 +549,16 @@
 		85E2936B307AC6A3002CF04C /* Debug configuration for PBXNativeTarget "Aivatar" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Aivatar iPhone/Aivatar iPhone.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				EXCLUDED_SOURCE_FILE_NAMES = "*.entitlements";
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Aivatar;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Aivatar reads workouts and sleep saved in Health on this watch only while the app is open, so your companion can celebrate with you. Health details are never stored or sent anywhere.";
@@ -550,9 +579,16 @@
 		85E2936C307AC6A3002CF04C /* Release configuration for PBXNativeTarget "Aivatar" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Aivatar iPhone/Aivatar iPhone.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				EXCLUDED_SOURCE_FILE_NAMES = "*.entitlements";
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Aivatar;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Aivatar reads workouts and sleep saved in Health on this watch only while the app is open, so your companion can celebrate with you. Health details are never stored or sent anywhere.";

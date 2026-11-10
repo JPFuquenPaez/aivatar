@@ -1,5 +1,5 @@
 {
-  "/Users/juanpablofuquenpaez/aivatar/Aivatar/Aivatar Widgets/AivatarWidgetBundle.swift" : {
+  "/Users/juanpablofuquenpaez/aivatar/Aivatar/AivatarShared/CompanionWidgetState.swift" : {
     "abi-baseline-json" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/Aivatar_Widgets.abi.json",
     "const-values" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/Aivatar Widgets-primary.swiftconstvalues",
     "dependencies" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/Aivatar Widgets-primary.d",

@@ -1,0 +1,96 @@
+{
+  "source": "/Users/juanpablofuquenpaez/aivatar/Aivatar/AivatarShared/CompanionWidgetState.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "presence.napping",
+        "location": {
+          "startingColumn": 48,
+          "startingLine": 142
+        }
+      },
+      {
+        "comment": "",
+        "key": "presence.awake",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 143
+        }
+      },
+      {
+        "comment": "",
+        "key": "presence.noticed_day",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 146
+        }
+      },
+      {
+        "comment": "",
+        "key": "presence.celebrated_workout",
+        "location": {
+          "startingColumn": 57,
+          "startingLine": 147
+        }
+      },
+      {
+        "comment": "",
+        "key": "presence.slept_beside",
+        "location": {
+          "startingColumn": 60,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "presence.checked_sky",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 149
+        }
+      },
+      {
+        "comment": "",
+        "key": "presence.ran_with",
+        "location": {
+          "startingColumn": 57,
+          "startingLine": 150
+        }
+      },
+      {
+        "comment": "",
+        "key": "presence.lap_done",
+        "location": {
+          "startingColumn": 51,
+          "startingLine": 151
+        }
+      },
+      {
+        "comment": "",
+        "key": "presence.noticed_something",
+        "location": {
+          "startingColumn": 48,
+          "startingLine": 152
+        }
+      },
+      {
+        "comment": "",
+        "key": "inline.line",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 159
+        }
+      },
+      {
+        "comment": "",
+        "key": "rect.line",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 164
+        }
+      }
+    ]
+  },
+  "version": 1
+}

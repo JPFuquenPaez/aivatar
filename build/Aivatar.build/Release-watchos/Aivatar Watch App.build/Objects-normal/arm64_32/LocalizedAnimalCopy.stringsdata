@@ -1,0 +1,16 @@
+{
+  "source": "/Users/juanpablofuquenpaez/aivatar/Aivatar/AivatarShared/LocalizedAnimalCopy.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "identity.full",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 53
+        }
+      }
+    ]
+  },
+  "version": 1
+}

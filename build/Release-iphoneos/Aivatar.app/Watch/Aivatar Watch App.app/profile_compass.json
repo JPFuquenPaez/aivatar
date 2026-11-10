@@ -1,0 +1,43 @@
+{
+  "id": "compass",
+  "traitVector": { "extraversion": 0.4, "agreeableness": 0.5, "conscientiousness": 0.9, "openness": 0.45, "neuroticism": 0.25 },
+  "motionProfile": {
+    "gestureRatePerMin": 1.5,
+    "amplitudeScale": 0.85,
+    "tempoScale": 0.95,
+    "transitionDurationSec": [0.35, 0.55],
+    "overshoot": 0.02
+  },
+  "gazeProfile": {
+    "blinkRatePerMin": 15,
+    "saccadeRatePerMin": 6,
+    "headPropensity": 0.2,
+    "idleGazeTargets": ["user", "away"]
+  },
+  "visualTokens": {
+    "dominantShape": "square",
+    "accentShape": "line",
+    "palette": ["#4A7FA8", "#A9C6DC", "#0A141C"],
+    "silhouetteWeights": { "roundness": 0.2, "angularity": 0.8 }
+  },
+  "speciesTokens": {
+    "bodyLight": "#3E8EF7",
+    "bodyMid": "#2E5FCC",
+    "shadow": "#1B2F73",
+    "face": "#0A1226",
+    "accentA": "#4DEBFF",
+    "accentB": "#C9D9FF",
+    "glow": "#7FF0FF"
+  },
+  "motionGrammar": { "settleComplete": 1.0, "drift": 0.2, "anticipation": 0.15 },
+  "gazePolicy": "metricSweep",
+  "blink": { "durationScale": 1.0, "variance": 0.06 },
+  "tell": "tick",
+  "quirkLoop": "alignmentFidget",
+  "voiceStyle": "terse, numeric, report-style",
+  "gesturePoolWeights": { "wave": 0.15, "bounce": 0.0, "stretch": 0.0, "spin": 0.0, "nod": 0.2, "tilt": 0.15, "lookAround": 0.1, "shiftWeight": 0.2, "shiver": 0.0, "doubleTake": 0.0, "sparkle": 0.0, "puff": 0.0, "preen": 0.0, "swayCatch": 0.0, "tick": 0.2, "mirror": 0.0, "driftFloat": 0.0, "slowBlink": 0.0 },
+  "quirks": ["metronomic saccade rhythm"],
+  "assetVersion": "3.0.0"
+,
+  "weatherDials": { "classes": {"sunny": {"tempoScale": 1.0, "amplitudeScale": 1.0, "accentBias": 0.0, "hueShiftDeg": 0}, "gray": {"tempoScale": 0.95, "amplitudeScale": 0.95, "accentBias": 0.0, "hueShiftDeg": 0}, "rain": {"tempoScale": 1.1, "amplitudeScale": 1.1, "accentBias": 0.2, "hueShiftDeg": 0}, "wind": {"tempoScale": 1.0, "amplitudeScale": 1.45, "accentBias": 0.2, "hueShiftDeg": 0}, "cold": {"tempoScale": 0.9, "amplitudeScale": 0.9, "accentBias": -0.1, "hueShiftDeg": 0}, "hot": {"tempoScale": 1.05, "amplitudeScale": 1.0, "accentBias": 0.1, "hueShiftDeg": 0}, "unknown": {"tempoScale": 1.0, "amplitudeScale": 1.0, "accentBias": 0.0, "hueShiftDeg": 0}} }
+}

@@ -499,3 +499,20 @@ of truth is still an authored grid, not a drawing:
 - Localized identity `animal.lumen.*` in app EN/FR + widget EN/FR mirrors.
 - `LumenCompanionTests` pins the parity contract; lumen goldens recorded for
   idle grid, postcard, and bond-level-3 sequence.
+
+---
+
+# v8 — the iPhone companion shell (Aivatar 2.0 Phase 3)
+
+- The `Aivatar` iOS target is now a real iOS app (`product-type.application`,
+  still embedding the watch app) with its own synchronized source group
+  `Aivatar iPhone/` + `AivatarShared`. It is a pure READER of the app-group
+  snapshot — the watch app stays the single writer.
+- `PostcardCard` (AivatarShared, compiled into all three processes): composes
+  the shareable 1080x1080 postcard — pure-black canvas, the companion's pixel
+  icon nearest-neighbor upscaled 12x, caption in CoreText. Deterministic:
+  same inputs -> same PNG bytes (pinned by PostcardCardTests).
+- The shell shows the companion card (icon, name, identity line, day count,
+  presence line), an empty state before the first watch launch, and a
+  ShareLink exporting the postcard PNG. EN/FR strings mirrored in its bundle.
+- The shell's entitlements carry only the app group — it reads, never writes.

@@ -1,0 +1,22 @@
+/* Aivatar iPhone — français. */
+"phone.title" = "Aivatar";
+"phone.share" = "Partager la carte postale";
+"phone.empty" = "Ouvre Aivatar sur ton Apple Watch pour rencontrer ton compagnon.";
+"phone.card.subtitle" = "jour %1$d · %2$@";
+
+"presence.napping" = "fait la sieste";
+"presence.awake" = "éveillé";
+"presence.noticed_day" = "a remarqué ta journée";
+"presence.celebrated_workout" = "a fêté ta course";
+"presence.slept_beside" = "a dormi près de toi";
+"presence.checked_sky" = "a regardé le ciel";
+"presence.ran_with" = "a couru avec toi";
+"presence.lap_done" = "a fini un tour";
+"presence.noticed_something" = "a remarqué quelque chose";
+"identity.full" = "%1$@ le %2$@";
+"animal.ember.name" = "Renard";
+"animal.willow.name" = "Grenouille";
+"animal.compass.name" = "Poisson";
+"animal.prism.name" = "Caméléon";
+"animal.nimbus.name" = "Oiseau";
+"animal.lumen.name" = "Papillon de nuit";

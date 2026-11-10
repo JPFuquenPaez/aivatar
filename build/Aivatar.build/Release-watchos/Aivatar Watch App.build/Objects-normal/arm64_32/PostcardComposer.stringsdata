@@ -1,0 +1,32 @@
+{
+  "source": "/Users/juanpablofuquenpaez/aivatar/Aivatar/Aivatar Watch App/Render/PostcardComposer.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "postcard.day",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 62
+        }
+      },
+      {
+        "comment": "",
+        "key": "postcard.old_friends",
+        "location": {
+          "startingColumn": 44,
+          "startingLine": 64
+        }
+      },
+      {
+        "comment": "",
+        "key": "postcard.weather_day",
+        "location": {
+          "startingColumn": 59,
+          "startingLine": 76
+        }
+      }
+    ]
+  },
+  "version": 1
+}

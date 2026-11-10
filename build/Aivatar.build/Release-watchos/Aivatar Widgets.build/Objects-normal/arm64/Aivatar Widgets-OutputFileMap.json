@@ -27,5 +27,10 @@
     "index-unit-output-path" : "/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/LocalizedAnimalCopy.o",
     "llvm-bc" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/LocalizedAnimalCopy.bc",
     "object" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/LocalizedAnimalCopy.o"
+  },
+  "/Users/juanpablofuquenpaez/aivatar/Aivatar/AivatarShared/PostcardCard.swift" : {
+    "index-unit-output-path" : "/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/PostcardCard.o",
+    "llvm-bc" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/PostcardCard.bc",
+    "object" : "/Users/juanpablofuquenpaez/aivatar/Aivatar/build/Aivatar.build/Release-watchos/Aivatar Widgets.build/Objects-normal/arm64/PostcardCard.o"
   }
 }

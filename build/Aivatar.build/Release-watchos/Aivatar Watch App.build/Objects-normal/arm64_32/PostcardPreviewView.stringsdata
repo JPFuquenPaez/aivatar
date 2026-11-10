@@ -1,0 +1,16 @@
+{
+  "source": "/Users/juanpablofuquenpaez/aivatar/Aivatar/Aivatar Watch App/Shell/PostcardPreviewView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "postcard.preview",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 68
+        }
+      }
+    ]
+  },
+  "version": 1
+}
