@@ -57,7 +57,7 @@ struct WorkoutPageView: View {
                     }
                     .buttonStyle(.setupProminent(accentHex: "FF3B30"))
                     // E6: double tap = the page's primary action.
-                    .handGestureShortcut(.primaryAction)
+                    .primaryActionShortcut()
                     .accessibilityHint(String(localized: "workout.end_hint"))
                 } else {
                     SetupTheme.iconDisc(for: archetype, size: 72)
@@ -84,7 +84,7 @@ struct WorkoutPageView: View {
                     }
                     .buttonStyle(.setupProminent(accentHex: SetupTheme.accentHex(for: archetype)))
                     // E6: double tap = the page's primary action.
-                    .handGestureShortcut(.primaryAction)
+                    .primaryActionShortcut()
                     .accessibilityHint(String(localized: "workout.start_hint"))
                     if error {
                         // v31: honest failure — Health access is off.

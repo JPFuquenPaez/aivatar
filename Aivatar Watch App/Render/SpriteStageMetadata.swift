@@ -12,7 +12,7 @@ import Foundation
 /// - `blushL` / `blushR`: the two accent blush cells at face-rect mid-height (E7).
 /// - `vapor`: the two ink breath-vapor cells above the face center (E9.2).
 nonisolated enum SpriteStageMetadata {
-    nonisolated struct AnimalMeta: Sendable, Equatable {
+    nonisolated struct AnimalMeta: Sendable {
         var faceRect: (x: Int, y: Int, w: Int, h: Int)
         var shadowRow: Int
         var shadowWidth: Int

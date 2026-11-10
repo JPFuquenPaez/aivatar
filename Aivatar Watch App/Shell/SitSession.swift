@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 /// SitSession (Aivatar 2.0, E8): the shell-side coordinator for the mindful
 /// minute. Owns the session lifecycle around the director's session grammar:

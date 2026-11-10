@@ -355,7 +355,7 @@ struct AvatarStageView: View {
             // action is "Play signature move" — the gesture-native twin of the
             // VoiceOver named action below (same act path, same seed stream).
             .accessibilityAddTraits(.isButton)
-            .handGestureShortcut(.primaryAction)
+            .primaryActionShortcut()
             // A5c: long-press is the SLOW-BLINK RITUAL (U8 — the trust
             // exchange: mutual gaze, then a blink you can watch happen).
             // The signature quirk stays on the VoiceOver named action and

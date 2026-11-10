@@ -46,13 +46,19 @@ nonisolated final class MindfulnessBridge: @unchecked Sendable {
     func saveSession(start: Date, end: Date) async throws {
         guard let store else { throw MindfulnessError.unavailable }
         let type = HKObjectType.categoryType(forIdentifier: .mindfulSession)!
-        let sample = HKCategorySample(type: type, value: HKCategoryValue.notApplicable.rawValue,
-                                      start: start, end: end)
-        try await withCheckedThrowingContinuation { cont in
-            store.save(sample) { _, error in
-                if let error { cont.resume(throwing: error) }
-                else { cont.resume(returning: ()) }
+        // Mindful-session samples carry the not-applicable category value (0).
+        let sample = HKCategorySample(type: type, value: 0, start: start, end: end)
+        let saved: Void = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            store.save(sample) { (success: Bool, error: Error?) in
+                if let error {
+                    cont.resume(throwing: error)
+                } else if success {
+                    cont.resume(returning: ())
+                } else {
+                    cont.resume(throwing: MindfulnessError.unavailable)
+                }
             }
         }
+        return saved
     }
 }

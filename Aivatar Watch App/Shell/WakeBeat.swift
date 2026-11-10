@@ -120,15 +120,6 @@ nonisolated enum WakeBeatSelector {
             case .prism: return [.quirk]        // the coil release
             case .nimbus: return [.perk]        // the puff
             }
-        case .namingAnniversary:
-            // The archetype's one "big" signature act (<= 33 ticks total).
-            switch archetype {
-            case .ember: return [.quirk]        // the fox's spin-class show
-            case .willow: return [.slowBlink]   // slow blink + croak
-            case .compass: return [.quirk]      // the metronome double
-            case .prism: return [.quirk]        // the coil release
-            case .nimbus: return [.perk]        // the puff
-            }
         case .lifeEvent(let kind):
             let event: LifeEvent = {
                 switch kind {
