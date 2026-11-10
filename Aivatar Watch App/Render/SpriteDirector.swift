@@ -69,8 +69,22 @@ nonisolated final class SpriteDirector {
         var cells: [CompanionSprite.CellDiff] = []
         // E7: the happy-flush blush — 2 accent cells at face mid-height.
         if blushTicksLeft > 0 { cells += SpriteStageMetadata.blushCells(archetype) }
+        // E9.2: the cold breath vapor — 2 ink cells above the face center.
+        if vaporOnTicksLeft > 0 { cells += SpriteStageMetadata.vaporCells(archetype) }
         return cells
     }
+
+    // MARK: - E9.2 cold breath vapor
+
+    /// Dedicated deterministic stream for the vapor cycle (house rule).
+    private var vaporRng: SeededRandom
+    /// Ticks left in the current vapor puff (on 3, then hidden >= 33).
+    private var vaporOnTicksLeft = 0
+    private var vaporNextTick = 0
+    static let vaporOnTicks = 3
+    static let vaporMinHiddenTicks = 33
+    /// True while a vapor puff renders (suppresses other tells: one focal story).
+    var vaporActive: Bool { vaporOnTicksLeft > 0 }
 
     // MARK: - E7 boop the face
 
@@ -256,6 +270,8 @@ nonisolated final class SpriteDirector {
         gazePolicy = profile.gazePolicy ?? .lock
         weatherDials = profile.weatherDials
         nextMoteTick = 140 + rng.nextInt(160)
+        vaporRng = SeededRandom(seed ^ 0xFAE2_B04D)
+        vaporNextTick = 80 + vaporRng.nextInt(120)
     }
 
     // MARK: - Reading state
@@ -278,6 +294,7 @@ nonisolated final class SpriteDirector {
     private func step() {
         tick += 1
         if resting { return }
+        if vaporOnTicksLeft > 0 { vaporOnTicksLeft -= 1 }  // E9.2 puff lifetime
         // E8 session grammar runs instead of the idle schedule entirely.
         if sessionMode { stepSession(); return }
         // E2 preview: mood pinned calm, no motes/yawn/lonely; the dwell quirk
@@ -297,6 +314,15 @@ nonisolated final class SpriteDirector {
             let ceremony = pendingCeremonies.remove(at: i)
             play(ceremony.act)
             return
+        }
+        // E9.2 vapor scheduling: cold class only, awake + full mode, no
+        // workout/session/preview, queue free. On 3 ticks, then hidden
+        // >= 33 ticks (gap drawn from the dedicated vapor stream).
+        if mode == .full, !workoutMode, !sessionMode, !previewMode,
+           condition == .cold, queue.isEmpty,
+           vaporOnTicksLeft == 0, tick >= vaporNextTick {
+            vaporOnTicksLeft = Self.vaporOnTicks
+            vaporNextTick = tick + Self.vaporOnTicks + Self.vaporMinHiddenTicks + vaporRng.nextInt(60)
         }
         // Idle schedule (draw order fixed: blink, glance, quirk, flick). A
         // firing act preempts the floor frame; draws only run on idle ticks.
@@ -333,10 +359,11 @@ nonisolated final class SpriteDirector {
                 play(.look, direction: direction)
             }
             actCount += 1
-        } else if mode == .full, !workoutMode, !previewMode, rng.nextFloat() < eventP * eventMul {
+        } else if mode == .full, !workoutMode, !previewMode, !vaporActive,
+                  rng.nextFloat() < eventP * eventMul {
             play(.quirk)
             actCount += 1
-        } else if mode == .full, !workoutMode, rng.nextFloat() < flickP {
+        } else if mode == .full, !workoutMode, !vaporActive, rng.nextFloat() < flickP {
             // v31: idle micro-flick — a 1-tick perk reads as an ear flick at
             // this rate, not an alert. Negligible motion-budget cost.
             play(.flick)

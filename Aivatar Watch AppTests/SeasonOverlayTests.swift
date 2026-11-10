@@ -68,3 +68,88 @@ final class SeasonOverlayTests: XCTestCase {
         }
     }
 }
+
+// MARK: - E9.2 cold breath vapor (PR-9)
+
+extension SeasonOverlayTests {
+
+    private func director(_ archetype: Archetype, seed: UInt64 = 20261010) throws -> SpriteDirector {
+        let profile = try PersonalityProfile.load(archetype)
+        return SpriteDirector(profile: profile, seed: seed)
+    }
+
+    func testVaporOnlyWhenCold() throws {
+        for archetype in Archetype.allCases {
+            let d = try director(archetype)
+            d.setCondition(.sunny)
+            var puffs = 0
+            for t in 1...1000 {
+                d.advance(toTick: t)
+                if d.vaporActive { puffs += 1 }
+            }
+            XCTAssertEqual(puffs, 0, "\(archetype): sunny never vaporizes")
+            d.setCondition(.unknown)
+            for t in 1001...2000 { d.advance(toTick: t) }
+            XCTAssertFalse(d.vaporActive, "\(archetype): unknown class never vaporizes (G8)")
+        }
+    }
+
+    func testVaporScheduleStatisticsAndShape() throws {
+        let d = try director(.ember)
+        d.setCondition(.cold)
+        var puffTicks: [Int] = []
+        for t in 1...2000 {
+            d.advance(toTick: t)
+            if d.vaporActive { puffTicks.append(t) }
+        }
+        XCTAssertFalse(puffTicks.isEmpty, "cold weather produces vapor over 2000 ticks")
+        // Puffs are exactly 3 contiguous ticks.
+        var i = 0
+        while i < puffTicks.count {
+            let start = puffTicks[i]
+            var len = 1
+            while i + len < puffTicks.count, puffTicks[i + len] == start + len { len += 1 }
+            XCTAssertEqual(len, SpriteDirector.vaporOnTicks, "puff at \(start) must be exactly 3 ticks")
+            i += len
+            // Gap to the next puff is >= 33 ticks.
+            if i < puffTicks.count {
+                XCTAssertGreaterThanOrEqual(puffTicks[i] - start, 3 + SpriteDirector.vaporMinHiddenTicks)
+            }
+        }
+        // Overlay cells are the 2 authored ink cells.
+        d.setCondition(.cold)
+        for t in 2001...2600 {
+            d.advance(toTick: t)
+            if d.vaporActive {
+                let cells = d.transientOverlayCells.filter { $0.symbol == "K" }
+                XCTAssertEqual(cells.count, 2)
+                XCTAssertEqual(Set(cells.map { "\($0.x),\($0.y)" }),
+                               Set(SpriteStageMetadata.vaporCells(.ember).map { "\($0.x),\($0.y)" }))
+                break
+            }
+        }
+    }
+
+    func testVaporDeterministicPerSeed() throws {
+        func run() -> [Bool] {
+            let d = try! director(.prism, seed: 424242)
+            d.setCondition(.cold)
+            var out: [Bool] = []
+            for t in 1...500 { d.advance(toTick: t); out.append(d.vaporActive) }
+            return out
+        }
+        XCTAssertEqual(run(), run())
+    }
+
+    func testVaporSuppressedInWorkoutAndSession() throws {
+        let d = try director(.nimbus)
+        d.setCondition(.cold)
+        d.setWorkoutMode(true)
+        for t in 1...600 { d.advance(toTick: t) }
+        XCTAssertFalse(d.vaporActive, "no vapor while the run is the motion")
+        d.setWorkoutMode(false)
+        d.setSessionMode(true)
+        for t in 601...1200 { d.advance(toTick: t) }
+        XCTAssertFalse(d.vaporActive, "no vapor during a breath session")
+    }
+}
