@@ -149,4 +149,11 @@ final class HapticsChannel {
         guard limiter.allowing(now: Date()) else { return }
         WKInterfaceDevice.current().play(.success)
     }
+
+    /// Aivatar 2.0 E8: breath-session markers — `.click` at tick 0, `.success`
+    /// at tick 396. Exactly 2 haptics per session, through the global limiter.
+    func sessionMarker(start: Bool) {
+        guard limiter.allowing(now: Date()) else { return }
+        WKInterfaceDevice.current().play(start ? .click : .success)
+    }
 }

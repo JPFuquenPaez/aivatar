@@ -45,6 +45,16 @@ nonisolated struct CompanionMemory: Codable, Equatable, Sendable {
     /// E5: bitmask of bond levels whose ceremony has been scheduled (1 << L).
     /// Set when the ceremony is SCHEDULED, so a skipped ceremony never repeats.
     var crossedLevels: Int = 0
+    /// E3/E4: the naming-ceremony date (the anniversary anchor; nil = unset).
+    var namingDay: Date?
+    /// E8: logged sit-sessions today (cap counter) and the calendar day index
+    /// of that count — content-free day-index counting.
+    var sitCountDay: Int?
+    var lastSitDay: Int?
+    /// E8: the mindful-minute Health write was denied — dormant, no re-prompt.
+    var mindfulWriteDenied: Bool = false
+    /// E10 (inert until Phase 3): the sixth companion's reveal beat has fired.
+    var sixthRevealed: Bool = false
 
     init(firstLaunch: Date = Date(), lastSeen: Date = Date()) {
         self.firstLaunch = firstLaunch
@@ -72,6 +82,11 @@ nonisolated struct CompanionMemory: Codable, Equatable, Sendable {
         lastGreetingDay = (try? c.decodeIfPresent(Int.self, forKey: .lastGreetingDay)) ?? -1
         lastBeatDay = (try? c.decodeIfPresent(Int.self, forKey: .lastBeatDay)) ?? -1
         crossedLevels = (try? c.decodeIfPresent(Int.self, forKey: .crossedLevels)) ?? 0
+        namingDay = try? c.decodeIfPresent(Date.self, forKey: .namingDay)
+        sitCountDay = try? c.decodeIfPresent(Int.self, forKey: .sitCountDay)
+        lastSitDay = try? c.decodeIfPresent(Int.self, forKey: .lastSitDay)
+        mindfulWriteDenied = (try? c.decodeIfPresent(Bool.self, forKey: .mindfulWriteDenied)) ?? false
+        sixthRevealed = (try? c.decodeIfPresent(Bool.self, forKey: .sixthRevealed)) ?? false
     }
 
     /// Derived bond level (1...5) — F1: levels are felt, never displayed.

@@ -165,6 +165,24 @@ struct SettingsView: View {
                     Text(String(localized: "settings.life_sense_footer"))
                         .font(.footnote)
                 }
+                // E8 "Sit together": the mindful minute, primary entry point.
+                Section {
+                    Button {
+                        SitSession.shared.start()
+                    } label: {
+                        Label {
+                            Text(String(format: String(localized: "sit.entry.title"),
+                                        stageName))
+                        } icon: {
+                            Image(systemName: "lungs.fill")
+                                .foregroundStyle(SetupTheme.accent(for: archetype))
+                        }
+                    }
+                    .accessibilityHint(String(localized: "sit.entry.hint"))
+                } footer: {
+                    Text(String(localized: "sit.privacy.footer"))
+                        .font(.footnote)
+                }
                 Section(String(localized: "settings.about")) {
                     // v22 F8: the deterministic postcard of this companion.
                     Button {

@@ -88,7 +88,8 @@ nonisolated final class SpriteDirector {
     /// resting, in a workout, or during a breath session.
     @discardableResult
     func boopFace() -> Bool {
-        guard !resting, !workoutMode, tick - lastBoopTick >= Self.boopRefractoryTicks else { return false }
+        guard !resting, !workoutMode, !sessionMode,
+              tick - lastBoopTick >= Self.boopRefractoryTicks else { return false }
         lastBoopTick = tick
         blushTicksLeft = Self.blushDurationTicks
         play(.happy)
@@ -277,6 +278,8 @@ nonisolated final class SpriteDirector {
     private func step() {
         tick += 1
         if resting { return }
+        // E8 session grammar runs instead of the idle schedule entirely.
+        if sessionMode { stepSession(); return }
         // E2 preview: mood pinned calm, no motes/yawn/lonely; the dwell quirk
         // replaces the random quirk draw.
         if previewMode { stepPreview() } else { updateMoodAndAutonomy() }
@@ -289,7 +292,7 @@ nonisolated final class SpriteDirector {
         // during workouts — one intention at a time).
         if mementoDepositTicksLeft > 0 { mementoDepositTicksLeft -= 1 }
         if blushTicksLeft > 0 { blushTicksLeft -= 1 }
-        if !pendingCeremonies.isEmpty, !workoutMode,
+        if !pendingCeremonies.isEmpty, !workoutMode, !sessionMode,
            let i = pendingCeremonies.firstIndex(where: { $0.atTick <= tick }) {
             let ceremony = pendingCeremonies.remove(at: i)
             play(ceremony.act)
@@ -441,6 +444,14 @@ nonisolated final class SpriteDirector {
     // MARK: - Events (shares the engine's AvatarEvent vocabulary)
 
     func handleEvent(_ event: AvatarEvent) {
+        // E8: taps and crown ticks end a breath session immediately (G1,
+        // < 300 ms), then answer normally; a wrist-drop ends it too.
+        if sessionMode {
+            switch event {
+            case .tap, .crownTick, .sleep: endSession()
+            default: break
+            }
+        }
         switch event {
         case .tap:
             markInteraction()
@@ -613,6 +624,61 @@ nonisolated final class SpriteDirector {
 
     /// Minimum ticks between split cheers (45 s at 150 ms — F6 split channel).
     static let splitCooldownTicks = 300
+
+    // MARK: - Breath session mode (Aivatar 2.0, E8 "Sit together")
+
+    /// Session grammar: while active, the breath IS the motion — the idle
+    /// floor alternates inhale (breathe frame, 27 ticks) / exhale (idle
+    /// settle, 53 ticks) for exactly 5 cycles (400 ticks = 60.0 s). Glances,
+    /// quirks, flicks, motes and boops are suppressed; only the gentle blink
+    /// remains. Taps and crown ticks end the session immediately (G1); a
+    /// wrist-drop farewell ends it too (a partial >= 200 ticks still logs).
+    private(set) var sessionMode = false
+    private var sessionStartTick = 0
+    /// Elapsed session ticks (0 when not in a session) — drives the L2
+    /// breathe-in/out captions in the shell.
+    var sessionElapsedTicks: Int { sessionMode ? tick - sessionStartTick : 0 }
+    /// Fired exactly once when a session ends (auto at 400 ticks, or early via
+    /// tap/crown/wrist-drop) with the elapsed tick count — the shell logs and
+    /// plays the contentment act's aftermath from here.
+    var onSessionEnded: (@Sendable (Int) -> Void)?
+
+    func setSessionMode(_ on: Bool) {
+        sessionMode = on
+        if on {
+            sessionStartTick = tick
+            moteCell = nil
+            scheduledIdle = "breathe"
+        }
+    }
+
+    private func endSession() {
+        guard sessionMode else { return }
+        sessionMode = false
+        onSessionEnded?(tick - sessionStartTick)
+    }
+
+    private func stepSession() {
+        let elapsed = tick - sessionStartTick
+        if blushTicksLeft > 0 { blushTicksLeft -= 1 }
+        if mementoDepositTicksLeft > 0 { mementoDepositTicksLeft -= 1 }
+        if !queue.isEmpty {
+            queue[0].ticks -= 1
+            if queue[0].ticks <= 0 { queue.removeFirst() }
+            return
+        }
+        if elapsed >= BreathSessionController.totalTicks {
+            endSession()
+            play(BreathSessionController.contentmentAct(archetype))
+            return
+        }
+        scheduledIdle = BreathSessionController.frame(atTick: elapsed)
+        // The gentle blink survives the session; everything else is breath.
+        if rng.nextFloat() < blinkP, tick - lastBlinkTick >= 3 {
+            lastBlinkTick = tick
+            play(.blink)
+        }
+    }
 
     // MARK: - Workout mode (v21, F6)
 

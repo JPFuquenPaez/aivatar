@@ -75,6 +75,8 @@ struct AvatarStageView: View {
     @State private var bondAnnouncement = ""
     /// v19 F5: the morning-beat caption (Dynamic Type text, ~5 s, then gone).
     @State private var beatCaption: String?
+    /// E8: the sit-session coordinator (captions ride the stage's bottom block).
+    @StateObject private var sit = SitSession.shared
 
     /// v14 sonic presence: the one-a-lifetime creation point — state
     /// changes surface as the on-stage listening tell.
@@ -96,6 +98,8 @@ struct AvatarStageView: View {
     @AppStorage("workoutEverStarted") private var workoutEverStarted = false
     /// v31: previous tab page, to derive crown-paging deltas.
     @State private var lastTabSelection = 0
+    /// E8: the in-app Reduce Motion L2 setting (drives the session captions).
+    @AppStorage("reduceMotionL2") private var reduceMotionL2Stage = false
 
     init(archetype: Archetype? = nil) {
         launchOverride = archetype
@@ -115,7 +119,8 @@ struct AvatarStageView: View {
             // v21 F6: the workout page rides the same crown paging.
             WorkoutPageView(archetype: archetype, active: workoutActive,
                             elapsed: workoutElapsed, error: workoutError,
-                            onStart: startWorkout, onStop: stopWorkout)
+                            onStart: startWorkout, onStop: stopWorkout,
+                            onSit: { SitSession.shared.start() })
             SettingsView(archetype: archetype)
         }
         .tabViewStyle(.verticalPage(transitionStyle: .automatic))
@@ -859,6 +864,27 @@ struct AvatarStageView: View {
                     .foregroundStyle(.secondary)
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.25), value: showPagesHint)
+            }
+            // E8: while a sit-session runs, the stage carries its caption —
+            // the first-cycle "Breathe with <name>" hint (all modes), then the
+            // alternating in/out captions under Reduce Motion L2.
+            if sit.active {
+                if sit.firstCycle {
+                    Text(sit.caption ?? "")
+                        .font(.footnote)
+                        .foregroundStyle(.primary)
+                        .transition(.opacity)
+                } else if reduceMotionL2Stage {
+                    Text(sit.phaseCaption())
+                        .font(.footnote)
+                        .foregroundStyle(.primary)
+                        .transition(.opacity)
+                }
+            } else if let sitCaption = sit.caption {
+                Text(sitCaption)
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+                    .transition(.opacity)
             }
             // v19 F5: the beat caption rides as text (Dynamic Type), never as
             // painter pixels. v28: it's the moment's headline — footnote/primary.

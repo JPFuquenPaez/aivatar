@@ -18,8 +18,12 @@ struct WorkoutPageView: View {
     let error: Bool
     let onStart: () -> Void
     let onStop: () -> Void
+    /// E8: long-press on the idle hero starts "Sit together" (discoverable
+    /// once, then silent).
+    var onSit: (() -> Void)? = nil
 
     @AppStorage("companionName") private var companionName = ""
+    @AppStorage("sitHeroHintShown") private var sitHeroHintShown = false
 
     private var name: String {
         companionName.isEmpty ? archetype.displayName : companionName
@@ -57,6 +61,17 @@ struct WorkoutPageView: View {
                     .accessibilityHint(String(localized: "workout.end_hint"))
                 } else {
                     SetupTheme.iconDisc(for: archetype, size: 72)
+                        // E8: long-press the hero to sit together (the stage's
+                        // long-press belongs to the slow-blink ritual).
+                        .onLongPressGesture(minimumDuration: 0.5) {
+                            onSit?()
+                        }
+                    if !sitHeroHintShown, onSit != nil {
+                        Text(String(format: String(localized: "sit.entry.title"), name))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .onAppear { sitHeroHintShown = true }
+                    }
                     Text(String(format: String(localized: "workout.run_with"), name))
                         .font(.title3.weight(.semibold))
                         .multilineTextAlignment(.center)
