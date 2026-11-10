@@ -34,15 +34,20 @@ nonisolated struct CompanionSprite: Sendable, Equatable {
 
     /// One absolute cell change applied (in order) over the idle grid.
     /// Symbol "." clears the cell — patches are full authored micro-poses.
+    /// `alpha` (Aivatar 2.0 transient overlays, e.g. the level-5 memento
+    /// deposit's 4-tick stepped appearance): 1 = full; the renderer draws
+    /// sub-1 cells individually instead of in the batched symbol path.
     nonisolated struct CellDiff: Sendable, Equatable {
         let x: Int
         let y: Int
         let symbol: Character
+        var alpha: Float
 
-        init(_ x: Int, _ y: Int, _ symbol: Character) {
+        init(_ x: Int, _ y: Int, _ symbol: Character, alpha: Float = 1) {
             self.x = x
             self.y = y
             self.symbol = symbol
+            self.alpha = alpha
         }
     }
 

@@ -50,6 +50,12 @@ nonisolated final class SpriteDirector {
 
     private let sprite: CompanionSprite
     private let archetype: Archetype
+    /// The archetype this director acts (stage-metadata / hit-routing key).
+    var currentArchetype: Archetype { archetype }
+    /// Aivatar 2.0: transient tell overlays (E7 blush, E9.2 vapor, E5 memento
+    /// deposit) — merged into the stage overlay by the renderer; the authored
+    /// grids and frame patches never change for these.
+    var transientOverlayCells: [CompanionSprite.CellDiff] { [] }
     private var rng: SeededRandom
     private let blinkP: Float
     private let glanceP: Float

@@ -143,8 +143,14 @@ struct SpriteStageRenderer: View {
         let elapsed = date.timeIntervalSince(epoch)
         director.advance(toTick: Int((elapsed / SpriteDirector.tickDuration).rounded(.down)))
         // v15: session memory renders as authored overlay cells on whatever
-        // frame plays (sprout / week grid / trinket).
-        let overlay = sprite.interiorityDiffs(director.interiority)
+        // frame plays (sprout / week grid / trinket); Aivatar 2.0 adds the
+        // director's transient tells (blush / vapor / memento deposit) and
+        // the E9.1 ground shadow — awake frames only: absent in the rest LOD
+        // and during the farewell wipe (G9 + craft: the rest frame's lit-pixel
+        // ratio is untouched).
+        var overlay = sprite.interiorityDiffs(director.interiority) + director.transientOverlayCells
+        overlay += SpriteStageMetadata.shadowOverlayIfAwake(
+            director.currentArchetype, frame: director.currentFrame, farewellPending: farewellPending)
         let rampBucket = farewellPending ? Int(date.timeIntervalSince(farewellStartedAt ?? date) / 0.15) : -1
         // v31: the overlay joins the key by CONTENT, not count — a streakDays
         // change 3->4 keeps count but changes symbols, and the week grid must
@@ -175,18 +181,31 @@ struct SpriteStageRenderer: View {
         let cell = size.width / CGFloat(CompanionSprite.gridWidth)
         let top = size.height * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
         var paths: [Character: Path] = [:]
+        var partialCells: [(rect: CGRect, symbol: Character, alpha: Float)] = []
         for y in 0..<CompanionSprite.gridHeight {
             for x in 0..<CompanionSprite.gridWidth {
                 let symbol = grid[y][x]
                 guard symbol != "." else { continue }
                 let rect = CGRect(x: CGFloat(x) * cell, y: top + CGFloat(y) * cell,
                                   width: cell, height: cell)
-                paths[symbol, default: Path()].addRect(rect)
+                // Aivatar 2.0: transient overlays may carry sub-1 alpha
+                // (memento deposit) — those draw individually, not batched.
+                let alpha = overlay.first { $0.x == x && $0.y == y }?.alpha ?? 1
+                if alpha >= 1 {
+                    paths[symbol, default: Path()].addRect(rect)
+                } else {
+                    partialCells.append((rect, symbol, alpha))
+                }
             }
         }
         for (symbol, path) in paths {
             if let color = palette[symbol] {
                 ctx.fill(path, with: .color(color))
+            }
+        }
+        for cell in partialCells {
+            if let color = palette[cell.symbol] {
+                ctx.fill(Path(cell.rect), with: .color(color.opacity(Double(cell.alpha))))
             }
         }
         // v16 self-play: the single drifting mote the companion chases.
