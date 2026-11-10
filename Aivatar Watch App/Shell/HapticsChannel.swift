@@ -135,4 +135,18 @@ final class HapticsChannel {
 
     /// Split cheer (F6): one success-class beat.
     func split() { play(.split, archetype: AvatarSession.shared.archetype) }
+
+    /// Aivatar 2.0 E2: picker page-swipe tick — one `.click` per swipe, routed
+    /// through the global limiter (>= 1.5 s spacing, <= 6/hour).
+    func pageTick() {
+        guard limiter.allowing(now: Date()) else { return }
+        WKInterfaceDevice.current().play(.click)
+    }
+
+    /// Aivatar 2.0 E7: the boop ack — a soft confirmation (`.success` is the
+    /// gentle double-tick; WKHapticType has no softer watchOS-native option).
+    func boop() {
+        guard limiter.allowing(now: Date()) else { return }
+        WKInterfaceDevice.current().play(.success)
+    }
 }

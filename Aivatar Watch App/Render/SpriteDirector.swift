@@ -56,6 +56,36 @@ nonisolated final class SpriteDirector {
     /// deposit) — merged into the stage overlay by the renderer; the authored
     /// grids and frame patches never change for these.
     var transientOverlayCells: [CompanionSprite.CellDiff] { [] }
+
+    // MARK: - Preview mode (Aivatar 2.0, E2 "Meet them" live picker)
+
+    /// Preview configuration (the picker): the animal is *meeting you*, not
+    /// performing — blink λ x 0.7, glance rate x 0.5, motes/yawn/lonely-poke
+    /// off, mood pinned calm, life floor on. Dwell >= 8 ticks (1.2 s) of
+    /// continuous presence schedules exactly ONE owner quirk per page visit.
+    var previewMode = false
+    private var previewDwellTicks = 0
+    private var previewQuirkDone = false
+    /// Preview dwell threshold in ticks (8 ticks = 1.2 s).
+    static let previewQuirkDwellTicks = 8
+
+    /// Page change in the picker: the dwell counter resets and the quirk
+    /// re-arms (at most one quirk per page visit).
+    func resetPreviewDwell() {
+        previewDwellTicks = 0
+        previewQuirkDone = false
+    }
+
+    private func stepPreview() {
+        guard queue.isEmpty else { return }
+        previewDwellTicks += 1
+        if previewDwellTicks >= Self.previewQuirkDwellTicks,
+           !previewQuirkDone, mode == .full {
+            previewQuirkDone = true
+            play(.quirk)  // the owner's signature move, once per page visit
+        }
+    }
+
     private var rng: SeededRandom
     private let blinkP: Float
     private let glanceP: Float
@@ -184,7 +214,9 @@ nonisolated final class SpriteDirector {
     private func step() {
         tick += 1
         if resting { return }
-        updateMoodAndAutonomy()
+        // E2 preview: mood pinned calm, no motes/yawn/lonely; the dwell quirk
+        // replaces the random quirk draw.
+        if previewMode { stepPreview() } else { updateMoodAndAutonomy() }
         if !queue.isEmpty {
             queue[0].ticks -= 1
             if queue[0].ticks <= 0 { queue.removeFirst() }
@@ -193,17 +225,20 @@ nonisolated final class SpriteDirector {
         // Idle schedule (draw order fixed: blink, glance, quirk, flick). A
         // firing act preempts the floor frame; draws only run on idle ticks.
         scheduledIdle = scheduledIdleFrame()
+        // E2 preview: blink λ x 0.7, glance rate x 0.5.
+        let effBlinkP = previewMode ? blinkP * 0.7 : blinkP
+        let effGlanceP = previewMode ? glanceP * 0.5 : glanceP
         // v16 F1: bond biases the idle schedule — higher bond, more signature
         // quirks, fewer glances away (the companion looks at you more).
         let glanceMul: Float = (mood == .bored ? 2 : (mood == .lonely ? 0.3 : 1))
             * BondRules.glanceAwayMultiplier(bondLevel) * weatherGlanceMul
         let eventMul: Float = (mood == .playful ? 2 : (mood == .lonely ? 1.5 : 1))
             * BondRules.quirkRateMultiplier(bondLevel) * weatherTempoMul
-        if rng.nextFloat() < blinkP, tick - lastBlinkTick >= 3 {
+        if rng.nextFloat() < effBlinkP, tick - lastBlinkTick >= 3 {
             lastBlinkTick = tick
             play(.blink)
         } else if mode != .reduceMotionL2, !workoutMode,
-                  rng.nextFloat() < glanceP * glanceMul || compassSweepDue() {
+                  rng.nextFloat() < effGlanceP * glanceMul || compassSweepDue() {
             // v31: the gaze policy shapes the glance — compass sweeps on a
             // deterministic 600-tick metronome, prism alternates corners.
             let direction: Int
@@ -222,7 +257,7 @@ nonisolated final class SpriteDirector {
                 play(.look, direction: direction)
             }
             actCount += 1
-        } else if mode == .full, !workoutMode, rng.nextFloat() < eventP * eventMul {
+        } else if mode == .full, !workoutMode, !previewMode, rng.nextFloat() < eventP * eventMul {
             play(.quirk)
             actCount += 1
         } else if mode == .full, !workoutMode, rng.nextFloat() < flickP {

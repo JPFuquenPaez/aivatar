@@ -42,6 +42,11 @@ struct CompanionPickerView: View {
             }
         }
         .tabViewStyle(.page)
+        // E2: one .click per swipe, through the global haptic limiter
+        // (fast swiping naturally throttles at the >= 1.5 s spacing).
+        .onChange(of: page) { _ in
+            HapticsChannel.shared.pageTick()
+        }
         .navigationTitle(String(localized: "picker.nav"))
         .toolbar {
             // v30: onboarding must be skippable (HIG) — a quiet text button,
@@ -78,8 +83,18 @@ struct CompanionPickerView: View {
                 : min(geometry.size.height * 0.34, 104)
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
-                SetupTheme.iconDisc(for: archetype, selected: isSelected, size: hero)
-                    .padding(.bottom, 14)
+                // E2 "Meet them": the hero is the LIVING animal (preview
+                // director on a distinct seed stream). Accessibility type
+                // sizes keep the static clamped disc so type never competes
+                // with motion.
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        SetupTheme.iconDisc(for: archetype, selected: isSelected, size: hero)
+                    } else {
+                        LiveCompanionPreviewView(archetype: archetype, size: hero, selected: isSelected, page: page)
+                    }
+                }
+                .padding(.bottom, 14)
                 VStack(spacing: 4) {
                     Text(archetype.animal.name)
                         .font(.title3.weight(.semibold))
