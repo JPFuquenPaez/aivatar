@@ -40,6 +40,12 @@ nonisolated struct CompanionMemory: Codable, Equatable, Sendable {
     /// v19 F5: calendar day index of the last morning-beat shown (once/day).
     var lastBeatDay: Int = -1
 
+    // MARK: - Schema v4 (Aivatar 2.0, strictly additive, G8)
+
+    /// E5: bitmask of bond levels whose ceremony has been scheduled (1 << L).
+    /// Set when the ceremony is SCHEDULED, so a skipped ceremony never repeats.
+    var crossedLevels: Int = 0
+
     init(firstLaunch: Date = Date(), lastSeen: Date = Date()) {
         self.firstLaunch = firstLaunch
         self.lastSeen = lastSeen
@@ -65,6 +71,7 @@ nonisolated struct CompanionMemory: Codable, Equatable, Sendable {
         lastPresenceDay = (try? c.decodeIfPresent(Int.self, forKey: .lastPresenceDay)) ?? -1
         lastGreetingDay = (try? c.decodeIfPresent(Int.self, forKey: .lastGreetingDay)) ?? -1
         lastBeatDay = (try? c.decodeIfPresent(Int.self, forKey: .lastBeatDay)) ?? -1
+        crossedLevels = (try? c.decodeIfPresent(Int.self, forKey: .crossedLevels)) ?? 0
     }
 
     /// Derived bond level (1...5) — F1: levels are felt, never displayed.

@@ -22,6 +22,10 @@ nonisolated struct BondAward: Sendable, Equatable {
     var newXP: Int
     var previousLevel: Int
     var newLevel: Int
+    /// Aivatar 2.0 E5: the levels this award newly crossed, computed against
+    /// the PRE-award level (previousLevel+1 ... newLevel) — the ceremony
+    /// scheduler consumes these; each fires once ever (memory bitmask).
+    var newlyCrossedLevels: [Int] = []
     /// True exactly when this award crossed a level threshold (the moment
     /// VoiceOver announces and the bond haptic plays).
     var leveledUp: Bool { newLevel > previousLevel }
@@ -77,8 +81,11 @@ nonisolated enum BondRules {
         let previousLevel = level(forXP: memory.bondXP)
         memory.bondXP += gained
         let newLevel = level(forXP: memory.bondXP)
+        // E5: levels crossed by THIS award (against the pre-award level).
+        let newlyCrossed = (previousLevel + 1...newLevel).map { $0 }
         return BondAward(xpGained: gained, newXP: memory.bondXP,
-                         previousLevel: previousLevel, newLevel: newLevel)
+                         previousLevel: previousLevel, newLevel: newLevel,
+                         newlyCrossedLevels: newlyCrossed)
     }
 
     // MARK: - What bond unlocks (consumed by SpriteDirector / the stage)

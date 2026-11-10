@@ -744,10 +744,32 @@ struct AvatarStageView: View {
         let store = CompanionMemoryStore()
         var memory = store.load() ?? CompanionMemory()
         let award = BondRules.award(&memory, ritual)
+        // E5: schedule the ceremony for every newly crossed level whose bit is
+        // still clear; the bit is set at SCHEDULE time so a skipped ceremony
+        // is still a celebrated crossing and never repeats.
+        var scheduledLevels: [Int] = []
+        for level in award.newlyCrossedLevels where (memory.crossedLevels & (1 << level)) == 0 {
+            memory.crossedLevels |= (1 << level)
+            scheduledLevels.append(level)
+        }
         store.save(memory)
         guard award.xpGained > 0 else { return }
         bondLevel = award.newLevel
         director?.bondLevel = award.newLevel
+        // E5 ceremonies: one demonstration act per newly crossed level, after
+        // the ritual ack settles (+ >= 20 ticks, via the director's queue).
+        for level in scheduledLevels {
+            switch level {
+            case 2: director?.scheduleCeremony(.quirk)       // the newly unlocked quirk, unprompted
+            case 3: director?.scheduleCeremony(.slowBlink)   // a directed slow blink at you
+            case 4: break                                     // farewell bloom already scales (farewellBloomTicks)
+            case 5:
+                director?.depositMemento()                    // confidant cell, 4-tick stepped deposit
+                director?.scheduleCeremony(.happy)
+                announce(String(localized: "ceremony.level5.caption"))
+            default: break
+            }
+        }
         if award.leveledUp {
             HapticsChannel.shared.bond()
             announce(String(format: String(localized: "bond.announce"), stageName))

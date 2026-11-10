@@ -148,7 +148,13 @@ struct SpriteStageRenderer: View {
         // the E9.1 ground shadow — awake frames only: absent in the rest LOD
         // and during the farewell wipe (G9 + craft: the rest frame's lit-pixel
         // ratio is untouched).
-        var overlay = sprite.interiorityDiffs(director.interiority) + director.transientOverlayCells
+        var baseOverlay = sprite.interiorityDiffs(director.interiority)
+        // E5: while the memento deposit animates, the stepped-alpha copy in the
+        // transient channel replaces the full-alpha interiority cell.
+        if director.mementoDepositAlpha != nil {
+            baseOverlay.removeAll { $0.x == 9 && $0.y == 16 && $0.symbol == "A" }
+        }
+        var overlay = baseOverlay + director.transientOverlayCells
         overlay += SpriteStageMetadata.shadowOverlayIfAwake(
             director.currentArchetype, frame: director.currentFrame, farewellPending: farewellPending)
         let rampBucket = farewellPending ? Int(date.timeIntervalSince(farewellStartedAt ?? date) / 0.15) : -1

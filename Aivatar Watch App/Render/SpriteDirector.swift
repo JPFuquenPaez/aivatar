@@ -55,7 +55,42 @@ nonisolated final class SpriteDirector {
     /// Aivatar 2.0: transient tell overlays (E7 blush, E9.2 vapor, E5 memento
     /// deposit) — merged into the stage overlay by the renderer; the authored
     /// grids and frame patches never change for these.
-    var transientOverlayCells: [CompanionSprite.CellDiff] { [] }
+    var transientOverlayCells: [CompanionSprite.CellDiff] {
+        var cells: [CompanionSprite.CellDiff] = []
+        // E5 level-5 memento deposit: the confidant cell fades in over 4 ticks.
+        if let alpha = mementoDepositAlpha {
+            cells.append(CompanionSprite.CellDiff(9, 16, "A", alpha: alpha))
+        }
+        cells += transientTellCells
+        return cells
+    }
+    /// E7/E9 transient tells (blush / vapor) — extended by those PRs.
+    private var transientTellCells: [CompanionSprite.CellDiff] { [] }
+
+    // MARK: - E5 bond ceremonies
+
+    /// Ceremonies scheduled after the ritual ack settles (+ >= 20 ticks).
+    private var pendingCeremonies: [(act: SpriteAct, atTick: Int)] = []
+    /// Minimum settle delay before a ceremony may play (ticks).
+    static let ceremonySettleTicks = 20
+
+    /// Schedules a one-shot demonstration act (E5). Suppressed while a
+    /// workout runs (the run is the motion); fires as soon as the queue is
+    /// free and the settle delay has passed.
+    func scheduleCeremony(_ act: SpriteAct, afterTicks: Int = ceremonySettleTicks) {
+        pendingCeremonies.append((act, tick + max(1, afterTicks)))
+    }
+
+    /// E5 level-5: the confidant memento deposit — the accent cell at (9,16)
+    /// appears over 4 ticks (alpha stepped 0.25/tick through the overlay).
+    private var mementoDepositTicksLeft = 0
+    static let mementoDepositTicks = 4
+    func depositMemento() { mementoDepositTicksLeft = Self.mementoDepositTicks }
+    /// The deposit's current alpha, or nil when no deposit is in progress.
+    var mementoDepositAlpha: Float? {
+        guard mementoDepositTicksLeft > 0 else { return nil }
+        return Float(Self.mementoDepositTicks - mementoDepositTicksLeft + 1) / Float(Self.mementoDepositTicks)
+    }
 
     // MARK: - Preview mode (Aivatar 2.0, E2 "Meet them" live picker)
 
@@ -220,6 +255,15 @@ nonisolated final class SpriteDirector {
         if !queue.isEmpty {
             queue[0].ticks -= 1
             if queue[0].ticks <= 0 { queue.removeFirst() }
+            return
+        }
+        // E5: a due ceremony plays as soon as the queue is free (suppressed
+        // during workouts — one intention at a time).
+        if mementoDepositTicksLeft > 0 { mementoDepositTicksLeft -= 1 }
+        if !pendingCeremonies.isEmpty, !workoutMode,
+           let i = pendingCeremonies.firstIndex(where: { $0.atTick <= tick }) {
+            let ceremony = pendingCeremonies.remove(at: i)
+            play(ceremony.act)
             return
         }
         // Idle schedule (draw order fixed: blink, glance, quirk, flick). A
