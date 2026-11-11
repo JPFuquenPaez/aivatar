@@ -84,13 +84,14 @@ struct CompanionPickerView: View {
         let accent = SetupTheme.accent(for: archetype)
         return GeometryReader { geometry in
             // v30/v31 layout: hero -> name -> element -> temperament -> button
-            // pinned to the bottom (safe-area aware); the hero clamps so the
-            // column always fits a 40 mm screen — v31 bumps the hero and
-            // shrinks it at accessibility type sizes (a TabView page cannot
-            // scroll).
+            // pinned to the bottom (safe-area aware). v32 fit fix: the hero
+            // clamps harder on short screens (42mm = 198 pt) and the
+            // temperament drops a line, so the choose button is ALWAYS on
+            // screen (a TabView page cannot scroll).
+            let compact = geometry.size.height < 215
             let hero = dynamicTypeSize.isAccessibilitySize
-                ? min(geometry.size.height * 0.26, 72)
-                : min(geometry.size.height * 0.34, 104)
+                ? min(geometry.size.height * 0.20, 56)
+                : min(geometry.size.height * (compact ? 0.22 : 0.30), compact ? 56 : 88)
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
                 // E2 "Meet them": the hero is the LIVING animal (preview
@@ -104,7 +105,7 @@ struct CompanionPickerView: View {
                         LiveCompanionPreviewView(archetype: archetype, size: hero, selected: isSelected, page: page)
                     }
                 }
-                .padding(.bottom, 14)
+                .padding(.bottom, compact ? 8 : 14)
                 VStack(spacing: 4) {
                     Text(archetype.animal.name)
                         .font(.title3.weight(.semibold))
@@ -119,7 +120,7 @@ struct CompanionPickerView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                        .lineLimit(2)
+                        .lineLimit(compact ? 1 : 2)
                         .padding(.horizontal, 10)
                         .padding(.top, 2)
                 }
@@ -142,7 +143,7 @@ struct CompanionPickerView: View {
                                      ? String(format: String(localized: "a11y.picker_button_selected"), archetype.animal.name)
                                      : String(format: String(localized: "picker.choose"), archetype.animalName))
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
-                .padding(.bottom, 8 + geometry.safeAreaInsets.bottom)
+                .padding(.bottom, 6 + geometry.safeAreaInsets.bottom)
             }
             .padding(.horizontal, 12)
         }

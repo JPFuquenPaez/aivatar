@@ -24,6 +24,7 @@ struct WorkoutPageView: View {
 
     @AppStorage("companionName") private var companionName = ""
     @AppStorage("sitHeroHintShown") private var sitHeroHintShown = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var name: String {
         companionName.isEmpty ? archetype.displayName : companionName
@@ -32,76 +33,90 @@ struct WorkoutPageView: View {
     var body: some View {
         let accent = SetupTheme.accent(for: archetype)
         GeometryReader { geometry in
-            VStack(spacing: 12) {
-                Spacer(minLength: 0)
-                if active {
-                    SetupTheme.iconDisc(for: archetype, size: 48)
-                    Text(String(format: String(localized: "workout.running_with"), name))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    Text(Self.format(elapsed))
-                        .font(.title2.monospacedDigit().weight(.semibold))
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 14)
-                        .background(accent.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        // v31: VoiceOver reads whole minutes, not a label that
-                        // churns every 10 s.
-                        .accessibilityLabel(String(format: String(localized: "workout.elapsed"),
-                                                    Self.format(Double(Int(elapsed / 60) * 60))))
+            // v32 fit fix: the page must fit small screens (42mm = 198 pt) —
+            // the hero clamps to the available height and the column scrolls
+            // as a safety net, so the primary action is always reachable.
+            let heroSize = active
+                ? min(40, geometry.size.height * 0.22)
+                : min(64, geometry.size.height * 0.30)
+            ScrollView {
+                VStack(spacing: 10) {
                     Spacer(minLength: 0)
-                    Button {
-                        onStop()
-                    } label: {
-                        Label(String(localized: "workout.end_run"), systemImage: "stop.fill")
-                    }
-                    .buttonStyle(.setupProminent(accentHex: "FF3B30"))
-                    // E6: double tap = the page's primary action.
-                    .primaryActionShortcut()
-                    .accessibilityHint(String(localized: "workout.end_hint"))
-                } else {
-                    SetupTheme.iconDisc(for: archetype, size: 72)
-                        // E8: long-press the hero to sit together (the stage's
-                        // long-press belongs to the slow-blink ritual).
-                        .onLongPressGesture(minimumDuration: 0.5) {
-                            onSit?()
-                        }
-                    if !sitHeroHintShown, onSit != nil {
-                        Text(String(format: String(localized: "sit.entry.title"), name))
-                            .font(.caption2)
+                    if active {
+                        SetupTheme.iconDisc(for: archetype, size: heroSize)
+                        Text(String(format: String(localized: "workout.running_with"), name))
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
-                            .onAppear { sitHeroHintShown = true }
-                    }
-                    Text(String(format: String(localized: "workout.run_with"), name))
-                        .font(.title3.weight(.semibold))
-                        .multilineTextAlignment(.center)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Button {
-                        onStart()
-                    } label: {
-                        Label(String(localized: "workout.start"), systemImage: "figure.run")
-                    }
-                    .buttonStyle(.setupProminent(accentHex: SetupTheme.accentHex(for: archetype)))
-                    // E6: double tap = the page's primary action.
-                    .primaryActionShortcut()
-                    .accessibilityHint(String(localized: "workout.start_hint"))
-                    if error {
-                        // v31: honest failure — Health access is off.
-                        Text(String(localized: "workout.error"))
+                        Text(Self.format(elapsed))
+                            .font(.title2.monospacedDigit().weight(.semibold))
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 14)
+                            .background(accent.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            // v31: VoiceOver reads whole minutes, not a label that
+                            // churns every 10 s.
+                            .accessibilityLabel(String(format: String(localized: "workout.elapsed"),
+                                                        Self.format(Double(Int(elapsed / 60) * 60))))
+                        Spacer(minLength: 0)
+                        Button {
+                            onStop()
+                        } label: {
+                            Label(String(localized: "workout.end_run"), systemImage: "stop.fill")
+                        }
+                        .buttonStyle(.setupProminent(accentHex: "FF3B30"))
+                        // E6: double tap = the page's primary action.
+                        .primaryActionShortcut()
+                        .accessibilityHint(String(localized: "workout.end_hint"))
+                    } else {
+                        // v32: the hero is the LIVING companion (E2 preview), so
+                        // the workout page greets you too; AX sizes keep the
+                        // static disc. Long-press = Sit together (E8).
+                        Group {
+                            if dynamicTypeSize.isAccessibilitySize {
+                                SetupTheme.iconDisc(for: archetype, size: heroSize)
+                                    .onLongPressGesture(minimumDuration: 0.5) { onSit?() }
+                            } else {
+                                LiveCompanionPreviewView(archetype: archetype, size: heroSize)
+                                    .onLongPressGesture(minimumDuration: 0.5) { onSit?() }
+                            }
+                        }
+                        if !sitHeroHintShown, onSit != nil {
+                            Text(String(format: String(localized: "sit.entry.title"), name))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .onAppear { sitHeroHintShown = true }
+                        }
+                        Text(String(format: String(localized: "workout.run_with"), name))
+                            .font(.title3.weight(.semibold))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        Button {
+                            onStart()
+                        } label: {
+                            Label(String(localized: "workout.start"), systemImage: "figure.run")
+                        }
+                        .buttonStyle(.setupProminent(accentHex: SetupTheme.accentHex(for: archetype)))
+                        // E6: double tap = the page's primary action.
+                        .primaryActionShortcut()
+                        .accessibilityHint(String(localized: "workout.start_hint"))
+                        if error {
+                            // v31: honest failure — Health access is off.
+                            Text(String(localized: "workout.error"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        Text(String(localized: "workout.sub"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
-                    Text(String(localized: "workout.sub"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8 + geometry.safeAreaInsets.bottom)
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 8 + geometry.safeAreaInsets.bottom)
         }
     }
 

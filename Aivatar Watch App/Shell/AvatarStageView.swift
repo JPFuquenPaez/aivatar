@@ -57,7 +57,15 @@ struct AvatarStageView: View {
     @State private var showPicker = false
     /// v27 debug/CI hooks: -showPicker opens the companion picker directly,
     /// -page N jumps the TabView to page N (0 stage, 1 workout, 2 settings).
-    @State private var tabSelection = 0
+    /// Initialized from the launch args (not in onAppear) so the first
+    /// rendered frame is already the requested page.
+    @State private var tabSelection = {
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-page"), i + 1 < args.count, let n = Int(args[i + 1]) {
+            return n
+        }
+        return 0
+    }()
     @State private var showNaming = false
     @State private var showRitualHint = false
     /// "It noticed" (§10.5.5): timestamp when the app left the active
@@ -159,9 +167,14 @@ struct AvatarStageView: View {
                 ceremonyShown = true
                 showNaming = true
             }
+            // v32: also apply -page here, deferred one beat — the verticalPage
+            // TabView snaps to page 0 on first layout, so the arg must be
+            // applied after that initial snap (debug/CI hook only).
             if let i = args.firstIndex(of: "-page"), i + 1 < args.count,
                let n = Int(args[i + 1]) {
-                tabSelection = n
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    tabSelection = n
+                }
             }
         }
         .onChange(of: archetype) { _ in

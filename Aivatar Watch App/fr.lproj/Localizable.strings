@@ -80,7 +80,7 @@
 "settings.health" = "Séances et sommeil";
 "settings.weather" = "Météo";
 "settings.life_sense" = "Contexte";
-"settings.life_sense_footer" = "tant qu'Aivatar est ouvert, ton compagnon peut réagir aux événements à venir du calendrier, aux séances et au sommeil enregistrés dans Santé, et à la météo actuelle là où tu es — lu uniquement sur cette montre, récupéré au plus une fois par heure. Titres, détails de santé et météo ne sont jamais conservés au-delà d'un haché, et rien ne quitte la montre.";
+"settings.life_sense_footer" = "Tant qu’Aivatar est ouvert, ton compagnon peut réagir aux événements à venir, aux courses et au sommeil dans Santé, et à la météo — lu sur cette montre uniquement, au plus une fois par heure. Seuls des hachages sont conservés ; rien ne quitte la montre.";
 "settings.about" = "À propos";
 "settings.postcard" = "Carte postale";
 "settings.about_copy" = "Tout est procédural, généré en direct.";

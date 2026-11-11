@@ -82,7 +82,7 @@
 "settings.health" = "Workouts & sleep";
 "settings.weather" = "Weather";
 "settings.life_sense" = "Life sense";
-"settings.life_sense_footer" = "While Aivatar is open, your companion can react to upcoming calendar events, to workouts and sleep saved in Health, and to the current weather at your location — read on this watch only, fetched at most once an hour. Event titles, health details, and weather are never stored beyond a hash, and nothing ever leaves the watch.";
+"settings.life_sense_footer" = "While Aivatar is open, your companion can react to upcoming calendar events, workouts and sleep in Health, and the current weather — read on this watch only, at most once an hour. Only hashes are kept; nothing leaves the watch.";
 "settings.about" = "About";
 "settings.postcard" = "Postcard";
 "settings.about_copy" = "Fully procedural — everything is generated live.";

@@ -53,24 +53,32 @@ struct SettingsView: View {
                     Button {
                         showNaming = true
                     } label: {
-                        HStack(spacing: 12) {
-                            SetupTheme.iconDisc(for: archetype, size: 48)
+                        // v32 audit: on 42 mm (187 pt wide) a 48 pt disc + name +
+                        // chevron in one row left the text ~50 pt — the name
+                        // truncated to "Will…". 40 pt disc, tighter metrics.
+                        HStack(spacing: 10) {
+                            SetupTheme.iconDisc(for: archetype, size: 40)
+                            // v32 fix: the text column must take all remaining
+                            // width (without the frame it was crushed to one
+                            // character per line on small screens).
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(stageName)
                                     .font(.headline)
                                     .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
+                                    .minimumScaleFactor(0.7)
                                 Text(aboutLine)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
                             }
-                            Spacer()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Spacer(minLength: 4)
                             Image(systemName: "chevron.right")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
-                        .padding(12)
+                        .padding(10)
                         .frame(maxWidth: .infinity)
                         .background(SetupTheme.accent(for: archetype).opacity(0.08))
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))

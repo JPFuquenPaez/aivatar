@@ -2437,6 +2437,7 @@ final class V7PixelDesignTests: XCTestCase {
             .compass: ["dorsalFin", "fin", "fin"],
             .nimbus: ["beak", "wing"],
             .prism: ["casque"],
+            .lumen: ["antenna", "antenna"],
         ]
         for archetype in Archetype.allCases {
             let engine = try makeGoldenEngine(archetype)

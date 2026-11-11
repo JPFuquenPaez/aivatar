@@ -100,14 +100,6 @@ struct SetupIconDisc: View {
     var body: some View {
         let accent = SetupTheme.accent(for: archetype)
         ZStack {
-            // Soft halo — chrome only; the brand's hard-edge rule governs
-            // the sprite, not this. Confined to a ~1.6x-size circle, so the
-            // lit area stays small (OLED discipline).
-            Circle()
-                .fill(RadialGradient(
-                    colors: [accent.opacity(selected ? 0.34 : 0.24), accent.opacity(0.10), .clear],
-                    center: .center, startRadius: size * 0.12, endRadius: size * 0.80))
-                .frame(width: size * 1.6, height: size * 1.6)
             Circle()
                 .fill(accent.opacity(0.12))
                 .frame(width: size, height: size)
@@ -128,6 +120,18 @@ struct SetupIconDisc: View {
                     .background(Circle().fill(Color.black))
                     .offset(x: size * 0.36, y: -size * 0.36)
             }
+        }
+        // The layout size is exactly `size`; the soft halo is an OVERLAY so it
+        // glows beyond the disc without consuming layout width (v32 fix: the
+        // halo previously inflated the disc to 1.6x and crushed sibling text,
+        // e.g. the Settings identity card name).
+        .frame(width: size, height: size)
+        .overlay {
+            Circle()
+                .fill(RadialGradient(
+                    colors: [accent.opacity(selected ? 0.34 : 0.24), accent.opacity(0.10), .clear],
+                    center: .center, startRadius: size * 0.12, endRadius: size * 0.80))
+                .frame(width: size * 1.6, height: size * 1.6)
         }
         .scaleEffect(selected ? 1.05 : 1)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: selected)

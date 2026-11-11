@@ -25,7 +25,23 @@ struct ContentView: View {
             case "spritekit":
                 SpriteKitGreyboxSpikeView(seed: seed, frameBudget: frames)
             default:
-                AvatarStageView(archetype: launchArchetype(args))
+                // v32 audit hooks: -root workout|settings renders that page as
+                // the root (the verticalPage TabView ignores programmatic
+                // selection in the simulator, so -page alone is unreliable
+                // for captures). Debug-only.
+                if let root = value(after: "-root", in: args), root != "stage" {
+                    let archetype = launchArchetype(args) ?? .ember
+                    if root == "workout" {
+                        WorkoutPageView(archetype: archetype, active: false, elapsed: 0,
+                                        error: false, onStart: {}, onStop: {}, onSit: nil)
+                    } else if root == "settings" {
+                        SettingsView(archetype: archetype)
+                    } else {
+                        AvatarStageView(archetype: launchArchetype(args))
+                    }
+                } else {
+                    AvatarStageView(archetype: launchArchetype(args))
+                }
             }
             #else
             AvatarStageView(archetype: launchArchetype(args))
