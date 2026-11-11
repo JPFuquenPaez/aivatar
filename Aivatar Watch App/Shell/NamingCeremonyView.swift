@@ -53,14 +53,19 @@ struct NamingCeremonyView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 10) {
+            GeometryReader { geometry in
+                // v32 fit fix: on 42 mm (223 pt) the field + commit sat below
+                // the fold — compact mode tightens the stack so the typing
+                // surface is reachable with the keyboard open.
+                let compact = geometry.size.height < 260
+                ScrollView {
+                    VStack(spacing: compact ? 8 : 10) {
                     // E3 "it hears you": the hero is alive — while you type,
                     // the companion perks (looks up at the name), throttled to
                     // once per 20 ticks (3 s).
-                    LiveCompanionPreviewView(archetype: archetype, size: 56,
+                    LiveCompanionPreviewView(archetype: archetype, size: compact ? 44 : 56,
                                              onDirectorChange: { previewDirector = $0 })
-                        .padding(.top, 6)
+                        .padding(.top, compact ? 2 : 6)
                         .onChange(of: draft) { _ in
                             guard focused else { return }
                             let tick = Int(Date().timeIntervalSince(appearDate) / SpriteDirector.tickDuration)
@@ -73,6 +78,7 @@ struct NamingCeremonyView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                        .lineLimit(compact ? 1 : 2)
                     // v30: the live preview is the moment's headline — large,
                     // accent, scales down instead of truncating at AX sizes.
                     Text("“\(previewName)”")
@@ -123,9 +129,10 @@ struct NamingCeremonyView: View {
                     // v30: quiet visually, 44 pt in hit area.
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 8)
                 }
-                .padding(.horizontal, 4)
-                .padding(.bottom, 8)
             }
             .navigationTitle(String(localized: "naming.nav"))
             .onAppear {

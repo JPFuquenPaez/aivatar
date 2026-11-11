@@ -57,7 +57,9 @@ struct CompanionPickerView: View {
         .onChange(of: page) { _ in
             HapticsChannel.shared.pageTick()
         }
-        .navigationTitle(String(localized: "picker.nav"))
+        // v32 polish: no nav title — on 42 mm the centered title clips at
+        // the right edge next to the "Not now" item; the page's own animal
+        // name is the headline.
         .toolbar {
             // v30: onboarding must be skippable (HIG) — a quiet text button,
             // no dedicated key (reuses the ceremony's "Not now").
@@ -89,9 +91,11 @@ struct CompanionPickerView: View {
             // temperament drops a line, so the choose button is ALWAYS on
             // screen (a TabView page cannot scroll).
             let compact = geometry.size.height < 215
+            // v32 polish: the living hero is the page's heart — give it a
+            // little more of the screen (was 0.22/56 compact, 0.30/88).
             let hero = dynamicTypeSize.isAccessibilitySize
                 ? min(geometry.size.height * 0.20, 56)
-                : min(geometry.size.height * (compact ? 0.22 : 0.30), compact ? 56 : 88)
+                : min(geometry.size.height * (compact ? 0.26 : 0.34), compact ? 64 : 96)
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
                 // E2 "Meet them": the hero is the LIVING animal (preview
