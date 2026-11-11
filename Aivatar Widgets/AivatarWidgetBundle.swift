@@ -41,7 +41,9 @@ struct CompanionProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CompanionEntry) -> Void) {
-        completion(entry(at: .now))
+        var iconCache: [String: Data?] = [:]
+        var plainCache: [String: Data?] = [:]
+        completion(entry(at: .now, iconCache: &iconCache, plainCache: &plainCache))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CompanionEntry>) -> Void) {
@@ -53,7 +55,13 @@ struct CompanionProvider: TimelineProvider {
         let snapshot = current()
         let dates = CompanionStateDerivation.timelineDates(
             now: now, lastSeen: snapshot.lastSeen, lastEventAt: snapshot.lastEventAt)
-        let entries = dates.map { entry(at: $0, snapshot: snapshot, now: now) }
+        // v32: icon PNGs are read once per DISTINCT (archetype, presence)
+        // combo, not once per entry — the timeline holds up to 12 entries but
+        // only 3 presence states exist, so at most 3 file reads per refresh.
+        var iconCache: [String: Data?] = [:]
+        var plainCache: [String: Data?] = [:]
+        let entries = dates.map { entry(at: $0, snapshot: snapshot, now: now,
+                                        iconCache: &iconCache, plainCache: &plainCache) }
         let last = dates.last ?? now
         completion(Timeline(entries: entries, policy: .after(last.addingTimeInterval(3_600))))
     }
@@ -62,14 +70,23 @@ struct CompanionProvider: TimelineProvider {
         CompanionWidgetState.readSnapshot() ?? .default()
     }
 
-    private func entry(at date: Date, snapshot: CompanionWidgetSnapshot? = nil, now: Date? = nil) -> CompanionEntry {
+    private func entry(at date: Date, snapshot: CompanionWidgetSnapshot? = nil, now: Date? = nil,
+                       iconCache: inout [String: Data?], plainCache: inout [String: Data?]) -> CompanionEntry {
         let snapshot = snapshot ?? current()
         let now = now ?? Date()
         let presence = CompanionStateDerivation.presence(
             now: date, lastSeen: snapshot.lastSeen, lastEventAt: snapshot.lastEventAt)
+        let raw = CompanionStateDerivation.sanitizedArchetypeRaw(snapshot.archetypeRaw)
+        let iconKey = "\(raw)-\(presence.rawValue)"
+        if iconCache[iconKey] == nil {
+            iconCache[iconKey] = iconData(for: snapshot.archetypeRaw, presence: presence)
+        }
+        if plainCache[raw] == nil {
+            plainCache[raw] = plainIconData(for: snapshot.archetypeRaw)
+        }
         return CompanionEntry(date: date, snapshot: snapshot, presence: presence,
-                              iconData: iconData(for: snapshot.archetypeRaw, presence: presence),
-                              plainIconData: plainIconData(for: snapshot.archetypeRaw),
+                              iconData: iconCache[iconKey] ?? nil,
+                              plainIconData: plainCache[raw] ?? nil,
                               relevance: Self.relevance(for: presence, snapshot: snapshot))
     }
 

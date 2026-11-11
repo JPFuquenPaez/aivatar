@@ -1,0 +1,9 @@
+/* watchOS permission purpose strings (Info.plist NS keys), English base.
+   Kept in sync with the INFOPLIST_KEY_* build settings in project.pbxproj —
+   these files win at runtime when present. */
+"NSCalendarsUsageDescription" = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
+"NSCalendarsFullAccessUsageDescription" = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
+"NSHealthShareUsageDescription" = "Aivatar reads workouts and sleep saved in Health on this watch only while the app is open, so your companion can celebrate with you. Health details are never stored or sent anywhere.";
+"NSHealthUpdateUsageDescription" = "Aivatar saves the workouts you start with it (Run with) and your mindful minutes (Sit with) to Health on this watch only. Nothing is sent anywhere.";
+"NSLocationWhenInUseUsageDescription" = "Aivatar uses your location once, while the app is open, to read the current weather so your companion can notice the day. Your location is never stored or sent anywhere.";
+"NSMicrophoneUsageDescription" = "Aivatar listens for nearby sounds while the app is open so your companion can react to your voice and claps. Audio never leaves the watch and is never saved.";

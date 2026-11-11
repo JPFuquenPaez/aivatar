@@ -69,7 +69,7 @@ for name, en, fr in (("app", app_en, app_fr), ("widget", wid_en, wid_fr)):
                   f"{name}/{k}: placeholder sequence differs en vs fr")
 
 # 4. dynamic key prefixes expanded over the closed sets used in code
-archetypes = ["ember", "willow", "compass", "prism", "nimbus"]
+archetypes = ["ember", "willow", "compass", "prism", "nimbus", "lumen"]
 weather = ["sunny", "gray", "rain", "wind", "cold", "hot", "unknown"]
 dynamic = ([f"animal.{a}.{f}" for a in archetypes for f in ("name", "element", "temperament")]
            + [f"weather.{w}" for w in weather])
@@ -80,6 +80,16 @@ for k in dynamic:
         check(k in tables[wid_en], f"widget en: missing mirrored key {k}")
         check(k in tables[wid_fr], f"widget fr: missing mirrored key {k}")
 
+# 5. InfoPlist.strings (watch target): en/fr key-set equality — the
+#    permission purpose strings must exist in both shipped languages.
+plist_en = os.path.join(root, "Aivatar Watch App/en.lproj/InfoPlist.strings")
+plist_fr = os.path.join(root, "Aivatar Watch App/fr.lproj/InfoPlist.strings")
+t_plist = {p: parse(p) for p in (plist_en, plist_fr)}
+for p, t in t_plist.items():
+    check(len(t) > 0, f"{p}: parsed zero keys (format drift?)")
+check(sorted(t_plist[plist_en]) == sorted(t_plist[plist_fr]),
+      f"InfoPlist.strings en/fr key drift: {sorted(set(t_plist[plist_en]) ^ set(t_plist[plist_fr]))}")
+
 if failures:
     print("LOCALIZATION CHECK FAILED:")
     for f in failures:
@@ -87,5 +97,6 @@ if failures:
     sys.exit(1)
 print(f"LOCALIZATION CHECK PASSED: app {len(tables[app_en])}/{len(tables[app_fr])} keys, "
       f"widget {len(tables[wid_en])}/{len(tables[wid_fr])} keys, {len(shared_keys)} shared keys mirrored, "
-      f"{len(dynamic)} dynamic keys present, placeholder parity holds.")
+      f"{len(dynamic)} dynamic keys present, {len(t_plist[plist_en])} InfoPlist keys en/fr, "
+      f"placeholder parity holds.")
 PYEOF

@@ -19,7 +19,7 @@ nonisolated enum CompanionWidgetPublisher {
         let dayCount = memory.map { CompanionMemoryStore.dayDistance(from: $0.firstLaunch, to: now) + 1 } ?? 1
         let presence = CompanionStateDerivation.presence(
             now: now, lastSeen: memory?.lastSeen, lastEventAt: lastEvent?.at)
-        CompanionWidgetState.write(CompanionWidgetSnapshot(
+        let snapshot = CompanionWidgetSnapshot(
             archetypeRaw: archetype.rawValue,
             name: name,
             streakDays: memory?.streakDays ?? 1,
@@ -30,13 +30,31 @@ nonisolated enum CompanionWidgetPublisher {
             lastSeen: memory?.lastSeen,
             lastEventAt: lastEvent?.at,
             lastEventKindRaw: lastEventKind?.rawValue
-        ))
+        )
+        // The snapshot write is always cheap and local — it keeps lastSeen
+        // fresh for the widget's own hourly presence derivation.
+        CompanionWidgetState.write(snapshot)
         seedIcons()
-        WidgetCenter.shared.reloadAllTimelines()
+        // watchOS budget guidance: reloads are budget-limited, so ask only
+        // when what the widget SHOWS actually changed (or the 10-minute
+        // visit bucket moved — the awake window must not go stale on the
+        // face). Redundant publishes (settings toggles, re-renders) skip
+        // the reload entirely; the timeline policy covers time-based
+        // reverts on its own.
+        let signature = "\(archetype.rawValue)|\(name)|\(presence.rawValue)|\(lastEventKind?.rawValue ?? "-")|\(dayCount)|\(Int((memory?.lastSeen.timeIntervalSince1970 ?? 0) / 600))"
+        let defaults = UserDefaults(suiteName: CompanionWidgetState.appGroupID)
+        let lastSignature = defaults?.string(forKey: Self.widgetSignatureKey)
+        if signature != lastSignature {
+            defaults?.set(signature, forKey: Self.widgetSignatureKey)
+            WidgetCenter.shared.reloadTimelines(ofKind: "AivatarCompanion")
+        }
         // Aivatar 2.0 platform pass: fitness relevance clue on workout events
         // only (donated at publish time — never polled, G9).
         RelevanceDonor.donateIfNeeded(lastEventKind: lastEventKind)
     }
+
+    /// App-group key for the last widget-visible signature (see publish).
+    private static let widgetSignatureKey = "widgetLastSignature"
 
     /// Renders every archetype's icon into the shared container (plain icon
     /// plus one PNG per presence state). Files are only written when missing
