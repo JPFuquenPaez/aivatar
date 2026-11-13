@@ -44,4 +44,37 @@ final class PostcardCardTests: XCTestCase {
         let b = try XCTUnwrap(PostcardCard.pngData(iconPNG: icon, title: "Willow", subtitle: "day 2 · napping"))
         XCTAssertNotEqual(a, b)
     }
+
+    /// v33 regression: the icon must keep a top margin (fit-to-box, not a
+    /// fixed scale flush with the canvas edge) and the subtitle must be
+    /// centered under the title — the CTM used to accumulate between
+    /// captions, pushing the subtitle off the right edge.
+    func testCardCompositionMarginsAndCenteredCaptions() throws {
+        let icon = try XCTUnwrap(CompanionIcon.pngData(for: .willow))
+        let image = try XCTUnwrap(PostcardCard.render(iconPNG: icon, title: "Willow", subtitle: "day 2 · awake"))
+        guard let data = image.dataProvider?.data,
+              let bytes = CFDataGetBytePtr(data) else { return XCTFail("no pixel data") }
+        func px(_ x: Int, _ y: Int) -> (UInt8, UInt8, UInt8) {
+            let o = (y * 1080 + x) * 4
+            return (bytes[o], bytes[o + 1], bytes[o + 2])
+        }
+        func painted(_ p: (UInt8, UInt8, UInt8)) -> Bool {
+            p.0 != 0 || p.1 != 0 || p.2 != 0
+        }
+        // Top margin: the fitted icon starts below y=20 at center-x.
+        XCTAssertFalse(painted(px(540, 20)), "icon keeps a top margin")
+        // Caption bands (y-down): title glyphs ~784..823, subtitle ~869..894.
+        // Centered => painted near center-x in the band; and nothing may
+        // touch the right edge (the v33 bug pushed the subtitle off-canvas).
+        func paintedInBand(_ y0: Int, _ y1: Int, _ x0: Int, _ x1: Int) -> Bool {
+            for y in y0...y1 where y < 1080 {
+                for x in stride(from: x0, through: x1, by: 2) where painted(px(x, y)) { return true }
+            }
+            return false
+        }
+        XCTAssertTrue(paintedInBand(784, 823, 400, 680), "title is centered on its band")
+        XCTAssertTrue(paintedInBand(869, 894, 400, 680), "subtitle is centered on its band")
+        XCTAssertFalse(paintedInBand(784, 894, 1060, 1078), "no caption reaches the right edge")
+        XCTAssertFalse(paintedInBand(784, 894, 0, 18), "no caption reaches the left edge")
+    }
 }

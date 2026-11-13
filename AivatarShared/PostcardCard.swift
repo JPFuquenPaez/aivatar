@@ -29,16 +29,24 @@ nonisolated enum PostcardCard {
         // Pure black (OLED-brand) background.
         ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
         ctx.fill(CGRect(x: 0, y: 0, width: size, height: size))
-        // The companion, nearest-neighbor upscaled, centered in the upper 2/3.
+        // The companion, nearest-neighbor upscaled, centered in the upper
+        // 2/3 with real margins — the scale is FIT to a box (max 80% width,
+        // max 52% height), not a fixed factor, so any icon size composes.
         // (The context is y-up; rects are computed y-down then converted.)
         if let iconPNG,
            let source = CGImageSourceCreateWithData(iconPNG as CFData, nil),
            let icon = CGImageSourceCreateImageAtIndex(source, 0, nil) {
-            let w = icon.width * iconScale, h = icon.height * iconScale
-            let topYDown = CGFloat(size) * 0.30 - CGFloat(h) / 2
-            let rect = CGRect(x: CGFloat(size - w) / 2,
-                              y: CGFloat(size) - topYDown - CGFloat(h),
-                              width: CGFloat(w), height: CGFloat(h))
+            let maxW = CGFloat(size) * 0.80, maxH = CGFloat(size) * 0.52
+            let scale = min(CGFloat(iconScale),
+                            maxW / CGFloat(icon.width),
+                            maxH / CGFloat(icon.height))
+            let w = CGFloat(icon.width) * scale, h = CGFloat(icon.height) * scale
+            // y-up context: compute the top edge y-down, then convert.
+            let centerYDown = CGFloat(size) * 0.33
+            let topYDown = centerYDown - h / 2
+            let rect = CGRect(x: (CGFloat(size) - w) / 2,
+                              y: CGFloat(size) - topYDown - h,
+                              width: w, height: h)
             ctx.interpolationQuality = .none
             ctx.draw(icon, in: rect)
         }
@@ -68,6 +76,10 @@ nonisolated enum PostcardCard {
         ] as CFDictionary)!
         let line = CTLineCreateWithAttributedString(attr)
         let width = CTLineGetTypographicBounds(line, nil, nil, nil)
+        // save/restore: translateBy composes with the CTM, so each caption
+        // must start from the identity transform or it drifts (v33 bug).
+        ctx.saveGState()
+        defer { ctx.restoreGState() }
         // y-up context: baseline = canvas - centerYDown + ~0.35 em (cap-height centering).
         ctx.textMatrix = .identity
         ctx.translateBy(x: CGFloat(canvasSize - Int(width)) / 2,
