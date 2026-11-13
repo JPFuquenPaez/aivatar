@@ -24,6 +24,9 @@ final class PostcardCardTests: XCTestCase {
         XCTAssertTrue(corner.0 == 0 && corner.1 == 0 && corner.2 == 0, "corner stays pure black")
         let center = px(540, 300)
         XCTAssertFalse(center.0 == 0 && center.1 == 0 && center.2 == 0, "icon area is painted")
+        // v35: the isometric ground tile sits just below the icon.
+        let tile = px(540, 690)
+        XCTAssertFalse(tile.0 == 0 && tile.1 == 0 && tile.2 == 0, "iso tile painted under the icon")
     }
 
     func testCardIsDeterministic() throws {

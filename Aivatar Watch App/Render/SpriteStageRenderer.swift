@@ -185,7 +185,11 @@ struct SpriteStageRenderer: View {
         // its content center sits slightly above the vertical middle (face
         // in the upper-third glance zone, §9).
         let cell = size.width / CGFloat(CompanionSprite.gridWidth)
-        let top = size.height * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+        var top = size.height * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+        // v35: the inhale lifts the companion one cell off its tile —
+        // squash-and-stretch without new art (the breathe frame + the
+        // widened tile sell the volume).
+        if frameID == "breathe" && !rest { top -= cell }
         var paths: [Character: Path] = [:]
         var partialCells: [(rect: CGRect, symbol: Character, alpha: Float)] = []
         for y in 0..<CompanionSprite.gridHeight {

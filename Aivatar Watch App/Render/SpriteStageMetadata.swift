@@ -80,18 +80,41 @@ nonisolated enum SpriteStageMetadata {
         return x >= f.x && x < f.x + f.w && y >= f.y && y < f.y + f.h
     }
 
-    /// The ground-shadow strip (E9.1): `widthExtra` cells wider (breathe frame).
-    /// One cell high, horizontally centered under the body. `D` shade token.
+    /// The ground tile (E9.1 shadow, evolved v35 into a pseudo-3D isometric
+    /// slab — flat tokens only, no gradients, so the pixel-honesty rules hold):
+    ///   row+0: width w-2, `D` (top face, narrow)
+    ///   row+1: width w,   `D` (top face, widest)
+    ///   row+2: width w,   `K` (ink front face = the slab's thickness)
+    /// The diamond-plus-lip reads as an isometric ground plane in classic
+    /// pixel-art fashion. `widthExtra` widens every row (the breathe frame
+    /// swells the tile as the companion inhales — the tile is animated).
+    /// Rows past the grid bottom are clamped away.
     static func shadowCells(_ archetype: Archetype, widthExtra: Int = 0) -> [CompanionSprite.CellDiff] {
         let m = meta(for: archetype)
         let w = m.shadowWidth + widthExtra
-        let x0 = (CompanionSprite.gridWidth - w) / 2
-        return (0..<w).map { CompanionSprite.CellDiff(x0 + $0, m.shadowRow, "D") }
+        let rows: [(dy: Int, width: Int, symbol: Character)] = [
+            (0, max(0, w - 2), "D"),
+            (1, w, "D"),
+            (2, w, "K"),
+        ]
+        var cells: [CompanionSprite.CellDiff] = []
+        for (dy, width, symbol) in rows {
+            let y = m.shadowRow + dy
+            guard y < CompanionSprite.gridHeight, width > 0 else { continue }
+            let x0 = (CompanionSprite.gridWidth - width) / 2
+            for i in 0..<width {
+                let x = x0 + i
+                guard x >= 0, x < CompanionSprite.gridWidth else { continue }
+                cells.append(CompanionSprite.CellDiff(x, y, symbol))
+            }
+        }
+        return cells
     }
 
-    /// The stage's shadow overlay decision, factored pure for tests: present
-    /// in every awake frame (width +1 on the breathe frame), absent during
-    /// the farewell wipe and in the rest LOD (the rest path never calls this).
+    /// The stage's ground-tile overlay decision, factored pure for tests:
+    /// present in every awake frame (width +1 on the breathe frame), absent
+    /// during the farewell wipe and in the rest LOD (the rest path never
+    /// calls this).
     static func shadowOverlayIfAwake(_ archetype: Archetype, frame: String, farewellPending: Bool) -> [CompanionSprite.CellDiff] {
         guard !farewellPending else { return [] }
         return shadowCells(archetype, widthExtra: frame == "breathe" ? 1 : 0)

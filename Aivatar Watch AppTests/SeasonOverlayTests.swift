@@ -2,36 +2,59 @@ import XCTest
 @testable import Aivatar_Watch_App
 
 /// Aivatar 2.0 E9 — ambient season overlays. PR-2 covers the ground shadow
-/// (E9.1); PR-9 extends this file with the cold-weather breath vapor (E9.2).
-/// Shadow rules pinned here: present in every awake frame, one cell high,
-/// `D` shade token, width +1 on the breathe frame, absent during the farewell
-/// wipe and in the rest LOD, and the shadow row must be empty in every base
-/// grid (the overlay never collides with authored art).
+/// (E9.1, evolved v35 into a 3-row isometric pixel tile: D top face + K front
+/// lip); PR-9 extends this file with the cold-weather breath vapor (E9.2).
+/// Tile rules pinned here: present in every awake frame, every row +1 wide on
+/// the breathe frame, absent during the farewell wipe and in the rest LOD,
+/// and the tile rows must be empty in every base grid (the overlay never
+/// collides with authored art).
 final class SeasonOverlayTests: XCTestCase {
 
-    func testShadowRowIsEmptyInEveryBaseGrid() {
+    func testShadowRowsAreEmptyInEveryBaseGrid() {
+        // v35: the ground tile spans shadowRow..shadowRow+2 (clamped) — every
+        // tile row must be empty in the base grid (overlay never collides
+        // with authored art).
         for archetype in Archetype.allCases {
             let sprite = AuthoredSprites.sprite(for: archetype)
             let row = SpriteStageMetadata.meta(for: archetype).shadowRow
-            for x in 0..<CompanionSprite.gridWidth {
-                XCTAssertEqual(sprite.base[row][sprite.base[row].index(sprite.base[row].startIndex, offsetBy: x)], ".",
-                               "\(archetype): shadow row \(row) must be empty in the base grid at x=\(x)")
+            for dy in 0...2 {
+                let y = row + dy
+                guard y < CompanionSprite.gridHeight else { continue }
+                for x in 0..<CompanionSprite.gridWidth {
+                    XCTAssertEqual(sprite.base[y][sprite.base[y].index(sprite.base[y].startIndex, offsetBy: x)], ".",
+                                   "\(archetype): tile row \(y) must be empty in the base grid at x=\(x)")
+                }
             }
         }
     }
 
-    func testShadowWidthFollowsBreatheFrame() {
+    func testTileShapeIsIsoSlabAndFollowsBreatheFrame() {
         for archetype in Archetype.allCases {
             let idle = SpriteStageMetadata.shadowCells(archetype, widthExtra: 0)
             let breathe = SpriteStageMetadata.shadowCells(archetype, widthExtra: 1)
-            XCTAssertEqual(breathe.count, idle.count + 1, "\(archetype): breathe frame widens the shadow by 1 cell")
-            XCTAssertTrue(idle.allSatisfy { $0.symbol == "D" }, "shadow is the D shade token only")
-            // Centered: same row, contiguous, centered on the 20-cell grid.
             let row = SpriteStageMetadata.meta(for: archetype).shadowRow
-            XCTAssertTrue(idle.allSatisfy { $0.y == row })
-            let xs = idle.map(\.x).sorted()
-            XCTAssertEqual(xs.last! - xs.first! + 1, idle.count, "contiguous strip")
-            XCTAssertEqual(xs.first!, (CompanionSprite.gridWidth - idle.count) / 2, "centered")
+            let rows = Dictionary(grouping: idle, by: \.y).sorted { $0.key < $1.key }
+            // Iso slab by design: dy 0/1 = D top face, dy 2 = K front lip
+            // (clipped past the grid bottom). Each visible row contiguous+centered.
+            XCTAssertGreaterThanOrEqual(rows.count, 2, "\(archetype): tile has at least 2 visible rows")
+            for (y, cells) in rows {
+                let xs = cells.map(\.x).sorted()
+                XCTAssertEqual(xs.last! - xs.first! + 1, cells.count, "\(archetype): row \(y) contiguous")
+                XCTAssertEqual(xs.first!, (CompanionSprite.gridWidth - cells.count) / 2, "\(archetype): row \(y) centered")
+                let dy = y - row
+                let expected: Character = dy >= 2 ? "K" : "D"
+                XCTAssertTrue(cells.allSatisfy { $0.symbol == expected },
+                              "\(archetype): row \(y) is \(expected)")
+            }
+            // Breathe swells every row by exactly one cell (the tile inhales).
+            let idleByRow = Dictionary(grouping: idle, by: \.y)
+            let breatheByRow = Dictionary(grouping: breathe, by: \.y)
+            for (y, cells) in idleByRow {
+                XCTAssertEqual(breatheByRow[y]?.count ?? -1, cells.count + 1,
+                               "\(archetype): breathe widens tile row \(y) by 1")
+            }
+            XCTAssertEqual(Set(breathe.map(\.y)), Set(idle.map(\.y)), "same rows awake/breathe")
+            XCTAssertTrue(idle.allSatisfy { $0.y >= row && $0.y < CompanionSprite.gridHeight }, "clamped to grid")
         }
     }
 
@@ -57,11 +80,10 @@ final class SeasonOverlayTests: XCTestCase {
             let without = sprite.symbols(frameID: "idle")
             for y in 0..<CompanionSprite.gridHeight {
                 for x in 0..<CompanionSprite.gridWidth {
-                    let isShadow = shadow.contains { $0.x == x && $0.y == y }
-                    if !isShadow {
-                        XCTAssertEqual(with[y][x], without[y][x], "\(archetype) cell (\(x),\(y)) changed by shadow")
+                    if let diff = shadow.first(where: { $0.x == x && $0.y == y }) {
+                        XCTAssertEqual(with[y][x], diff.symbol, "\(archetype) overlay cell (\(x),\(y)) draws its own token")
                     } else {
-                        XCTAssertEqual(with[y][x], "D")
+                        XCTAssertEqual(with[y][x], without[y][x], "\(archetype) cell (\(x),\(y)) changed by overlay")
                     }
                 }
             }

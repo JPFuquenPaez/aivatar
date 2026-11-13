@@ -96,7 +96,9 @@ struct LiveCompanionPreviewView: View {
         let sprite = AuthoredSprites.sprite(for: archetype)
         let grid = sprite.symbols(frameID: frameID)
         let cell = size / CGFloat(CompanionSprite.gridWidth)
-        let top = size * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+        var top = size * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+        // v35: same inhale lift as the stage (one cell off the tile).
+        if frameID == "breathe" { top -= cell }
         var paths: [Character: Path] = [:]
         // Ground shadow (E9.1): awake preview frames carry it too.
         let overlay = SpriteStageMetadata.shadowOverlayIfAwake(archetype, frame: frameID, farewellPending: false)

@@ -33,6 +33,7 @@ nonisolated enum PostcardCard {
         // 2/3 with real margins — the scale is FIT to a box (max 80% width,
         // max 52% height), not a fixed factor, so any icon size composes.
         // (The context is y-up; rects are computed y-down then converted.)
+        var iconBottomYDown: CGFloat = CGFloat(size) * 0.33 + CGFloat(size) * 0.26
         if let iconPNG,
            let source = CGImageSourceCreateWithData(iconPNG as CFData, nil),
            let icon = CGImageSourceCreateImageAtIndex(source, 0, nil) {
@@ -49,6 +50,12 @@ nonisolated enum PostcardCard {
                               width: w, height: h)
             ctx.interpolationQuality = .none
             ctx.draw(icon, in: rect)
+            iconBottomYDown = topYDown + h
+            drawIsoTile(ctx: ctx, topYDown: iconBottomYDown + CGFloat(size) * 0.025,
+                        width: w * 0.92, size: size)
+        } else {
+            drawIsoTile(ctx: ctx, topYDown: iconBottomYDown + CGFloat(size) * 0.025,
+                        width: CGFloat(size) * 0.5, size: size)
         }
         // Caption: title (semibold) + subtitle (secondary), centered, bottom.
         let white = CGColor(red: 1, green: 1, blue: 1, alpha: 1)
@@ -66,6 +73,29 @@ nonisolated enum PostcardCard {
         CGImageDestinationAddImage(dest, image, nil)
         guard CGImageDestinationFinalize(dest) else { return nil }
         return data as Data
+    }
+
+    /// v35: the pseudo-3D ground tile under the companion — a flat isometric
+    /// slab (diamond top face + ink front lip) in two grays on the black
+    /// canvas. No gradients: the shape alone carries the depth, matching the
+    /// stage's pixel tile.
+    private static func drawIsoTile(ctx: CGContext, topYDown: CGFloat, width: CGFloat, size: Int) {
+        let rowH = CGFloat(size) * 0.016
+        let inset = CGFloat(size) * 0.018
+        let rows: [(width: CGFloat, gray: CGFloat)] = [
+            (width - inset * 2, 0.12),  // top face, narrow
+            (width, 0.12),              // top face, widest
+            (width, 0.05),              // front lip (thickness)
+        ]
+        var yDown = topYDown
+        for (w, gray) in rows {
+            let rect = CGRect(x: (CGFloat(size) - w) / 2,
+                              y: CGFloat(size) - yDown - rowH,
+                              width: w, height: rowH)
+            ctx.setFillColor(CGColor(gray: gray, alpha: 1))
+            ctx.fill(rect)
+            yDown += rowH
+        }
     }
 
     private static func drawCentered(ctx: CGContext, text: String, fontSize: CGFloat, color: CGColor, centerYDown: CGFloat) {
