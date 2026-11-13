@@ -2,7 +2,7 @@ import WidgetKit
 
 /// CompanionWidgetPublisher (v29): the single writer of the watch-face
 /// snapshot. Every shell surface that changes what the complication should
-/// say (stage visit/wake, rename, archetype switch, life event, workout)
+/// say (stage visit/wake, rename, archetype switch, life event)
 /// calls `publish` — the widget itself never polls; WidgetKit is told to
 /// reload. Extracted from AvatarStageView so Settings (rename) shares the
 /// exact same path instead of a hand-rolled copy.
@@ -48,9 +48,6 @@ nonisolated enum CompanionWidgetPublisher {
             defaults?.set(signature, forKey: Self.widgetSignatureKey)
             WidgetCenter.shared.reloadTimelines(ofKind: "AivatarCompanion")
         }
-        // Aivatar 2.0 platform pass: fitness relevance clue on workout events
-        // only (donated at publish time — never polled, G9).
-        RelevanceDonor.donateIfNeeded(lastEventKind: lastEventKind)
     }
 
     /// App-group key for the last widget-visible signature (see publish).

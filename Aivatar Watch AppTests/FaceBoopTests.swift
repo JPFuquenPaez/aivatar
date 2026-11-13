@@ -72,12 +72,12 @@ final class FaceBoopTests: XCTestCase {
         XCTAssertTrue(d.boopFace(), "refractory clears at exactly 600 ticks")
     }
 
-    func testBoopSuppressedInWorkoutAndRest() throws {
+    func testBoopSuppressedInSessionAndRest() throws {
         let d = try director(.nimbus)
         d.advance(toTick: 50)
-        d.setWorkoutMode(true)
-        XCTAssertFalse(d.boopFace(), "no boop while the run is the motion")
-        d.setWorkoutMode(false)
+        d.setSessionMode(true)
+        XCTAssertFalse(d.boopFace(), "no boop during a breath session")
+        d.setSessionMode(false)
         d.setResting(true)
         XCTAssertFalse(d.boopFace(), "no boop while resting")
     }

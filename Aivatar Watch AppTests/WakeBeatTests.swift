@@ -99,7 +99,6 @@ final class WakeBeatTests: XCTestCase {
         XCTAssertNil(WakeBeatCaption.text(for: .warm, name: "Ember"))
         let beats: [WakeBeat] = [
             .lifeEvent(kind: .calendarSoon), .lifeEvent(kind: .workoutDone),
-            .lifeEvent(kind: .sleptWithWatch), .lifeEvent(kind: .workoutLive),
             .weather(.sunny), .weather(.gray), .weather(.rain), .weather(.wind),
             .weather(.cold), .weather(.hot),
             .memory(.rehearsal), .memory(.sprout), .memory(.weekGrid),

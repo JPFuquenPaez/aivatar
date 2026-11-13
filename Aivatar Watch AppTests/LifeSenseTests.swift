@@ -119,7 +119,6 @@ final class LifeSenseTests: XCTestCase {
         // F3/F6 kinds are parked until their phases.
         for archetype in Archetype.allCases {
             XCTAssertNil(SpriteDirector.reactionAct(for: .weatherClass(classHash: 1), archetype: archetype))
-            XCTAssertNil(SpriteDirector.reactionAct(for: .workoutLive(paceBand: 1), archetype: archetype))
         }
     }
 

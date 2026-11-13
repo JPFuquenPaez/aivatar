@@ -4,8 +4,6 @@
 "beat.noticed_day" = "%@ a remarqué ta journée";
 "beat.celebrated_run" = "%@ a fêté ta course";
 "beat.slept_beside" = "%@ a dormi près de toi";
-"beat.ran_with" = "%@ a couru avec toi";
-"beat.finished_lap" = "%@ a fini un tour";
 "beat.glows_sun" = "%@ rayonne au soleil";
 "beat.cozy" = "%@ est bien au chaud";
 "beat.loves_rain" = "%@ adore la pluie";
@@ -23,11 +21,6 @@
 "hint.pages" = "Couronne digitale : course et réglages";
 
 /* Workout page (F6) */
-"workout.run_with" = "Courir avec %@";
-"workout.running_with" = "Course avec %@";
-"workout.end_run" = "Terminer la course";
-"workout.sub" = "Court avec toi — chaque tour est fêté";
-"workout.elapsed" = "Temps écoulé %@";
 
 /* Postcard (F8) */
 "postcard.day" = "%1$@ · jour %2$d";
@@ -43,8 +36,6 @@
 "presence.celebrated_workout" = "a fêté ton entraînement";
 "presence.slept_beside" = "a dormi près de toi";
 "presence.checked_sky" = "a regardé le ciel";
-"presence.ran_with" = "a couru avec toi";
-"presence.lap_done" = "tour fait";
 "presence.noticed_something" = "a remarqué quelque chose";
 "inline.line" = "%1$@ · %2$@";
 "rect.line" = "jour %1$d · %2$@";
@@ -85,7 +76,6 @@
 "settings.postcard" = "Carte postale";
 "settings.about_copy" = "Tout est procédural, généré en direct.";
 "settings.tip" = "Astuce : touche longue pour un clin d'œil lent.";
-"workout.start" = "Commencer";
 
 
 /* Identité des animaux (v30) — texte présenté, localisé. Miroiré dans les
@@ -147,9 +137,6 @@
 "bond.announce" = "%@ te fait plus confiance";
 
 /* Indices de la page course (v30) */
-"workout.start_hint" = "Lance une course avec ton compagnon à tes côtés";
-"workout.error" = "Accès à Santé désactivé — active-le dans l’app Santé de l’iPhone";
-"workout.end_hint" = "Termine la course et l'enregistre dans Santé";
 
 /* Aivatar 2.0 (E3/E4/E5/E8/E10) */
 "beat.namingday.title" = "Un an avec %@";

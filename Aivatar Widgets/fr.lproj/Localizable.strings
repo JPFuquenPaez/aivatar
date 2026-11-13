@@ -5,8 +5,6 @@
 "presence.celebrated_workout" = "a fêté ton entraînement";
 "presence.slept_beside" = "a dormi près de toi";
 "presence.checked_sky" = "a regardé le ciel";
-"presence.ran_with" = "a couru avec toi";
-"presence.lap_done" = "tour fait";
 "presence.noticed_something" = "a remarqué quelque chose";
 "inline.line" = "%1$@ · %2$@";
 "rect.line" = "jour %1$d · %2$@";

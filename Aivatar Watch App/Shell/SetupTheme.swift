@@ -2,7 +2,7 @@ import SwiftUI
 
 /// SetupTheme (v30, "setup surfaces 2.0" — from the three-agent audit of the
 /// setup surfaces): the shared visual system for the picker, naming
-/// ceremony, settings, workout and postcard — one coherent language on the
+/// ceremony, settings and postcard — one coherent language on the
 /// OLED-black stage.
 ///
 /// v30 changes over v27:

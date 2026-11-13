@@ -7,7 +7,7 @@ import Combine
 /// haptics), end (log >= 200 ticks to memory + one mindfulSession sample,
 /// once per session), and the stage captions ("Breathe with %@" first cycle,
 /// alternating breathe-in/out under Reduce Motion L2, "%@ sat with you" at
-/// the end). Entry points: the Settings row and the workout page's long-press
+/// the end). Entry point: the Settings row
 /// hero — never the stage page (its long-press belongs to the slow-blink
 /// ritual: one gesture, one meaning).
 @MainActor

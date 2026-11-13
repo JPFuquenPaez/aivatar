@@ -7,8 +7,6 @@
 "presence.celebrated_workout" = "celebrated your workout";
 "presence.slept_beside" = "slept beside you";
 "presence.checked_sky" = "checked the sky";
-"presence.ran_with" = "ran with you";
-"presence.lap_done" = "lap done";
 "presence.noticed_something" = "noticed something";
 "inline.line" = "%1$@ · %2$@";
 "rect.line" = "day %1$d · %2$@";

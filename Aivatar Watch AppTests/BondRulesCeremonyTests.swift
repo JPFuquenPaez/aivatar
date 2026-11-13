@@ -85,9 +85,9 @@ final class BondRulesCeremonyTests: XCTestCase {
         XCTAssertGreaterThan(firstQuirkTick, 0, "ceremony eventually plays")
     }
 
-    func testCeremonySuppressedDuringWorkout() throws {
+    func testCeremonySuppressedDuringSession() throws {
         let d = try director()
-        d.setWorkoutMode(true)
+        d.setSessionMode(true)
         d.scheduleCeremony(.quirk, afterTicks: 5)
         var sawQuirk = false
         for t in 1...40 {

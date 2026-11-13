@@ -24,9 +24,9 @@ final class HapticsAndPostcardTests: XCTestCase {
         for moment in HapticMoment.allCases where moment != .bond {
             XCTAssertFalse(HapticGrammar.isPair(moment))
         }
-        // Same moment, same shape class across archetypes: split/farewell/
-        // greet/wake are identical for all five (only ack/lifeEvent flavor).
-        for moment in [HapticMoment.split, .farewell, .greet, .wake] {
+        // Same moment, same shape class across archetypes: farewell/
+        // greet/wake are identical for all six (only ack/lifeEvent flavor).
+        for moment in [HapticMoment.farewell, .greet, .wake] {
             let types = Set(Archetype.allCases.map { HapticGrammar.type(for: moment, archetype: $0) })
             XCTAssertEqual(types.count, 1, "\(moment.rawValue) must be one identical haptic for all archetypes")
         }

@@ -9,8 +9,6 @@
 "presence.celebrated_workout" = "a fêté ta course";
 "presence.slept_beside" = "a dormi près de toi";
 "presence.checked_sky" = "a regardé le ciel";
-"presence.ran_with" = "a couru avec toi";
-"presence.lap_done" = "a fini un tour";
 "presence.noticed_something" = "a remarqué quelque chose";
 "identity.full" = "%1$@ le %2$@";
 "animal.ember.name" = "Renard";

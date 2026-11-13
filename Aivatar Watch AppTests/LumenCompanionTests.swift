@@ -52,8 +52,7 @@ final class LumenCompanionTests: XCTestCase {
 
     func testReactionTablesAnswerForLumen() {
         for event: LifeEvent in [.calendarSoon(titleHash: 1), .workoutDone(kindBand: 1, durationBand: 2),
-                                 .sleptWithWatch, .weatherClass(classHash: ConditionClass.sunny.hash),
-                                 .split(distanceKm: 1)] {
+                                 .sleptWithWatch, .weatherClass(classHash: ConditionClass.sunny.hash)] {
             XCTAssertNotNil(SpriteDirector.reactionAct(for: event, archetype: .lumen),
                             "\(event) must have a lumen answer")
         }

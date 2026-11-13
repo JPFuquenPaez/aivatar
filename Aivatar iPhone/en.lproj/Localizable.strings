@@ -10,8 +10,6 @@
 "presence.celebrated_workout" = "celebrated your workout";
 "presence.slept_beside" = "slept beside you";
 "presence.checked_sky" = "checked the sky";
-"presence.ran_with" = "ran with you";
-"presence.lap_done" = "lap done";
 "presence.noticed_something" = "noticed something";
 "identity.full" = "%1$@ the %2$@";
 "animal.ember.name" = "Fox";

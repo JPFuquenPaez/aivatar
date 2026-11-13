@@ -7,18 +7,15 @@ import XCTest
 final class LocalizationTests: XCTestCase {
 
     private let keys = [
-        "beat.noticed_day", "beat.celebrated_run", "beat.slept_beside", "beat.ran_with",
-        "beat.finished_lap", "beat.glows_sun", "beat.cozy", "beat.loves_rain", "beat.rides_wind",
+        "beat.noticed_day", "beat.celebrated_run", "beat.slept_beside", "beat.glows_sun", "beat.cozy", "beat.loves_rain", "beat.rides_wind",
         "beat.keeps_warm", "beat.seeks_shade", "beat.rehearsed", "beat.watered",
         "beat.finished_audit", "beat.found_trinket", "beat.saw_coming",
         "hint.slow_blink", "hint.pages",
-        "workout.run_with", "workout.running_with", "workout.end_run", "workout.sub",
-        "workout.elapsed", "workout.start",
         "postcard.day", "postcard.old_friends", "postcard.weather_day",
         "postcard.nav", "postcard.preview",
         "presence.napping", "presence.awake", "presence.noticed_day",
         "presence.celebrated_workout", "presence.slept_beside", "presence.checked_sky",
-        "presence.ran_with", "presence.lap_done", "presence.noticed_something",
+        "presence.noticed_something",
         "inline.line", "rect.line", "about.day",
         "picker.choose", "picker.current", "picker.nav",
         "naming.nav", "naming.title", "naming.subtitle", "naming.placeholder",
@@ -48,8 +45,7 @@ final class LocalizationTests: XCTestCase {
         "a11y.action_quirk", "a11y.action_slow_blink",
         "stage.hint", "stage.kind", "stage.state_resting", "stage.state_listening",
         "stage.state_calm", "stage.tag_here", "stage.tag_resting",
-        "bond.announce", "workout.start_hint", "workout.end_hint", "workout.error",
-        // Aivatar 2.0 (E3/E4/E5/E8/E10).
+        "bond.announce", // Aivatar 2.0 (E3/E4/E5/E8/E10).
         "beat.namingday.title", "beat.namingday.caption",
         "beat.sixth.title", "beat.sixth.caption",
         "ceremony.level5.caption",

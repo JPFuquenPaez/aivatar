@@ -108,12 +108,11 @@ nonisolated enum CompanionStateDerivation {
 
     /// v31 (watchOS 26 Smart Stack): the entry's relevance score, derived
     /// purely from presence + event kind so it is unit-testable. Event beats
-    /// awake beats asleep; live workout/split events are the most relevant.
+    /// awake beats asleep; events are the most relevant.
     static func relevanceScore(presence: CompanionPresence, lastEventKind: LifeKind?) -> Double {
         switch presence {
         case .event:
             switch lastEventKind {
-            case .workoutLive, .split: return 1.0
             case .workoutDone, .calendarSoon: return 0.95
             default: return 0.9
             }
@@ -147,8 +146,6 @@ nonisolated enum CompanionStateDerivation {
             case .workoutDone: return String(localized: "presence.celebrated_workout")
             case .sleptWithWatch: return String(localized: "presence.slept_beside")
             case .weatherClass: return String(localized: "presence.checked_sky")
-            case .workoutLive: return String(localized: "presence.ran_with")
-            case .split: return String(localized: "presence.lap_done")
             case nil: return String(localized: "presence.noticed_something")
             }
         }

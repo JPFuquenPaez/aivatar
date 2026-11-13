@@ -3,7 +3,7 @@ import SwiftUI
 /// Companion picker (v30): a visual, one-decision-per-screen carousel — the
 /// watchOS onboarding idiom for choosing a character. The horizontal `.page`
 /// TabView is deliberate: the app STRUCTURE pages vertically (`.verticalPage`
-/// — stage / workout / settings), a choice carousel swipes horizontally.
+/// — stage / settings), a choice carousel swipes horizontally.
 /// Each page leads with the rendered animal as a glow-disc hero (the real
 /// avatar, Render/CompanionIcon, pixel-crisp), then the animal name, the
 /// element tag, a one-line temperament, and a full-width 44 pt choose button

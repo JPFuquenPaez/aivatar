@@ -6,8 +6,6 @@
 "beat.noticed_day" = "%@ noticed your day";
 "beat.celebrated_run" = "%@ celebrated your run";
 "beat.slept_beside" = "%@ slept beside you";
-"beat.ran_with" = "%@ ran with you";
-"beat.finished_lap" = "%@ finished a lap";
 "beat.glows_sun" = "%@ glows in the sun";
 "beat.cozy" = "%@ is cozy today";
 "beat.loves_rain" = "%@ loves the rain";
@@ -25,11 +23,6 @@
 "hint.pages" = "Turn the Digital Crown for run & settings";
 
 /* Workout page (F6) */
-"workout.run_with" = "Run with %@";
-"workout.running_with" = "Running with %@";
-"workout.end_run" = "End run";
-"workout.sub" = "Runs with you — splits cheer, no numbers";
-"workout.elapsed" = "Elapsed time %@";
 
 /* Postcard (F8) */
 "postcard.day" = "%1$@ · day %2$d";
@@ -45,8 +38,6 @@
 "presence.celebrated_workout" = "celebrated your workout";
 "presence.slept_beside" = "slept beside you";
 "presence.checked_sky" = "checked the sky";
-"presence.ran_with" = "ran with you";
-"presence.lap_done" = "lap done";
 "presence.noticed_something" = "noticed something";
 "inline.line" = "%1$@ · %2$@";
 "rect.line" = "day %1$d · %2$@";
@@ -87,7 +78,6 @@
 "settings.postcard" = "Postcard";
 "settings.about_copy" = "Fully procedural — everything is generated live.";
 "settings.tip" = "Tip: touch and hold to share a slow blink.";
-"workout.start" = "Start run";
 
 
 /* Animal identity (v30) — presented copy, localized. Mirrored in the
@@ -150,9 +140,6 @@
 "bond.announce" = "%@ trusts you more";
 
 /* Workout hints (v30) */
-"workout.start_hint" = "Starts a workout with your companion running beside you";
-"workout.error" = "Health access is off — enable it in the iPhone Health app";
-"workout.end_hint" = "Ends the workout and saves it to Health";
 
 /* Aivatar 2.0 (E3/E4/E5/E8/E10) */
 "beat.namingday.title" = "One year of %@";

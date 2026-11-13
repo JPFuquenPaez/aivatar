@@ -9,10 +9,8 @@ nonisolated enum HapticMoment: String, Sendable, CaseIterable {
     case ack
     /// Bond ritual completed / level-up — the two-step rising pair.
     case bond
-    /// A life event was noticed (calendar, workout, sleep, weather).
+    /// A life event was noticed (calendar, sleep, weather).
     case lifeEvent
-    /// A workout split (F6).
-    case split
     /// Wrist-drop farewell.
     case farewell
     /// App open greeting.
@@ -47,7 +45,6 @@ nonisolated enum HapticGrammar {
             case .prism: return .notification
             case .lumen: return .click
             }
-        case .split:   return .success
         case .farewell: return .stop
         case .greet:   return .start
         case .wake:    return .success
@@ -136,7 +133,6 @@ final class HapticsChannel {
     func farewell() { play(.farewell, archetype: AvatarSession.shared.archetype) }
 
     /// Split cheer (F6): one success-class beat.
-    func split() { play(.split, archetype: AvatarSession.shared.archetype) }
 
     /// Aivatar 2.0 E2: picker page-swipe tick — one `.click` per swipe, routed
     /// through the global limiter (>= 1.5 s spacing, <= 6/hour).

@@ -53,11 +53,11 @@ final class SetupBehaviorTests: XCTestCase {
         let asleep = CompanionStateDerivation.relevanceScore(presence: .asleep, lastEventKind: nil)
         let awake = CompanionStateDerivation.relevanceScore(presence: .awake, lastEventKind: nil)
         let event = CompanionStateDerivation.relevanceScore(presence: .event, lastEventKind: .calendarSoon)
-        let split = CompanionStateDerivation.relevanceScore(presence: .event, lastEventKind: .split)
+        let done = CompanionStateDerivation.relevanceScore(presence: .event, lastEventKind: .workoutDone)
         XCTAssertLessThan(asleep, awake)
         XCTAssertLessThan(awake, event)
-        XCTAssertGreaterThanOrEqual(split, event, "live workout/split is the most relevant")
-        XCTAssertLessThanOrEqual(split, 1.0)
+        XCTAssertGreaterThanOrEqual(done, event, "a workout event is the most relevant")
+        XCTAssertLessThanOrEqual(done, 1.0)
     }
 
     // MARK: Bond look-at-you dial (v31)

@@ -480,12 +480,12 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Aivatar reads workouts and sleep saved in Health on this watch only while the app is open, so your companion can celebrate with you. Health details are never stored or sent anywhere.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aivatar saves the workouts you start with it (Run with) and your mindful minutes (Sit with) to Health on this watch only. Nothing is sent anywhere.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aivatar saves your mindful minutes (Sit with) to Health on this watch only. Nothing is sent anywhere.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Aivatar uses your location once, while the app is open, to read the current weather so your companion can notice the day. Your location is never stored or sent anywhere.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aivatar listens for nearby sounds while the app is open so your companion can react to your voice and claps. Audio never leaves the watch and is never saved.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = aivatarapp.Aivatar;
 				INFOPLIST_KEY_WKWatchOnly = NO;
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "aivatarapp.Aivatar";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -521,12 +521,12 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Aivatar reads workouts and sleep saved in Health on this watch only while the app is open, so your companion can celebrate with you. Health details are never stored or sent anywhere.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aivatar saves the workouts you start with it (Run with) and your mindful minutes (Sit with) to Health on this watch only. Nothing is sent anywhere.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aivatar saves your mindful minutes (Sit with) to Health on this watch only. Nothing is sent anywhere.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Aivatar uses your location once, while the app is open, to read the current weather so your companion can notice the day. Your location is never stored or sent anywhere.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aivatar listens for nearby sounds while the app is open so your companion can react to your voice and claps. Audio never leaves the watch and is never saved.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = aivatarapp.Aivatar;
 				INFOPLIST_KEY_WKWatchOnly = NO;
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "aivatarapp.Aivatar";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -562,7 +562,7 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Aivatar reads workouts and sleep saved in Health on this watch only while the app is open, so your companion can celebrate with you. Health details are never stored or sent anywhere.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aivatar saves the workouts you start with it (Run with) and your mindful minutes (Sit with) to Health on this watch only. Nothing is sent anywhere.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aivatar saves your mindful minutes (Sit with) to Health on this watch only. Nothing is sent anywhere.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Aivatar uses your location once, while the app is open, to read the current weather so your companion can notice the day. Your location is never stored or sent anywhere.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aivatar listens for nearby sounds while the app is open so your companion can react to your voice and claps. Audio never leaves the watch and is never saved.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -593,7 +593,7 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Aivatar reads upcoming calendar events on this watch only while the app is open, so your companion can notice your day. Event titles are never stored or sent anywhere.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Aivatar reads workouts and sleep saved in Health on this watch only while the app is open, so your companion can celebrate with you. Health details are never stored or sent anywhere.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aivatar saves the workouts you start with it (Run with) and your mindful minutes (Sit with) to Health on this watch only. Nothing is sent anywhere.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aivatar saves your mindful minutes (Sit with) to Health on this watch only. Nothing is sent anywhere.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Aivatar uses your location once, while the app is open, to read the current weather so your companion can notice the day. Your location is never stored or sent anywhere.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aivatar listens for nearby sounds while the app is open so your companion can react to your voice and claps. Audio never leaves the watch and is never saved.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;

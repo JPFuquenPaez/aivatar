@@ -163,14 +163,13 @@ extension SeasonOverlayTests {
         XCTAssertEqual(run(), run())
     }
 
-    func testVaporSuppressedInWorkoutAndSession() throws {
+    func testVaporSuppressedInSession() throws {
         let d = try director(.nimbus)
         d.setCondition(.cold)
-        d.setWorkoutMode(true)
-        for t in 1...600 { d.advance(toTick: t) }
-        XCTAssertFalse(d.vaporActive, "no vapor while the run is the motion")
-        d.setWorkoutMode(false)
         d.setSessionMode(true)
+        for t in 1...600 { d.advance(toTick: t) }
+        XCTAssertFalse(d.vaporActive, "no vapor during a breath session")
+        d.setSessionMode(false)
         for t in 601...1200 { d.advance(toTick: t) }
         XCTAssertFalse(d.vaporActive, "no vapor during a breath session")
     }

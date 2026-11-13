@@ -7,7 +7,7 @@ import Foundation
 ///
 /// Priority (spec F5): life event > weather line > memory beat > warm.
 nonisolated enum WakeBeat: Equatable, Sendable {
-    /// A real-life event within the lookback (workout, calendar, sleep).
+    /// A real-life event within the lookback (calendar, workout, sleep).
     case lifeEvent(kind: LifeKind)
     /// Aivatar 2.0 E4: today is the naming-day anniversary (years since).
     case namingAnniversary(years: Int)
@@ -130,8 +130,6 @@ nonisolated enum WakeBeatSelector {
                 case .workoutDone: return .workoutDone(kindBand: 0, durationBand: 0)
                 case .sleptWithWatch: return .sleptWithWatch
                 case .weatherClass: return .weatherClass(classHash: 0)
-                case .workoutLive: return .workoutLive(paceBand: 0)
-                case .split: return .split(distanceKm: 0)
                 }
             }()
             return [SpriteDirector.reactionAct(for: event, archetype: archetype) ?? .happy]
@@ -170,8 +168,6 @@ nonisolated enum WakeBeatCaption {
             case .calendarSoon: return String(format: String(localized: "beat.noticed_day"), name)
             case .workoutDone: return String(format: String(localized: "beat.celebrated_run"), name)
             case .sleptWithWatch: return String(format: String(localized: "beat.slept_beside"), name)
-            case .workoutLive: return String(format: String(localized: "beat.ran_with"), name)
-            case .split: return String(format: String(localized: "beat.finished_lap"), name)
             case .weatherClass: return nil  // weather has its own beat tier
             }
         case .weather(let klass):
