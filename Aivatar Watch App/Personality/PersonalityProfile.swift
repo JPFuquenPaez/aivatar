@@ -2,89 +2,6 @@ import Foundation
 
 /// The five personality archetypes (§5). One shared skeleton; each archetype
 /// contributes a PersonalityProfile + ArchetypeVisualSet.
-nonisolated enum Archetype: String, Sendable, CaseIterable, Codable {
-    case ember, willow, compass, prism, nimbus, lumen
-
-    var displayName: String {
-        switch self {
-        case .ember: return "Ember"
-        case .willow: return "Willow"
-        case .compass: return "Compass"
-        case .prism: return "Prism"
-        case .nimbus: return "Nimbus"
-        case .lumen: return "Lumen"
-        }
-    }
-
-    /// v10: the animal identity (Tools/PIXEL_DESIGN.md v3) — the personality
-    /// IS the animal. The codename above stays the persisted key (storage,
-    /// seed anchor, profile id); the animal is the presented identity in the
-    /// companion picker, the naming ceremony, and the accessibility label.
-    /// v30: the presented copy is LOCALIZED (`animal.<raw>.*` keys, resolved
-    /// via the shared LocalizedAnimalCopy so the widget bundle mirrors them);
-    /// engine behavior never keys on these strings.
-    var animal: CompanionAnimal {
-        CompanionAnimal(
-            name: LocalizedAnimalCopy.name(rawValue),
-            element: LocalizedAnimalCopy.element(rawValue),
-            temperament: LocalizedAnimalCopy.temperament(rawValue))
-    }
-
-    /// Lowercase animal name for prose ("your fox companion").
-    var animalName: String { animal.name.lowercased() }
-
-    /// "Ember the fox" — the presented full identity (localized word order).
-    var fullName: String { LocalizedAnimalCopy.fullName(displayName: displayName, archetypeRaw: rawValue) }
-
-    /// A5c farewell beat (U9 — peak-end rule): the wrist-drop goodbye is
-    /// ONE soft micro-gesture, never a guilt gesture. Small clips only —
-    /// no anticipation wind-up, no squash: the session ends warm.
-    var farewellGesture: GestureClip {
-        switch self {
-        case .ember: return .wave      // one last wave for the audience
-        case .willow: return .nod      // a slow nod, gardener-style
-        case .compass: return .nod     // a level acknowledgment
-        case .prism: return .wave      // a loose, friendly flip-wave
-        case .nimbus: return .nod       // a quiet settle-nod
-        case .lumen: return .slowBlink  // a soft night-blink goodbye
-        }
-    }
-
-    /// One-line likable-pole blurb for the companion picker (§5: every
-    /// archetype anchors a likable pole — sensitivity reads as responsive,
-    /// never as anxious). v10: the copy is the animal's temperament.
-    var tagline: String { animal.temperament }
-
-    /// The archetype's signature quirk clip (§5 quirks), performed on
-    /// long-press (§9 tap/crown/haptic dialogue). Ember's quirk is big, so
-    /// its spark-trail emits (§8 accent particles). In Reduce Motion L2 a
-    /// body-only quirk (Willow's weight shift) degrades to a face-readable
-    /// in-character reaction at the engine level.
-    var quirkGesture: GestureClip {
-        switch self {
-        case .ember: return .spin          // "spark-trail on big gestures"
-        case .willow: return .shiftWeight  // "leaf sway on weight shift"
-        case .compass: return .lookAround  // "metronomic saccade rhythm"
-        case .prism: return .doubleTake    // "double-take gaze"
-        case .nimbus: return .shiver       // "reactive micro-startles"
-        case .lumen: return .sparkle       // "luminous wing shimmer" (spark-class)
-        }
-    }
-}
-
-/// The animal a companion archetype presents as (v10, Tools/PIXEL_DESIGN.md
-/// v3): one reduced animal per category — fox (land/fire), frog (amphibian),
-/// fish (water), bird (air), chameleon (reptile). `temperament` is the
-/// likable-pole copy shown in the companion picker (§5 guardrail: no
-/// companion reads as a negative trait).
-nonisolated struct CompanionAnimal: Sendable, Equatable, Codable {
-    /// "Fox" — the headline in the picker.
-    var name: String
-    /// The animal's category/element ("land & fire").
-    var element: String
-    /// One-line likable-pole temperament.
-    var temperament: String
-}
 
 /// Big Five trait vector, 0...1 per trait (§5).
 nonisolated struct TraitVector: Codable, Sendable, Equatable {
@@ -298,4 +215,38 @@ nonisolated struct WeatherDials: Codable, Sendable, Equatable {
 nonisolated enum ProfileError: Error, Sendable {
     case missingProfile(String)
     case invalidJSON(String, any Error)
+}
+
+// MARK: - Gesture-coupled members (watch target: GestureClip lives in Engine)
+
+extension Archetype {
+    /// A5c farewell beat (U9 — peak-end rule): the wrist-drop goodbye is
+    /// ONE soft micro-gesture, never a guilt gesture. Small clips only —
+    /// no anticipation wind-up, no squash: the session ends warm.
+    nonisolated var farewellGesture: GestureClip {
+        switch self {
+        case .ember: return .wave      // one last wave for the audience
+        case .willow: return .nod      // a slow nod, gardener-style
+        case .compass: return .nod     // a level acknowledgment
+        case .prism: return .wave      // a loose, friendly flip-wave
+        case .nimbus: return .nod       // a quiet settle-nod
+        case .lumen: return .slowBlink  // a soft night-blink goodbye
+        }
+    }
+
+    /// The archetype's signature quirk clip (§5 quirks), performed on
+    /// long-press (§9 tap/crown/haptic dialogue). Ember's quirk is big, so
+    /// its spark-trail emits (§8 accent particles). In Reduce Motion L2 a
+    /// body-only quirk (Willow's weight shift) degrades to a face-readable
+    /// in-character reaction at the engine level.
+    nonisolated var quirkGesture: GestureClip {
+        switch self {
+        case .ember: return .spin          // "spark-trail on big gestures"
+        case .willow: return .shiftWeight  // "leaf sway on weight shift"
+        case .compass: return .lookAround  // "metronomic saccade rhythm"
+        case .prism: return .doubleTake    // "double-take gaze"
+        case .nimbus: return .shiver       // "reactive micro-startles"
+        case .lumen: return .sparkle       // "luminous wing shimmer" (spark-class)
+        }
+    }
 }

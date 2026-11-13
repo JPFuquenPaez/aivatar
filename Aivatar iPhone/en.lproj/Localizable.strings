@@ -1,6 +1,5 @@
 /* Aivatar iPhone shell — English (base). */
 "phone.title" = "Aivatar";
-"phone.share" = "Share postcard";
 "phone.empty" = "Open Aivatar on your Apple Watch to meet your companion.";
 "phone.card.subtitle" = "day %1$d · %2$@";
 

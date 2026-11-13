@@ -4,21 +4,6 @@ import CoreLocation
 import WeatherKit
 #endif
 
-/// ConditionClass (v18 F3): the on-device weather classification — a small
-/// closed set, so the engine/director only ever see a class + a day-stable
-/// hash (determinism: goldens inject classes, never live weather). "unknown"
-/// is the neutral fallback: indistinguishable from today's app (G8).
-nonisolated enum ConditionClass: String, Sendable, CaseIterable, Codable {
-    case sunny, gray, rain, wind, cold, hot, unknown
-
-    /// Stable content-free hash (payload key — shared FNV with LifeKind).
-    var hash: Int { LifeKind.hash(rawValue) }
-
-    static func fromHash(_ value: Int) -> ConditionClass? {
-        allCases.first { $0.hash == value }
-    }
-}
-
 /// WeatherSenseBridge (F3): WeatherKit current conditions, fetched ON
 /// VISIT/WAKE ONLY with a 60-min cache — never a background poll (G9; the
 /// free tier is 500k calls/month, ample at this cadence). All classification

@@ -1,6 +1,5 @@
 /* Aivatar iPhone — français. */
 "phone.title" = "Aivatar";
-"phone.share" = "Partager la carte postale";
 "phone.empty" = "Ouvre Aivatar sur ton Apple Watch pour rencontrer ton compagnon.";
 "phone.card.subtitle" = "jour %1$d · %2$@";
 
