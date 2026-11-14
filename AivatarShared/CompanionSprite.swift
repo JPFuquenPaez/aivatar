@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 
 /// v13 — AUTHORED PIXEL SPRITES (the source of truth for the companion's
 /// look, Tools/PIXEL_DESIGN.md v5).
@@ -69,7 +72,7 @@ nonisolated struct CompanionSprite: Sendable, Equatable {
 
     /// v40 HD pet pass: when set, renderers draw this asset image
     /// (aspect-fit into the 20x15 cell box above the ground tile) and
-    /// animate it with `frameTransform(_:)` instead of cell patches — the
+    /// animate it with PetMotion poses + puppet regions — the
     /// HD art has no cell-level poses. `base` remains as the deterministic
     /// auto-downsampled fallback (postcard, complication icon, tests).
     let imageAssetName: String?
@@ -80,48 +83,32 @@ nonisolated struct CompanionSprite: Sendable, Equatable {
 
     init(archetype: Archetype, base: [String], patches: [String: [CellDiff]],
          paletteHex: [Character: String], imageAssetName: String? = nil,
-         accentHexOverride: String? = nil) {
+         accentHexOverride: String? = nil,
+         puppetHead: PuppetRegion? = nil, puppetTail: PuppetRegion? = nil) {
         self.archetype = archetype
         self.base = base
         self.patches = patches
         self.paletteHex = paletteHex
         self.imageAssetName = imageAssetName
         self.accentHexOverride = accentHexOverride
+        self.puppetHead = puppetHead
+        self.puppetTail = puppetTail
     }
 
     nonisolated var isImageBacked: Bool { imageAssetName != nil }
     nonisolated var uiAccentHex: String { accentHexOverride ?? paletteHex["B"] ?? "FF9E4A" }
 
-    /// v40: image-backed sprites animate as TRANSFORMS of the HD art — a
-    /// pure frameID -> transform mapping, so motion stays a deterministic
-    /// function of the director's frame clock (G7). Units: dx/dy in cells
-    /// (dy + = up), scales and rotation around the bottom-center anchor
-    /// (the feet on the ground tile).
-    nonisolated struct FrameTransform: Sendable, Equatable {
-        var dx: Double = 0
-        var dy: Double = 0
-        var scaleX: Double = 1
-        var scaleY: Double = 1
-        var rotation: Double = 0
-        static let identity = FrameTransform()
+    /// v42: a puppeteered region of the HD image (head / tail), normalized
+    /// 0...1 in image space (y-down). The renderer redraws the region on top
+    /// of the body with its own small rotation/bob (see PetMotion.Pose), so
+    /// the animal reads as a creature, not a sticker. Nil for grid sprites.
+    nonisolated struct PuppetRegion: Sendable, Equatable {
+        var rect: CGRect      // normalized, y-down
+        var anchor: CGPoint   // normalized pivot, y-down
     }
 
-    static func frameTransform(_ frameID: String) -> FrameTransform {
-        switch frameID {
-        case "breathe": return FrameTransform(dy: 0.5, scaleX: 1.015, scaleY: 1.045)
-        case "blink":   return FrameTransform(scaleX: 1.02, scaleY: 0.90)
-        case "sleepy":  return FrameTransform(scaleY: 0.94)
-        case "happy":   return FrameTransform(dy: 0.25, scaleY: 1.03, rotation: 0.02)
-        case "glanceL": return FrameTransform(dx: -0.7)
-        case "glanceR": return FrameTransform(dx: 0.7)
-        case "quirk":   return FrameTransform(dy: 1.1, scaleX: 1.03, scaleY: 1.05, rotation: 0.04)
-        case "perk":    return FrameTransform(dy: 0.5, scaleX: 1.02, scaleY: 1.02)
-        case "yawn":    return FrameTransform(dy: 0.4, scaleY: 1.07)
-        case "idleA":   return FrameTransform(rotation: -0.008)
-        case "idleB":   return FrameTransform(rotation: 0.008)
-        default:        return .identity
-        }
-    }
+    let puppetHead: PuppetRegion?
+    let puppetTail: PuppetRegion?
 
     // MARK: - Resolution
 
@@ -395,56 +382,66 @@ nonisolated enum AuthoredSprites {
     static let ember = CompanionSprite(
         archetype: .ember,
         base: petFoxGrid,
-        // v40: HD image animates via CompanionSprite.frameTransform(_:);
-        // the grid is the static fallback (postcard / icon / tests).
+        // v40/v42: the HD image animates via PetMotion (ambient + act
+        // envelopes + head/tail puppet regions); the grid is the static fallback.
         patches: [:],
         paletteHex: petFoxPalette,
         imageAssetName: "pet-fox",
-        accentHexOverride: "FFC800"
+        accentHexOverride: "FFC800",
+        puppetHead: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.00, y: 0.00, width: 0.58, height: 0.62), anchor: CGPoint(x: 0.52, y: 0.58)),
+        puppetTail: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.55, y: 0.42, width: 0.45, height: 0.35), anchor: CGPoint(x: 0.60, y: 0.62))
     )
 
     static let willow = CompanionSprite(
         archetype: .willow,
         base: petShibaGrid,
-        // v40: HD image animates via CompanionSprite.frameTransform(_:);
-        // the grid is the static fallback (postcard / icon / tests).
+        // v40/v42: the HD image animates via PetMotion (ambient + act
+        // envelopes + head/tail puppet regions); the grid is the static fallback.
         patches: [:],
         paletteHex: petShibaPalette,
         imageAssetName: "pet-shiba",
-        accentHexOverride: "6FA0FF"
+        accentHexOverride: "6FA0FF",
+        puppetHead: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.22, y: 0.00, width: 0.62, height: 0.52), anchor: CGPoint(x: 0.52, y: 0.50)),
+        puppetTail: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.00, y: 0.32, width: 0.35, height: 0.30), anchor: CGPoint(x: 0.32, y: 0.55))
     )
 
     static let compass = CompanionSprite(
         archetype: .compass,
         base: petCorgiGrid,
-        // v40: HD image animates via CompanionSprite.frameTransform(_:);
-        // the grid is the static fallback (postcard / icon / tests).
+        // v40/v42: the HD image animates via PetMotion (ambient + act
+        // envelopes + head/tail puppet regions); the grid is the static fallback.
         patches: [:],
         paletteHex: petCorgiPalette,
         imageAssetName: "pet-corgi",
-        accentHexOverride: "5FAE4A"
+        accentHexOverride: "5FAE4A",
+        puppetHead: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.28, y: 0.00, width: 0.62, height: 0.55), anchor: CGPoint(x: 0.58, y: 0.52)),
+        puppetTail: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.00, y: 0.30, width: 0.28, height: 0.25), anchor: CGPoint(x: 0.26, y: 0.50))
     )
 
     static let prism = CompanionSprite(
         archetype: .prism,
         base: petSphynxGrid,
-        // v40: HD image animates via CompanionSprite.frameTransform(_:);
-        // the grid is the static fallback (postcard / icon / tests).
+        // v40/v42: the HD image animates via PetMotion (ambient + act
+        // envelopes + head/tail puppet regions); the grid is the static fallback.
         patches: [:],
         paletteHex: petSphynxPalette,
         imageAssetName: "pet-sphynx",
-        accentHexOverride: "2ED3C6"
+        accentHexOverride: "2ED3C6",
+        puppetHead: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.15, y: 0.00, width: 0.72, height: 0.45), anchor: CGPoint(x: 0.50, y: 0.42)),
+        puppetTail: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.62, y: 0.72, width: 0.38, height: 0.28), anchor: CGPoint(x: 0.68, y: 0.75))
     )
 
     static let nimbus = CompanionSprite(
         archetype: .nimbus,
         base: petMockingbirdGrid,
-        // v40: HD image animates via CompanionSprite.frameTransform(_:);
-        // the grid is the static fallback (postcard / icon / tests).
+        // v40/v42: the HD image animates via PetMotion (ambient + act
+        // envelopes + head/tail puppet regions); the grid is the static fallback.
         patches: [:],
         paletteHex: petMockingbirdPalette,
         imageAssetName: "pet-mockingbird",
-        accentHexOverride: "FFE066"
+        accentHexOverride: "FFE066",
+        puppetHead: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.52, y: 0.05, width: 0.48, height: 0.55), anchor: CGPoint(x: 0.60, y: 0.55)),
+        puppetTail: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.00, y: 0.00, width: 0.55, height: 0.65), anchor: CGPoint(x: 0.52, y: 0.60))
     )
 
     // MARK: LUMEN — moth (Aivatar 2.0, E10; night element, luminous)

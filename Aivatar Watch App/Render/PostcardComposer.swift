@@ -87,7 +87,7 @@ nonisolated enum PostcardComposer {
     /// v40: the card's frames as (frameID, overlay) pairs — the single
     /// source both the grid path (frames) and the HD-image path
     /// (frameImages) render from, so they can never diverge.
-    static func frameSpecs(_ inputs: PostcardInputs) -> [(frameID: String, overlay: [CompanionSprite.CellDiff])] {
+    static func frameSpecs(_ inputs: PostcardInputs) -> [(frameID: String, tick: Int, frameAge: Int, overlay: [CompanionSprite.CellDiff])] {
         let archetype = Archetype(rawValue: inputs.archetypeRaw) ?? .ember
         guard let profile = try? PersonalityProfile.load(archetype) else {
             return plainSpecs(seed: inputs.seed)
@@ -106,10 +106,10 @@ nonisolated enum PostcardComposer {
         if inputs.anniversary == true {
             overlay += PostcardStamp.cells()
         }
-        var out: [(frameID: String, overlay: [CompanionSprite.CellDiff])] = []
+        var out: [(frameID: String, tick: Int, frameAge: Int, overlay: [CompanionSprite.CellDiff])] = []
         for _ in 0..<frameCount {
             director.advance(toTick: director.tick + 1)
-            out.append((director.currentFrame, overlay))
+            out.append((director.currentFrame, director.tick, director.frameAge, overlay))
         }
         return out
     }
@@ -120,24 +120,27 @@ nonisolated enum PostcardComposer {
         return frameSpecs(inputs).map { sprite.symbols(frameID: $0.frameID, overlay: $0.overlay) }
     }
 
-    /// v40: the card's frames as rendered images — image-backed companions
-    /// play the HD pet with each frame's transform (the postcard is alive).
+    /// v40/v42: the card's frames as rendered images — image-backed
+    /// companions play the HD pet with the SAME continuous PetMotion pose
+    /// as the live stage (the postcard is alive, bit-exact per inputs).
     static func frameImages(_ inputs: PostcardInputs) -> [CGImage] {
         let archetype = Archetype(rawValue: inputs.archetypeRaw) ?? .ember
-        return frameSpecs(inputs).compactMap {
-            CompanionIcon.cgImage(for: archetype, frameID: $0.frameID, overlay: $0.overlay)
+        return frameSpecs(inputs).compactMap { spec in
+            let pose = PetMotion.pose(frameID: spec.frameID, frameAge: spec.frameAge,
+                                      tick: spec.tick, seed: inputs.seed)
+            return CompanionIcon.cgImage(for: archetype, frameID: spec.frameID, pose: pose, overlay: spec.overlay)
         }
     }
 
     /// The warm-greeting fallback (default companion, plain idle run).
-    private static func plainSpecs(seed: UInt64) -> [(frameID: String, overlay: [CompanionSprite.CellDiff])] {
+    private static func plainSpecs(seed: UInt64) -> [(frameID: String, tick: Int, frameAge: Int, overlay: [CompanionSprite.CellDiff])] {
         guard let profile = try? PersonalityProfile.load(.ember) else { return [] }
         let director = SpriteDirector(profile: profile, seed: seed)
         director.playSequence([.happy])
-        var out: [(frameID: String, overlay: [CompanionSprite.CellDiff])] = []
+        var out: [(frameID: String, tick: Int, frameAge: Int, overlay: [CompanionSprite.CellDiff])] = []
         for _ in 0..<frameCount {
             director.advance(toTick: director.tick + 1)
-            out.append((director.currentFrame, []))
+            out.append((director.currentFrame, director.tick, director.frameAge, []))
         }
         return out
     }

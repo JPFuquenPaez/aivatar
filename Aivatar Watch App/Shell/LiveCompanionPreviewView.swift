@@ -50,7 +50,7 @@ struct LiveCompanionPreviewView: View {
         ZStack {
             if staticFrame {
                 Canvas { ctx, _ in
-                    drawFrame(ctx: ctx, frameID: "idle", size: size)
+                    drawFrame(ctx: ctx, frameID: "idle", pose: .identity, size: size)
                 }
             } else {
                 TimelineView(.animation(minimumInterval: SpriteDirector.tickDuration)) { timeline in
@@ -59,7 +59,9 @@ struct LiveCompanionPreviewView: View {
                         director.accessibilityMode = resolveAccessibilityMode()
                         let elapsed = timeline.date.timeIntervalSince(epoch)
                         director.advance(toTick: Int((elapsed / SpriteDirector.tickDuration).rounded(.down)))
-                        drawFrame(ctx: ctx, frameID: director.currentFrame, size: size)
+                        let pose = PetMotion.pose(frameID: director.currentFrame, frameAge: director.frameAge,
+                                                  tick: director.tick, seed: director.seed)
+                        drawFrame(ctx: ctx, frameID: director.currentFrame, pose: pose, size: size)
                     }
                 }
             }
@@ -92,7 +94,7 @@ struct LiveCompanionPreviewView: View {
         return .full
     }
 
-    private func drawFrame(ctx: GraphicsContext, frameID: String, size: CGFloat) {
+    private func drawFrame(ctx: GraphicsContext, frameID: String, pose: PetMotion.Pose = .identity, size: CGFloat) {
         let sprite = AuthoredSprites.sprite(for: archetype)
         let cell = size / CGFloat(CompanionSprite.gridWidth)
         let baseTop = size * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
@@ -107,7 +109,7 @@ struct LiveCompanionPreviewView: View {
             PetImageRender.draw(ctx: ctx,
                 box: CGRect(x: 0, y: baseTop, width: size,
                             height: CGFloat(PetImageRender.imageBoxRows) * cell),
-                sprite: sprite, frameID: frameID)
+                sprite: sprite, pose: pose)
             return
         }
         let grid = sprite.symbols(frameID: frameID)

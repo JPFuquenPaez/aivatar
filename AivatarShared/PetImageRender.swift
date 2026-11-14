@@ -3,17 +3,18 @@ import SwiftUI
 import UIKit
 #endif
 
-/// PetImageRender (v40 HD pet pass): draws a companion's HD pet image
-/// (imageset `pet-<name>`, cut from the authored sheet in avatars/) instead
-/// of the 20x18 cell grid. The image is drawn aspect-fit into the 20x15
-/// cell box (rows 0...15 of the stage grid, bottom-anchored) so the
-/// isometric ground tile keeps rows 15-17 underneath; motion is the pure
-/// `CompanionSprite.frameTransform(_:)` mapping applied around the
-/// bottom-center anchor (feet stay planted on the tile).
+/// PetImageRender (v40 HD pets, v42 living motion): draws a companion's HD
+/// pet image (imageset `pet-<name>`, cut from the authored sheet in
+/// avatars/) instead of the 20x18 cell grid. The image is drawn aspect-fit
+/// into the 20x15 cell box (rows 0...15 of the stage grid, bottom-anchored)
+/// so the isometric ground tile keeps rows 15-17 underneath.
 ///
-/// Shared by the watch stage (SpriteStageRenderer), the live picker
-/// (LiveCompanionPreviewView) and the iPhone companion (PhoneCompanionView),
-/// so the SAME animal with the SAME animation shows on every surface.
+/// Motion is PetMotion: a continuous Pose (ambient breathing/sway + act
+/// envelopes, pure in (frameID, frameAge, tick, seed)) applied around the
+/// bottom-center anchor — plus PUPPET regions (head, tail) redrawn on top
+/// with their own tilt/bob/wag, so the animal feels alive rather than a
+/// rigid sticker. Shared by the watch stage, the live picker and the
+/// iPhone companion: same image, same motion, every surface.
 nonisolated enum PetImageRender {
 
     /// Cell rows the pet image occupies; rows below belong to the tile.
@@ -25,40 +26,98 @@ nonisolated enum PetImageRender {
         return UIImage(named: name)
     }
 
-    /// The 20x15 cell box for a stage of `width`/`height` at vertical center
-    /// 0.46 (same anchor math as the grid renderer). Pass `liftCells` for
-    /// the inhale lift (grid mode lifts `top`; image mode expresses the
-    /// lift as a transform dy, so pass 0 and let frameTransform do it).
-    static func imageBox(width: CGFloat, height: CGFloat, top: CGFloat, cell: CGFloat) -> CGRect {
-        CGRect(x: 0, y: top, width: CGFloat(CompanionSprite.gridWidth) * cell,
-               height: CGFloat(imageBoxRows) * cell)
-    }
-
-    /// Draws the pet into `box` with the frame's transform. `overOverlay`
-    /// cells (blush / vapor / interiority) paint on top of the image at
-    /// their grid-cell rects; the ground tile is the caller's job (drawn
-    /// before, from SpriteStageMetadata.shadowCells). `rest` dims to the
-    /// Always-On LOD (matches the grid rest dim: body x0.22 ~= black 0.78).
+    /// Draws the pet into `box` with `pose` applied. `overOverlay` cells
+    /// (blush / vapor / interiority) paint on top at their grid-cell rects;
+    /// the ground tile is the caller's job (drawn before, from
+    /// SpriteStageMetadata.shadowCells). `rest` dims to the Always-On LOD
+    /// (matches the grid rest dim: body x0.22 ~= black 0.78).
     static func draw(ctx: GraphicsContext, box: CGRect, sprite: CompanionSprite,
-                     frameID: String, rest: Bool = false,
+                     pose: PetMotion.Pose, rest: Bool = false,
                      overOverlay: [CompanionSprite.CellDiff] = []) {
         guard let img = uiImage(sprite), img.size.width > 0, img.size.height > 0 else { return }
-        let t = CompanionSprite.frameTransform(frameID)
         let cell = box.width / CGFloat(CompanionSprite.gridWidth)
         let scale = min(box.width / img.size.width, box.height / img.size.height)
         let dw = img.size.width * scale, dh = img.size.height * scale
-        // Anchor: bottom-center of the box (feet on the tile).
-        var tr = CGAffineTransform.identity
-            .translatedBy(x: box.midX, y: box.maxY)
-            .rotated(by: CGFloat(t.rotation))
-            .scaledBy(x: CGFloat(t.scaleX), y: CGFloat(t.scaleY))
-            .translatedBy(x: CGFloat(t.dx) * cell - dw / 2, y: -CGFloat(t.dy) * cell - dh)
-        let rect = CGRect(origin: .zero, size: CGSize(width: dw, height: dh)).applying(tr)
-        ctx.draw(Image(uiImage: img), in: rect)
+        // Whole-body transform around the bottom-center anchor (feet planted).
+        let base = CGRect(x: box.midX - dw / 2 + CGFloat(pose.dx) * cell,
+                          y: box.maxY - dh - CGFloat(pose.dy) * cell,
+                          width: dw, height: dh)
+        let anchor = CGPoint(x: base.midX, y: base.maxY)
+        let bodyTr = CGAffineTransform(translationX: anchor.x, y: anchor.y)
+            .rotated(by: CGFloat(pose.rotation))
+            .scaledBy(x: CGFloat(pose.scaleX), y: CGFloat(pose.scaleY))
+            .translatedBy(x: -anchor.x, y: -anchor.y)
+        let bodyRect = base.applying(bodyTr)
+        ctx.draw(Image(uiImage: img), in: bodyRect)
         if rest {
-            ctx.fill(Path(rect), with: .color(.black.opacity(0.78)))
+            ctx.fill(Path(bodyRect), with: .color(.black.opacity(0.78)))
+        }
+        // Puppet regions redrawn on top with their own motion (tail, then head).
+        if let tail = sprite.puppetTail {
+            drawRegion(ctx: ctx, img: img, sprite: sprite, region: tail, key: "tail",
+                       base: base, bodyTr: bodyTr,
+                       rotation: pose.tailWag, bobCells: 0)
+        }
+        if let head = sprite.puppetHead {
+            drawRegion(ctx: ctx, img: img, sprite: sprite, region: head, key: "head",
+                       base: base, bodyTr: bodyTr,
+                       rotation: pose.headTilt, bobCells: pose.headBob)
         }
         drawOverlay(ctx: ctx, box: box, cell: cell, sprite: sprite, cells: overOverlay)
+    }
+
+    /// Draws one puppeteered region: the image cropped to the region's
+    /// normalized rect, placed at the region's rect inside the (already
+    /// body-transformed) image, then rotated around the region's anchor.
+    private static func drawRegion(ctx: GraphicsContext, img: UIImage, sprite: CompanionSprite,
+                                   region: CompanionSprite.PuppetRegion, key: String,
+                                   base: CGRect, bodyTr: CGAffineTransform,
+                                   rotation: Double, bobCells: Double) {
+        guard let regionImg = regionImage(img, assetName: sprite.imageAssetName ?? "", key: key, region) else { return }
+        let cellH = base.height / CGFloat(imageBoxRows)
+        let destBase = CGRect(x: base.minX + region.rect.minX * base.width,
+                              y: base.minY + region.rect.minY * base.height - CGFloat(bobCells) * cellH,
+                              width: region.rect.width * base.width,
+                              height: region.rect.height * base.height)
+        let anchorBase = CGPoint(x: base.minX + region.anchor.x * base.width,
+                                 y: base.minY + region.anchor.y * base.height)
+        let dest = destBase.applying(bodyTr)
+        let a = anchorBase.applying(bodyTr)
+        let rot = CGAffineTransform(translationX: a.x, y: a.y)
+            .rotated(by: CGFloat(rotation))
+            .translatedBy(x: -a.x, y: -a.y)
+        ctx.draw(Image(uiImage: regionImg), in: dest.applying(rot))
+    }
+
+    // MARK: - Region image cache (cropped once per asset+region)
+
+    private final class RegionCache: @unchecked Sendable {
+        let lock = NSLock()
+        var images: [String: UIImage] = [:]   // "<asset>#<key>" -> cropped UIImage
+    }
+    private static let regionCache = RegionCache()
+
+    private static func regionImage(_ img: UIImage, assetName: String, key: String,
+                                    _ region: CompanionSprite.PuppetRegion) -> UIImage? {
+        let ck = "\(assetName)#\(key)"
+        regionCache.lock.lock()
+        if let cached = regionCache.images[ck] {
+            regionCache.lock.unlock()
+            return cached
+        }
+        regionCache.lock.unlock()
+        guard let cg = img.cgImage else { return nil }
+        let iw = CGFloat(cg.width), ih = CGFloat(cg.height)
+        // CGImage crop rect is in image pixel space, y-down from the top row
+        // for images loaded via CGImageSource (verified on device renders).
+        let src = CGRect(x: region.rect.minX * iw, y: region.rect.minY * ih,
+                         width: region.rect.width * iw, height: region.rect.height * ih)
+        guard let cropped = cg.cropping(to: src) else { return nil }
+        let ui = UIImage(cgImage: cropped, scale: img.scale, orientation: img.imageOrientation)
+        regionCache.lock.lock()
+        regionCache.images[ck] = ui
+        regionCache.lock.unlock()
+        return ui
     }
 
     /// Paints overlay cells at their grid rects (box origin = grid origin, so

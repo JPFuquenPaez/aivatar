@@ -165,6 +165,11 @@ nonisolated final class SpriteDirector {
     }
 
     private var rng: SeededRandom
+    /// The raw stream seed (test/render-visible — PetMotion derives the
+    /// ambient pose phases from it, so motion is pure in (seed, tick)).
+    nonisolated let seed: UInt64
+    /// Ticks the current frame has been showing (act envelopes key on this).
+    private(set) var frameAge = 0
     private let blinkP: Float
     private let glanceP: Float
     private let eventP: Float
@@ -255,6 +260,7 @@ nonisolated final class SpriteDirector {
 
     init(profile: PersonalityProfile, seed: UInt64) {
         let resolved = Archetype(rawValue: profile.id) ?? .ember
+        self.seed = seed
         archetype = resolved
         sprite = AuthoredSprites.sprite(for: resolved)
         rng = SeededRandom(seed ^ 0x51_DE_51_CE)
@@ -292,7 +298,13 @@ nonisolated final class SpriteDirector {
     }
 
     private func step() {
+        let before = currentFrame
         tick += 1
+        stepBody()
+        frameAge = (currentFrame == before) ? frameAge + 1 : 1
+    }
+
+    private func stepBody() {
         if resting { return }
         if vaporOnTicksLeft > 0 { vaporOnTicksLeft -= 1 }  // E9.2 puff lifetime
         if blushTicksLeft > 0 { blushTicksLeft -= 1 }      // E7 flush lifetime

@@ -18,6 +18,10 @@ nonisolated final class PhoneCompanionAnimator: @unchecked Sendable {
     private var rng: SeededRandom
     private var queue: [(frame: String, ticks: Int)] = []
     private(set) var currentFrame = "idle"
+    /// Ticks the current frame has been showing (act envelopes key on this).
+    private(set) var frameAge = 0
+    /// The animator's dedicated stream seed (PetMotion pose phases derive from it).
+    var seed: UInt64 { Self.phoneSeed(archetype) }
 
     /// The stage's per-archetype base seed (same constant the watch uses),
     /// XOR a private constant for the phone's dedicated stream.
@@ -38,7 +42,13 @@ nonisolated final class PhoneCompanionAnimator: @unchecked Sendable {
     }
 
     private func step() {
+        let before = currentFrame
         tick += 1
+        stepBody()
+        frameAge = (currentFrame == before) ? frameAge + 1 : 1
+    }
+
+    private func stepBody() {
         // Asleep: the rest face with a slow blink only.
         if presence == .asleep {
             if queue.isEmpty {

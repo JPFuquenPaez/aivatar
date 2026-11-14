@@ -25,20 +25,24 @@ struct PhoneCompanionView: View {
         TimelineView(.animation(minimumInterval: 0.15)) { timeline in
             Canvas { ctx, _ in
                 let frame: String
+                let pose: PetMotion.Pose
                 if reduceMotion {
                     frame = presence == .asleep ? "sleepy" : "idle"
+                    pose = .identity
                 } else {
                     let elapsed = timeline.date.timeIntervalSince(epoch)
                     animator.advance(toTick: Int((elapsed / 0.15).rounded(.down)))
                     frame = animator.currentFrame
+                    pose = PetMotion.pose(frameID: animator.currentFrame, frameAge: animator.frameAge,
+                                          tick: animator.tick, seed: animator.seed)
                 }
-                drawFrame(ctx: ctx, frameID: frame)
+                drawFrame(ctx: ctx, frameID: frame, pose: pose)
             }
         }
         .frame(width: size, height: size * 0.9)
     }
 
-    private func drawFrame(ctx: GraphicsContext, frameID: String) {
+    private func drawFrame(ctx: GraphicsContext, frameID: String, pose: PetMotion.Pose = .identity) {
         let sprite = AuthoredSprites.sprite(for: archetype)
         let cell = size / CGFloat(CompanionSprite.gridWidth)
         let baseTop = size * 0.42 - cell * CGFloat(CompanionSprite.gridHeight) / 2
@@ -55,7 +59,7 @@ struct PhoneCompanionView: View {
             PetImageRender.draw(ctx: ctx,
                 box: CGRect(x: 0, y: baseTop, width: size,
                             height: CGFloat(PetImageRender.imageBoxRows) * cell),
-                sprite: sprite, frameID: frameID, rest: presence == .asleep)
+                sprite: sprite, pose: pose, rest: presence == .asleep)
             return
         }
         var grid = sprite.symbols(frameID: frameID)

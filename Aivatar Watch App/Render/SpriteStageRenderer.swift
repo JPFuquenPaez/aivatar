@@ -90,6 +90,7 @@ struct SpriteStageRenderer: View {
             if luminanceReduced && !farewellPending {
                 Canvas { ctx, size in
                     drawFrame(ctx: ctx, size: size, frameID: "sleepy",
+                              pose: PetMotion.act("sleepy", 99),
                               overlay: [], shadow: [], rest: true, mote: nil)
                 }
             } else {
@@ -163,10 +164,16 @@ struct SpriteStageRenderer: View {
         // change 3->4 keeps count but changes symbols, and the week grid must
         // not stay stale until the next frame change.
         let overlayKey = fullOverlay.map { "\($0.x),\($0.y),\($0.symbol)" }.joined()
-        let key = "\(director.currentFrame)|\(overlayKey)|\(director.moteCell?.x ?? -1),\(director.moteCell?.y ?? -1)|\(director.weatherHueShiftDeg)|\(rampBucket)"
+        // v42: the pose joins the key QUANTIZED (sub-pixel moves don't force
+        // a redraw — OLED/battery), so continuous ambient motion redraws
+        // only when it crosses a pixel boundary.
+        let pose = PetMotion.pose(frameID: director.currentFrame, frameAge: director.frameAge,
+                                  tick: director.tick, seed: director.seed)
+        let poseKey = "\(Int(pose.rotation * 1000)),\(Int(pose.dx * 10)),\(Int(pose.dy * 10)),\(Int(pose.scaleY * 1000)),\(Int(pose.headTilt * 1000)),\(Int(pose.tailWag * 1000))"
+        let key = "\(director.currentFrame)|\(overlayKey)|\(director.moteCell?.x ?? -1),\(director.moteCell?.y ?? -1)|\(director.weatherHueShiftDeg)|\(rampBucket)|\(poseKey)"
         if key == lastDrawKey { return }
         lastDrawKey = key
-        drawFrame(ctx: ctx, size: size, frameID: director.currentFrame,
+        drawFrame(ctx: ctx, size: size, frameID: director.currentFrame, pose: pose,
                   overlay: overlay, shadow: shadow, rest: false, mote: director.moteCell)
         if farewellPending, let start = farewellStartedAt, farewellTotalSeconds > 0 {
             // v28: the dim ramps over the LAST ticks (peak-end), not the whole
@@ -178,6 +185,7 @@ struct SpriteStageRenderer: View {
     }
 
     private func drawFrame(ctx: GraphicsContext, size: CGSize, frameID: String,
+                           pose: PetMotion.Pose = .identity,
                            overlay: [CompanionSprite.CellDiff],
                            shadow: [CompanionSprite.CellDiff] = [],
                            rest: Bool,
@@ -195,7 +203,7 @@ struct SpriteStageRenderer: View {
             PetImageRender.drawOverlay(ctx: ctx, box: fullBox, cell: cell, sprite: sprite, cells: shadow)
             let box = CGRect(x: 0, y: baseTop, width: size.width,
                              height: CGFloat(PetImageRender.imageBoxRows) * cell)
-            PetImageRender.draw(ctx: ctx, box: box, sprite: sprite, frameID: frameID,
+            PetImageRender.draw(ctx: ctx, box: box, sprite: sprite, pose: pose,
                                 rest: rest, overOverlay: overlay)
             if let mote, !rest {
                 let rect = CGRect(x: CGFloat(mote.x) * cell, y: baseTop + CGFloat(mote.y) * cell,

@@ -171,8 +171,8 @@ final class CompanionSpriteTests: XCTestCase {
         for archetype in Archetype.allCases {
             let sprite = AuthoredSprites.sprite(for: archetype)
             if sprite.isImageBacked {
-                XCTAssertLessThan(CompanionSprite.frameTransform("blink").scaleY, 1.0,
-                                  "\(archetype.rawValue): image-backed blink squashes")
+                XCTAssertLessThan(PetMotion.act("blink", 1).scaleY, 1.0,
+                                  "\(archetype.rawValue): image-backed blink squashes (envelope)")
                 continue
             }
             let idle = symbols(archetype, frameID: "idle")
@@ -194,8 +194,8 @@ final class CompanionSpriteTests: XCTestCase {
         for archetype in Archetype.allCases {
             let sprite = AuthoredSprites.sprite(for: archetype)
             if sprite.isImageBacked {
-                XCTAssertNotEqual(CompanionSprite.frameTransform("happy"), .identity,
-                                  "\(archetype.rawValue): image-backed happy must move")
+                XCTAssertNotEqual(PetMotion.act("happy", 2), .identity,
+                                  "\(archetype.rawValue): image-backed happy must move (envelope)")
                 continue
             }
             let idle = symbols(archetype, frameID: "idle")

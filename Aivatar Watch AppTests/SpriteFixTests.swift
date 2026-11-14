@@ -1,4 +1,5 @@
 import XCTest
+import CoreGraphics
 @testable import Aivatar_Watch_App
 
 /// v24 sprite-craft fixes (from the visual audit): gaze patches must slide
@@ -33,26 +34,68 @@ final class SpriteFixTests: XCTestCase {
         XCTAssertFalse(AuthoredSprites.sprite(for: .lumen).isImageBacked, "lumen stays an authored grid")
     }
 
-    func testImageBackedTransformsCoverEveryFrame() {
+    /// v42: every non-idle act is a real ENVELOPE (non-identity at some age
+    /// 1...6), and the ambient layer is non-static but bounded — continuous
+    /// life, never a snap or a runaway.
+    func testImageBackedActEnvelopesCoverEveryFrame() {
         let frameIDs = ["blink", "sleepy", "happy", "glanceL", "glanceR",
                         "quirk", "perk", "breathe", "idleA", "idleB", "yawn"]
+        for id in frameIDs {
+            let moving = (1...6).contains { age in PetMotion.act(id, age) != .identity }
+            XCTAssertTrue(moving, "\(id): act envelope must move at some age")
+        }
+        // Ambient: bounded amplitude, non-zero (the animal is never a still).
+        for seed: UInt64 in [1, 20261010, 999] {
+            var maxRot = 0.0, maxDx = 0.0, maxWag = 0.0
+            var anyMotion = false
+            for tick in 0..<500 {
+                let p = PetMotion.ambient(tick, seed: seed)
+                maxRot = max(maxRot, abs(p.rotation))
+                maxDx = max(maxDx, abs(p.dx))
+                maxWag = max(maxWag, abs(p.tailWag))
+                if p != .identity { anyMotion = true }
+            }
+            XCTAssertTrue(anyMotion, "ambient must move")
+            XCTAssertLessThan(maxRot, 0.05, "sway stays subtle")
+            XCTAssertLessThan(maxDx, 0.5, "drift stays on the tile")
+            XCTAssertLessThan(maxWag, 0.25, "wag stays subtle")
+        }
+        // Determinism: same (frameID, age, tick, seed) -> same pose.
+        XCTAssertEqual(PetMotion.pose(frameID: "quirk", frameAge: 3, tick: 120, seed: 42),
+                       PetMotion.pose(frameID: "quirk", frameAge: 3, tick: 120, seed: 42))
+        // Non-repeating: the FULL ambient pose takes many distinct values over
+        // an hour of ticks. (Each layer has an integer period, but the periods
+        // are coprime, so the combined pose's period is ~1.2e9 ticks — no
+        // visible loop.)
+        func hash(_ p: PetMotion.Pose) -> Int {
+            var h = 0
+            for v in [p.dx, p.dy, p.scaleX, p.scaleY, p.rotation, p.headTilt, p.headBob, p.tailWag] {
+                h = h &* 31 &+ Int(v * 1_000_000)
+            }
+            return h
+        }
+        let poses = Set((0..<24000).map { hash(PetMotion.ambient($0, seed: 7)) })
+        XCTAssertGreaterThan(poses.count, 1000, "ambient motion must not loop visibly")
+    }
+
+    /// v42: the five HD pets carry puppet regions (head + tail) inside the
+    /// image bounds; the grid-authored lumen has none.
+    func testPuppetRegionsAreWiredPerPet() throws {
         for archetype in Archetype.allCases {
-            guard AuthoredSprites.sprite(for: archetype).isImageBacked else { continue }
-            XCTAssertEqual(CompanionSprite.frameTransform("idle"), .identity,
-                           "\(archetype.rawValue): idle is the rest pose")
-            for id in frameIDs {
-                XCTAssertNotEqual(CompanionSprite.frameTransform(id), .identity,
-                                  "\(archetype.rawValue) \(id): transform must be a real pose")
+            let sprite = AuthoredSprites.sprite(for: archetype)
+            if sprite.isImageBacked {
+                for region in [sprite.puppetHead, sprite.puppetTail] {
+                    let r = try XCTUnwrap(region, "\(archetype.rawValue): puppet region missing")
+                    XCTAssertTrue(r.rect.minX >= 0 && r.rect.maxX <= 1 && r.rect.minY >= 0 && r.rect.maxY <= 1,
+                                  "\(archetype.rawValue): region rect inside the image")
+                    XCTAssertTrue(r.anchor.x >= 0 && r.anchor.x <= 1 && r.anchor.y >= 0 && r.anchor.y <= 1,
+                                  "\(archetype.rawValue): anchor inside the image")
+                }
+            } else {
+                XCTAssertNil(sprite.puppetHead)
+                XCTAssertNil(sprite.puppetTail)
             }
         }
-        // The mapping itself is pinned (pure, seed-free — determinism by construction).
-        XCTAssertEqual(CompanionSprite.frameTransform("breathe"),
-                       CompanionSprite.FrameTransform(dy: 0.5, scaleX: 1.015, scaleY: 1.045))
-        XCTAssertEqual(CompanionSprite.frameTransform("quirk"),
-                       CompanionSprite.FrameTransform(dy: 1.1, scaleX: 1.03, scaleY: 1.05, rotation: 0.04))
-        XCTAssertEqual(CompanionSprite.frameTransform("glanceL").dx, -0.7)
-        XCTAssertEqual(CompanionSprite.frameTransform("glanceR").dx, 0.7)
-        XCTAssertEqual(CompanionSprite.frameTransform("blink").scaleY, 0.90)
     }
 
     /// v31 rule carried to v40: a frame that renders as plain idle is an
@@ -66,8 +109,8 @@ final class SpriteFixTests: XCTestCase {
             let base = sprite.symbols(frameID: "idle")
             for id in frameIDs {
                 if sprite.isImageBacked {
-                    XCTAssertNotEqual(CompanionSprite.frameTransform(id), .identity,
-                                      "\(archetype.rawValue) \(id): no-op frame")
+                    let moving = (1...6).contains { age in PetMotion.act(id, age) != .identity }
+                    XCTAssertTrue(moving, "\(archetype.rawValue) \(id): no-op act envelope")
                     continue
                 }
                 let frame = sprite.symbols(frameID: id)
