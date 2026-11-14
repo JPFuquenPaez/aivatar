@@ -113,11 +113,12 @@ final class HapticsAndPostcardTests: XCTestCase {
             // idleB foot step change the authored frames; willow and prism
             // first frames are unchanged.
             // Re-pinned v40: pet downsample grids (image-backed companions).
-            .ember: 13_119_732_844_903_430_415,
-            .willow: 6_208_847_639_857_728_232,
-            .compass: 7_028_191_633_825_068_648,
-            .prism: 5_421_257_008_312_214_618,
-            .nimbus: 1_244_477_897_577_249_929,
+            // Re-pinned v41: complete pet cuts (legs included).
+            .ember: 15_372_849_707_682_877_320,
+            .willow: 13_042_637_692_457_985_637,
+            .compass: 6_493_603_783_392_441_931,
+            .prism: 6_394_448_247_842_795_144,
+            .nimbus: 2_448_921_687_502_174_694,
             .lumen: 1_557_286_761_931_598_275,
         ]
         var recorded: [String] = []

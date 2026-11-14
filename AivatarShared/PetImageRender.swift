@@ -77,15 +77,25 @@ nonisolated enum PetImageRender {
             else { partial.append((r, d.symbol, d.alpha)) }
         }
         for (symbol, path) in paths {
-            if let hex = sprite.paletteHex[symbol] {
-                ctx.fill(path, with: .color(color(hex)))
-            }
+            ctx.fill(path, with: .color(cellColor(sprite, symbol)))
         }
         for (rect, symbol, alpha) in partial {
-            if let hex = sprite.paletteHex[symbol] {
-                ctx.fill(Path(rect), with: .color(color(hex).opacity(Double(alpha))))
+            ctx.fill(Path(rect), with: .color(cellColor(sprite, symbol).opacity(Double(alpha))))
+        }
+    }
+
+    /// Overlay cell color. v41: for image-backed pets the ground tile (and
+    /// any ink) is neutral dark — a shadow is not tinted by the pet's shade
+    /// token (the corgi's D is olive); accent cells keep the pet's accent.
+    private static func cellColor(_ sprite: CompanionSprite, _ symbol: Character) -> Color {
+        if sprite.isImageBacked {
+            switch symbol {
+            case "D": return color("26262B")
+            case "K": return color("0B0B0D")
+            default: break
             }
         }
+        return color(sprite.paletteHex[symbol] ?? "000000")
     }
 
     static func color(_ hex: String) -> Color {

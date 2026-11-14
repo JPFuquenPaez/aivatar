@@ -36,7 +36,7 @@ nonisolated enum SpriteStageMetadata {
             // the body center right.
             return AnimalMeta(
                 faceRect: (1, 2, 12, 12),
-                shadowRow: 15, shadowWidth: 14, shadowCenterX: 11,
+                shadowRow: 15, shadowWidth: 12, shadowCenterX: 10,
                 blushL: (2, 9), blushR: (11, 9),
                 vapor: [(5, 0), (6, 0)]
             )
@@ -52,7 +52,7 @@ nonisolated enum SpriteStageMetadata {
             // Corgi: head top-center-right.
             return AnimalMeta(
                 faceRect: (6, 1, 11, 11),
-                shadowRow: 15, shadowWidth: 12, shadowCenterX: 9,
+                shadowRow: 15, shadowWidth: 10, shadowCenterX: 9,
                 blushL: (7, 7), blushR: (16, 7),
                 vapor: [(10, 0), (11, 0)]
             )
@@ -89,14 +89,14 @@ nonisolated enum SpriteStageMetadata {
         return x >= f.x && x < f.x + f.w && y >= f.y && y < f.y + f.h
     }
 
-    /// The ground tile (E9.1 shadow, evolved v35 into a pseudo-3D isometric
-    /// slab — flat tokens only, no gradients, so the pixel-honesty rules hold):
-    ///   row+0: width w-2, `D` (top face, narrow)
+    /// The ground tile (E9.1, evolved v35/v41 into an isometric DIAMOND —
+    /// flat tokens only, no gradients, so the pixel-honesty rules hold):
+    ///   row+0: width w-2, `D` (top face, pointed)
     ///   row+1: width w,   `D` (top face, widest)
-    ///   row+2: width w,   `K` (ink front face = the slab's thickness)
-    /// The diamond-plus-lip reads as an isometric ground plane in classic
-    /// pixel-art fashion. `widthExtra` widens every row (the breathe frame
-    /// swells the tile as the companion inhales — the tile is animated).
+    ///   row+2: width w-2, `K` (ink front lip, inset)
+    /// The pointed rows read as a classic 2:1 iso ground plane instead of a
+    /// flat bar. `widthExtra` widens every row (the breathe frame swells the
+    /// tile as the companion inhales — the tile is animated).
     /// Rows past the grid bottom are clamped away.
     static func shadowCells(_ archetype: Archetype, widthExtra: Int = 0) -> [CompanionSprite.CellDiff] {
         let m = meta(for: archetype)
@@ -104,7 +104,7 @@ nonisolated enum SpriteStageMetadata {
         let rows: [(dy: Int, width: Int, symbol: Character)] = [
             (0, max(0, w - 2), "D"),
             (1, w, "D"),
-            (2, w, "K"),
+            (2, max(0, w - 2), "K"),
         ]
         var cells: [CompanionSprite.CellDiff] = []
         for (dy, width, symbol) in rows {

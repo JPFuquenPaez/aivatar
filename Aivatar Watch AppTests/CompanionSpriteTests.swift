@@ -94,11 +94,13 @@ final class CompanionSpriteTests: XCTestCase {
             // gained its 2-cell mouth — the other three idle grids are unchanged.
             // Re-pinned v40: the five companions are now auto-downsampled
             // pet grids (HD image-backed); lumen keeps its authored grid.
-            .ember: 13_119_732_844_903_430_415,
-            .willow: 625_819_346_969_015_129,
-            .compass: 8_738_366_297_932_403_113,
-            .prism: 5_421_257_008_312_214_618,
-            .nimbus: 1_244_477_897_577_249_929,
+            // Re-pinned v41: cuts now include the legs/paws (platform removed
+            // by color, not by row band).
+            .ember: 15_372_849_707_682_877_320,
+            .willow: 8_363_715_098_910_483_911,
+            .compass: 11_677_586_957_638_007_877,
+            .prism: 6_394_448_247_842_795_144,
+            .nimbus: 2_448_921_687_502_174_694,
             .lumen: 15_613_248_097_422_517_119,
         ]
         var actual: [Archetype: UInt64] = [:]
