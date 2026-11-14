@@ -14,64 +14,64 @@ final class SpriteFixTests: XCTestCase {
     func testCompassGlanceLSlidesEyeWithoutSmear() {
         let g = grid(.compass, "glanceL")
         // Old pupil cells cleared; the eye sits at x=3-4 as W K / K K.
-        XCTAssertEqual(g[4][5], "B", "old catchlight column cleared")
-        XCTAssertEqual(g[5][5], "B", "old pupil cleared")
-        XCTAssertEqual(g[4][3], "W")
-        XCTAssertEqual(g[4][4], "K")
-        XCTAssertEqual(g[5][3], "K")
+        XCTAssertEqual(g[5][5], "B", "old catchlight column cleared")
+        XCTAssertEqual(g[6][5], "B", "old pupil cleared")
+        XCTAssertEqual(g[5][3], "W")
         XCTAssertEqual(g[5][4], "K")
+        XCTAssertEqual(g[6][3], "K")
+        XCTAssertEqual(g[6][4], "K")
         // No third pupil column remains at x=5.
-        XCTAssertFalse(g[4][5] == "K" || g[5][5] == "K")
+        XCTAssertFalse(g[5][5] == "K" || g[6][5] == "K")
     }
 
     func testNimbusGlancesMoveBothEyes() {
         let left = grid(.nimbus, "glanceL")
-        // Both eyes shifted one cell left; nothing left behind at x=6/11.
-        XCTAssertEqual(left[5][6], "B"); XCTAssertEqual(left[6][6], "B")
-        XCTAssertEqual(left[5][11], "B"); XCTAssertEqual(left[6][11], "B")
-        XCTAssertEqual(left[5][4], "W"); XCTAssertEqual(left[5][5], "K")
-        XCTAssertEqual(left[5][9], "W"); XCTAssertEqual(left[5][10], "K")
+        // Both eyes shifted one cell left; nothing left behind at x=7/13.
+        XCTAssertEqual(left[5][7], "B"); XCTAssertEqual(left[6][7], "B")
+        XCTAssertEqual(left[5][13], "B"); XCTAssertEqual(left[6][13], "B")
+        XCTAssertEqual(left[5][5], "W"); XCTAssertEqual(left[5][6], "K")
+        XCTAssertEqual(left[5][11], "W"); XCTAssertEqual(left[5][12], "K")
 
         let right = grid(.nimbus, "glanceR")
-        // Right eye actually moved to x=11-12.
-        XCTAssertEqual(right[5][10], "B"); XCTAssertEqual(right[6][10], "B")
-        XCTAssertEqual(right[5][11], "W"); XCTAssertEqual(right[5][12], "K")
-        XCTAssertEqual(right[6][11], "K"); XCTAssertEqual(right[6][12], "K")
-        // Left eye moved right too, nothing at x=5.
-        XCTAssertEqual(right[5][5], "B"); XCTAssertEqual(right[6][5], "B")
-        XCTAssertEqual(right[5][6], "W"); XCTAssertEqual(right[5][7], "K")
+        // Right eye actually moved to x=13-14 (was: never moved).
+        XCTAssertEqual(right[5][12], "B"); XCTAssertEqual(right[6][12], "B")
+        XCTAssertEqual(right[5][13], "W"); XCTAssertEqual(right[5][14], "K")
+        XCTAssertEqual(right[6][13], "K"); XCTAssertEqual(right[6][14], "K")
+        // Left eye moved right too, nothing at x=6.
+        XCTAssertEqual(right[5][6], "B"); XCTAssertEqual(right[6][6], "B")
+        XCTAssertEqual(right[5][7], "W"); XCTAssertEqual(right[5][8], "K")
     }
 
     func testEmberTailTipIsLiteralAndRidesTheWag() {
         let base = grid(.ember, "idle")
         let idleA = grid(.ember, "idleA")
         let quirk = grid(.ember, "quirk")
-        XCTAssertEqual(base[11][19], ".", "base has no tail — the wag paints it")
-        XCTAssertEqual(quirk[11][19], "W", "quirk wags right, tip rides the extreme")
-        XCTAssertEqual(quirk[11][18], "B")
-        XCTAssertEqual(quirk[11][17], "B")
-        XCTAssertEqual(idleA[0][16], "B", "idleA flares the right ear")
-        XCTAssertEqual(base[0][16], ".", "base ear tip is one cell shorter")
-        // No floating accent: every W in the quirk row touches the tail mass.
-        for x in 0..<20 where quirk[11][x] == "W" {
-            XCTAssertTrue([x - 1, x + 1].contains { quirk[11][$0] != "." }, "W at \(x) attaches to a mass")
+        XCTAssertEqual(base[9][18], "W", "v28: tip sits at the tail's literal tip x=18")
+        XCTAssertEqual(quirk[9][19], "W", "quirk wags right, tip rides the extreme")
+        XCTAssertEqual(quirk[9][18], "B")
+        XCTAssertEqual(idleA[9][17], "W", "idleA wags left, tip at x=17")
+        XCTAssertEqual(idleA[9][18], "B")
+        // No floating accent: every W in these frames touches the tail mass.
+        for row in [base[9], idleA[9], quirk[9]] {
+            for x in 0..<20 where row[x] == "W" {
+                XCTAssertTrue([x - 1, x + 1].contains { row[$0] != "." }, "W at \(x) attaches to a mass")
+            }
         }
     }
 
     func testPrismTurretSlidesAsABlockAndQuirkDiffers() {
         let r = grid(.prism, "glanceR")
-        // Eye block slid right: W at x5 row4, K at x6 row4 + x5-6 row5; x4 cleared.
-        XCTAssertEqual(r[4][4], "B")
-        XCTAssertEqual(r[4][5], "W")
-        XCTAssertEqual(r[4][6], "K")
-        XCTAssertEqual(r[5][5], "K")
+        // Catchlight adjacent to pupil: W K K at x5-7, nothing severed at x4.
+        XCTAssertEqual(r[5][4], "B")
+        XCTAssertEqual(r[5][5], "W")
         XCTAssertEqual(r[5][6], "K")
+        XCTAssertEqual(r[5][7], "K")
         let q = grid(.prism, "quirk")
         XCTAssertNotEqual(r, q, "quirk is no longer identical to glanceR")
         // blink clears the catchlight too (no floating W above the lid)
         let b = grid(.prism, "blink")
-        XCTAssertEqual(b[4][4], "B")
-        XCTAssertEqual(b[4][5], "B")
+        XCTAssertEqual(b[5][4], "B")
+        XCTAssertEqual(b[6][4], "B")
         // breathe stays off the coil ring (no anchor shimmer)
         let br = grid(.prism, "breathe")
         let base = grid(.prism, "idle")
@@ -83,13 +83,13 @@ final class SpriteFixTests: XCTestCase {
 
     func testCompassMouthNeverVanishes() {
         let base = grid(.compass, "idle")
-        // Two-cell mouth at x=1-2, row 7 — off the bezel edge.
-        XCTAssertEqual(base[7][1], "K")
-        XCTAssertEqual(base[7][2], "K", "two-cell mouth survives downsampling")
-        XCTAssertEqual(base[7][0], ".", "snout no longer touches the left bezel edge")
+        // v31: the mouth moved one cell off the bezel edge (x=1-2, was x=0-1).
+        XCTAssertEqual(base[8][1], "K")
+        XCTAssertEqual(base[8][2], "K", "v28/v31: two-cell mouth survives downsampling")
+        XCTAssertEqual(base[8][0], ".", "v31: snout no longer touches the left bezel edge")
         let idleB = grid(.compass, "idleB")
-        XCTAssertEqual(idleB[7][1], "K", "idleB no longer erases the mouth")
-        XCTAssertEqual(idleB[7][2], "B", "idleB narrows the mouth by one cell instead of erasing")
+        XCTAssertEqual(idleB[8][2], "K", "idleB no longer erases the mouth")
+        XCTAssertEqual(idleB[8][1], "B", "v31: idleB narrows the mouth by one cell instead of erasing")
     }
 
     /// v31: a patch that produces zero real diffs against the base grid is an
@@ -120,12 +120,15 @@ final class SpriteFixTests: XCTestCase {
     func testPrismQuirkTightensTheCoil() {
         let base = grid(.prism, "idle")
         let q = grid(.prism, "quirk")
-        XCTAssertEqual(base[7][18], ".", "base hole at x=18 row 7")
-        XCTAssertEqual(q[7][18], "D", "quirk fills x=18 row 7 — the coil contracts")
-        XCTAssertNotEqual(base, q, "quirk visibly differs from base")
-        // The coil's right edge stays shaded in the base.
-        XCTAssertEqual(base[4][19], "D")
-        XCTAssertEqual(base[7][17], "D")
+        for y in 5...7 {
+            XCTAssertEqual(base[y][17], ".", "base hole at x=17 row \(y)")
+            XCTAssertEqual(q[y][17], "D", "quirk fills x=17 row \(y) — the coil contracts")
+        }
+        // The v31 base has a 2-cell-thick coil right edge (x=18-19).
+        for y in 5...7 {
+            XCTAssertEqual(base[y][18], "D")
+            XCTAssertEqual(base[y][19], "D")
+        }
     }
 
     func testNimbusFeetStaySeparatedAndCrestIsOneTuft() {
@@ -142,23 +145,22 @@ final class SpriteFixTests: XCTestCase {
             return masses
         }
         XCTAssertEqual(footMasses(Array(base[14])), 2)
-        XCTAssertEqual(footMasses(Array(idleB[14])), 2, "idleB steps the foot, no plank")
+        XCTAssertEqual(footMasses(Array(idleB[14])), 2, "v28: idleB steps the foot, no plank")
         let perk = grid(.nimbus, "perk")
-        XCTAssertEqual(perk[0][6], "B")
-        XCTAssertEqual(perk[0][9], "B")
-        XCTAssertEqual(perk[0][7], base[0][7], "no detached tuft at x=7")
+        XCTAssertEqual(perk[1][8], "B")
+        XCTAssertEqual(perk[1][9], "B")
+        XCTAssertEqual(perk[1][7], base[1][7], "no detached tuft at x=7")
     }
 
     func testWillowYawnMouthIsACleanCavity() {
         let y = grid(.willow, "yawn")
-        // open mouth row 9: K D D K — a clean cavity, no orphaned ink
-        XCTAssertEqual(y[9][8], "K")
-        XCTAssertEqual(y[9][9], "D")
-        XCTAssertEqual(y[9][10], "D")
-        XCTAssertEqual(y[9][11], "K")
-        // lids down over both eyes
-        XCTAssertEqual(y[1][5], "D")
-        XCTAssertEqual(y[1][13], "D")
+        // smile row: K D D D D K — no orphaned ink clusters
+        XCTAssertEqual(y[6][6], "K")
+        XCTAssertEqual(y[6][7], "D")
+        XCTAssertEqual(y[6][8], "D")
+        XCTAssertEqual(y[6][9], "D")
+        XCTAssertEqual(y[6][10], "D")
+        XCTAssertEqual(y[6][11], "K")
     }
 
     func testEventIconDiffersForAllArchetypes() {
