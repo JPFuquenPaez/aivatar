@@ -92,12 +92,12 @@ final class CompanionSpriteTests: XCTestCase {
             // Pinned 2026-11-03 (v13); re-pinned 2026-11-07 (v28): ember's base
             // tail tip moved to the literal tip (x=18) and compass's base row 8
             // gained its 2-cell mouth — the other three idle grids are unchanged.
-            .ember: 2_451_309_545_071_567_918,
-            .willow: 6_115_991_415_473_770_972,
-            .compass: 13_422_192_436_272_290_303,
-            .prism: 1_588_146_895_759_741_354,
-            .nimbus: 5_552_407_490_590_961_342,
-            .lumen: 15_613_248_097_422_517_119,
+            .ember: 9_854_334_368_486_915_035,
+            .willow: 2_003_694_257_741_325_181,
+            .compass: 4_623_125_994_238_026_786,
+            .prism: 2_578_285_504_653_071_135,
+            .nimbus: 4_363_241_763_941_009_695,
+            .lumen: 12_230_824_070_440_391_331,
         ]
         var actual: [Archetype: UInt64] = [:]
         var recorded: [String] = []

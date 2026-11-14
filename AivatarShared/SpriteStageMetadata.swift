@@ -26,49 +26,49 @@ nonisolated enum SpriteStageMetadata {
         case .ember:
             // Fox: eyes rows 4-5; head mass rows 2-13; ground row 15.
             return AnimalMeta(
-                faceRect: (4, 3, 13, 6),
+                faceRect: (4, 2, 12, 8),
                 shadowRow: 15, shadowWidth: 10,
-                blushL: (3, 6), blushR: (16, 6),
+                blushL: (3, 7), blushR: (16, 7),
                 vapor: [(9, 0), (10, 0)]  // between the ears
             )
         case .willow:
             // Frog: dome eyes rows 0-3 on top of the head; body bottom row 15.
             return AnimalMeta(
-                faceRect: (4, 0, 12, 7),
-                shadowRow: 16, shadowWidth: 14,
-                blushL: (3, 4), blushR: (16, 4),
+                faceRect: (3, 0, 14, 9),
+                shadowRow: 15, shadowWidth: 12,
+                blushL: (3, 6), blushR: (16, 6),
                 vapor: [(9, 0), (10, 0)]
             )
         case .compass:
             // Fish (side profile): eye cols 3-6 rows 5-6; body bottom row 13.
             return AnimalMeta(
-                faceRect: (2, 4, 8, 4),
-                shadowRow: 14, shadowWidth: 12,
-                blushL: (1, 6), blushR: (9, 6),
-                vapor: [(4, 2), (5, 2)]
+                faceRect: (2, 3, 8, 5),
+                shadowRow: 13, shadowWidth: 12,
+                blushL: (2, 6), blushR: (11, 6),
+                vapor: [(10, 0), (11, 0)]
             )
         case .prism:
             // Chameleon: turret eye rows 5-7 cols 2-7; feet row 14.
             return AnimalMeta(
-                faceRect: (2, 4, 9, 5),
-                shadowRow: 15, shadowWidth: 10,
-                blushL: (1, 6), blushR: (9, 6),
-                vapor: [(4, 0), (5, 0)]
+                faceRect: (3, 3, 10, 6),
+                shadowRow: 14, shadowWidth: 10,
+                blushL: (2, 7), blushR: (12, 7),
+                vapor: [(9, 0), (10, 0)]
             )
         case .nimbus:
             // Bird: eyes rows 5-6; feet row 15; beak band row 7-8.
             return AnimalMeta(
-                faceRect: (4, 4, 11, 5),
-                shadowRow: 16, shadowWidth: 10,
-                blushL: (3, 5), blushR: (15, 5),
-                vapor: [(9, 0), (10, 0)]
+                faceRect: (3, 4, 11, 6),
+                shadowRow: 15, shadowWidth: 10,
+                blushL: (4, 8), blushR: (13, 8),
+                vapor: [(10, 0), (11, 0)]
             )
         case .lumen:
             // Moth: eyes rows 2-3 cols 6-13 (antennae row 0); body bottom row 13.
             return AnimalMeta(
-                faceRect: (6, 1, 8, 4),
+                faceRect: (5, 1, 10, 5),
                 shadowRow: 14, shadowWidth: 12,
-                blushL: (6, 4), blushR: (13, 4),
+                blushL: (5, 5), blushR: (14, 5),
                 vapor: [(9, 0), (10, 0)]
             )
         }

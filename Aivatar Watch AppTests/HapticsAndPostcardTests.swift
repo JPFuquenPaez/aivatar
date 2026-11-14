@@ -82,12 +82,12 @@ final class HapticsAndPostcardTests: XCTestCase {
             // tail-tip cell, compass base mouth + happy patch, and nimbus
             // idleB foot step change the authored frames; willow and prism
             // first frames are unchanged.
-            .ember: 2_189_887_195_745_852_862,
-            .willow: 5_779_802_598_010_730_844,
-            .compass: 5_708_430_803_773_449_336,
-            .prism: 14_174_554_351_663_265_186,
-            .nimbus: 11_416_384_784_677_474_054,
-            .lumen: 1_557_286_761_931_598_275,
+            .ember: 7_756_400_188_131_548_275,
+            .willow: 7_965_842_243_094_656_501,
+            .compass: 4_617_438_998_504_845_913,
+            .prism: 4_517_095_608_148_382_113,
+            .nimbus: 12_274_591_858_681_228_199,
+            .lumen: 2_622_192_467_847_103_473,
         ]
         var recorded: [String] = []
         for archetype in Archetype.allCases {
