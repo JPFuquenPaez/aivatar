@@ -13,8 +13,8 @@
 "presence.noticed_something" = "noticed something";
 "identity.full" = "%1$@ the %2$@";
 "animal.ember.name" = "Fox";
-"animal.willow.name" = "Frog";
-"animal.compass.name" = "Fish";
-"animal.prism.name" = "Chameleon";
-"animal.nimbus.name" = "Bird";
+"animal.willow.name" = "Shiba Inu";
+"animal.compass.name" = "Corgi";
+"animal.prism.name" = "Sphynx";
+"animal.nimbus.name" = "Mockingbird";
 "animal.lumen.name" = "Moth";

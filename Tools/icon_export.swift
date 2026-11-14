@@ -34,7 +34,14 @@ guard CommandLine.arguments.count == 2 else {
 let root = URL(fileURLWithPath: CommandLine.arguments[1])
 
 // ---- 1. Parse the authored grid from the Swift source (single source of truth) ----
-let spriteURL = root.appendingPathComponent("Aivatar Watch App/Render/CompanionSprite.swift")
+// v36 moved the sprite core to AivatarShared; try both locations.
+let candidates = [
+    "AivatarShared/CompanionSprite.swift",
+    "Aivatar Watch App/Render/CompanionSprite.swift",
+]
+let spriteURL = candidates
+    .map { root.appendingPathComponent($0) }
+    .first { FileManager.default.fileExists(atPath: $0.path) }!
 guard let spriteSource = try? String(contentsOf: spriteURL, encoding: .utf8) else {
     fail("cannot read \(spriteURL.path)")
 }

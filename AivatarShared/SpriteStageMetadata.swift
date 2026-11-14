@@ -16,6 +16,10 @@ nonisolated enum SpriteStageMetadata {
         var faceRect: (x: Int, y: Int, w: Int, h: Int)
         var shadowRow: Int
         var shadowWidth: Int
+        /// v40: image-backed pets are not grid-centered (fox tail, bird on
+        /// its branch) — the ground tile centers under the body, not the
+        /// canvas. Nil = canvas center (authored-grid animals).
+        var shadowCenterX: Int? = nil
         var blushL: (x: Int, y: Int)
         var blushR: (x: Int, y: Int)
         var vapor: [(x: Int, y: Int)]
@@ -23,45 +27,50 @@ nonisolated enum SpriteStageMetadata {
 
     static func meta(for archetype: Archetype) -> AnimalMeta {
         switch archetype {
+        // v40 HD pets: the pet image is drawn aspect-fit into rows 0...15
+        // (bottom-anchored), so the ground tile sits at rows 15-17 and the
+        // face band follows the head in the HD art (cell coords of the same
+        // 20x18 box — boop hit math is unchanged).
         case .ember:
-            // Fox: eyes rows 4-5; head mass rows 2-13; ground row 15.
+            // Fox: head left-of-center (ears x1-11, rows 2-13); tail drags
+            // the body center right.
             return AnimalMeta(
-                faceRect: (4, 3, 13, 6),
-                shadowRow: 15, shadowWidth: 10,
-                blushL: (3, 6), blushR: (16, 6),
-                vapor: [(9, 0), (10, 0)]  // between the ears
+                faceRect: (1, 2, 12, 12),
+                shadowRow: 15, shadowWidth: 14, shadowCenterX: 11,
+                blushL: (2, 9), blushR: (11, 9),
+                vapor: [(5, 0), (6, 0)]
             )
         case .willow:
-            // Frog: dome eyes rows 0-3 on top of the head; body bottom row 15.
+            // Shiba: head top-center, facing forward.
             return AnimalMeta(
-                faceRect: (4, 0, 12, 7),
-                shadowRow: 16, shadowWidth: 14,
-                blushL: (3, 4), blushR: (16, 4),
-                vapor: [(9, 0), (10, 0)]
+                faceRect: (6, 1, 10, 11),
+                shadowRow: 15, shadowWidth: 10, shadowCenterX: 9,
+                blushL: (7, 7), blushR: (15, 7),
+                vapor: [(10, 0), (11, 0)]
             )
         case .compass:
-            // Fish (side profile): eye cols 3-6 rows 5-6; body bottom row 13.
+            // Corgi: head top-center-right.
             return AnimalMeta(
-                faceRect: (2, 4, 8, 4),
-                shadowRow: 14, shadowWidth: 12,
-                blushL: (1, 6), blushR: (9, 6),
-                vapor: [(4, 2), (5, 2)]
+                faceRect: (6, 1, 11, 11),
+                shadowRow: 15, shadowWidth: 12, shadowCenterX: 9,
+                blushL: (7, 7), blushR: (16, 7),
+                vapor: [(10, 0), (11, 0)]
             )
         case .prism:
-            // Chameleon: turret eye rows 5-7 cols 2-7; feet row 14.
+            // Sphynx: small head top-center, big ears.
             return AnimalMeta(
-                faceRect: (2, 4, 9, 5),
-                shadowRow: 15, shadowWidth: 10,
-                blushL: (1, 6), blushR: (9, 6),
-                vapor: [(4, 0), (5, 0)]
+                faceRect: (6, 1, 8, 9),
+                shadowRow: 15, shadowWidth: 8, shadowCenterX: 9,
+                blushL: (6, 5), blushR: (13, 5),
+                vapor: [(9, 0), (10, 0)]
             )
         case .nimbus:
-            // Bird: eyes rows 5-6; feet row 15; beak band row 7-8.
+            // Mockingbird: head at the right end of its branch.
             return AnimalMeta(
-                faceRect: (4, 4, 11, 5),
-                shadowRow: 16, shadowWidth: 10,
-                blushL: (3, 5), blushR: (15, 5),
-                vapor: [(9, 0), (10, 0)]
+                faceRect: (10, 1, 9, 11),
+                shadowRow: 15, shadowWidth: 8, shadowCenterX: 13,
+                blushL: (10, 7), blushR: (18, 7),
+                vapor: [(13, 0), (14, 0)]
             )
         case .lumen:
             // Moth: eyes rows 2-3 cols 6-13 (antennae row 0); body bottom row 13.
@@ -101,7 +110,8 @@ nonisolated enum SpriteStageMetadata {
         for (dy, width, symbol) in rows {
             let y = m.shadowRow + dy
             guard y < CompanionSprite.gridHeight, width > 0 else { continue }
-            let x0 = (CompanionSprite.gridWidth - width) / 2
+            let center = m.shadowCenterX ?? CompanionSprite.gridWidth / 2
+            let x0 = center - width / 2
             for i in 0..<width {
                 let x = x0 + i
                 guard x >= 0, x < CompanionSprite.gridWidth else { continue }

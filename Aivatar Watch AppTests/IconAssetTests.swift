@@ -57,8 +57,12 @@ final class IconAssetTests: XCTestCase {
         XCTAssertTrue(grid.contains { $0.contains("W") }, "paper muzzle required")
     }
 
-    func testIconPaletteMatchesEmberStagePalette() {
-        // The icon reuses the stage's authored palette — one hue family on stage and icon.
-        XCTAssertEqual(IconCuts.emberFacePaletteHex, AuthoredSprites.ember.paletteHex)
+    func testIconPaletteIsThePinnedFoxRamp() {
+        // v40: the stage moved to the downsampled pet art, but the app icon
+        // keeps its own hash-pinned ramp (icon_export.swift CI pins the PNGs).
+        XCTAssertEqual(IconCuts.emberFacePaletteHex, [
+            "B": "FF9E4A", "D": "C4621B", "K": "241206",
+            "W": "F5F4EF", "A": "FFC800",
+        ])
     }
 }

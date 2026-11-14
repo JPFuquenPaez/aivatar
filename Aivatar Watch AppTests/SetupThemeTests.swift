@@ -7,11 +7,13 @@ import XCTest
 /// palette put compass at 4.36:1 with black ink, a fail.
 final class SetupThemeTests: XCTestCase {
 
-    func testAccentHexIsTheSpriteBodyToken() {
+    func testAccentHexIsTheSpriteAccentToken() {
+        // v40: the chrome accent is the sprite's UI accent — the body token
+        // for authored grids, the vivid override for image-backed pets.
         for archetype in Archetype.allCases {
             XCTAssertEqual(SetupTheme.accentHex(for: archetype),
-                           AuthoredSprites.sprite(for: archetype).paletteHex["B"],
-                           "\(archetype.rawValue): chrome accent must equal the icon's body cell color")
+                           AuthoredSprites.sprite(for: archetype).uiAccentHex,
+                           "\(archetype.rawValue): chrome accent must equal the sprite's UI accent")
         }
     }
 

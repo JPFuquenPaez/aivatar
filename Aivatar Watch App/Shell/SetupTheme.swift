@@ -32,7 +32,7 @@ nonisolated enum SetupTheme {
     private static let accentHexes: [Archetype: String] = {
         var dict: [Archetype: String] = [:]
         for archetype in Archetype.allCases {
-            dict[archetype] = AuthoredSprites.sprite(for: archetype).paletteHex["B"]
+            dict[archetype] = AuthoredSprites.sprite(for: archetype).uiAccentHex
         }
         return dict
     }()

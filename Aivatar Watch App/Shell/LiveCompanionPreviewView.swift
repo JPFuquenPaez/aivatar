@@ -94,14 +94,27 @@ struct LiveCompanionPreviewView: View {
 
     private func drawFrame(ctx: GraphicsContext, frameID: String, size: CGFloat) {
         let sprite = AuthoredSprites.sprite(for: archetype)
-        let grid = sprite.symbols(frameID: frameID)
         let cell = size / CGFloat(CompanionSprite.gridWidth)
-        var top = size * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+        let baseTop = size * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+        // Ground shadow (E9.1): awake preview frames carry it too.
+        let overlay = SpriteStageMetadata.shadowOverlayIfAwake(archetype, frame: frameID, farewellPending: false)
+        // v40: image-backed companions draw the HD pet (tile under it);
+        // the inhale lift rides the frame transform.
+        if sprite.isImageBacked, PetImageRender.uiImage(sprite) != nil {
+            PetImageRender.drawOverlay(ctx: ctx,
+                box: CGRect(x: 0, y: baseTop, width: size, height: size),
+                cell: cell, sprite: sprite, cells: overlay)
+            PetImageRender.draw(ctx: ctx,
+                box: CGRect(x: 0, y: baseTop, width: size,
+                            height: CGFloat(PetImageRender.imageBoxRows) * cell),
+                sprite: sprite, frameID: frameID)
+            return
+        }
+        let grid = sprite.symbols(frameID: frameID)
+        var top = baseTop
         // v35: same inhale lift as the stage (one cell off the tile).
         if frameID == "breathe" { top -= cell }
         var paths: [Character: Path] = [:]
-        // Ground shadow (E9.1): awake preview frames carry it too.
-        let overlay = SpriteStageMetadata.shadowOverlayIfAwake(archetype, frame: frameID, farewellPending: false)
         var gridWithShadow = grid
         for diff in overlay {
             guard diff.x >= 0, diff.x < CompanionSprite.gridWidth,

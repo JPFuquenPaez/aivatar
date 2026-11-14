@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "pet-sphynx.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

@@ -1,4 +1,5 @@
 import XCTest
+import CoreGraphics
 @testable import Aivatar_Watch_App
 
 /// v22 suite for F7 (haptic language) + F8 (postcards): the moment->haptic
@@ -62,8 +63,37 @@ final class HapticsAndPostcardTests: XCTestCase {
                        bondLevel: 3, dayCount: 23, streakDays: 5, weatherClassRaw: "rain")
     }
 
+    /// v40: FNV-1a over the rendered frame images (image-backed pets animate
+    /// via transforms, so the pixel hashes are the meaningful pins for them).
+    private func imageHashes(_ inputs: PostcardInputs) -> [UInt64] {
+        PostcardComposer.frameImages(inputs).map { img in
+            var h: UInt64 = 0xcbf29ce484222325
+            if let data = img.dataProvider?.data, let ptr = CFDataGetBytePtr(data) {
+                let n = CFDataGetLength(data)
+                for i in 0..<n {
+                    h ^= UInt64(ptr[i])
+                    h = h &* 0x100000001b3
+                }
+            }
+            return h
+        }
+    }
+
     func testPostcardFramesAreDeterministicPerSeed() {
         for archetype in Archetype.allCases {
+            if AuthoredSprites.sprite(for: archetype).isImageBacked {
+                // v40: HD pets — the rendered image frames carry the motion.
+                let a = imageHashes(inputs(archetype))
+                let b = imageHashes(inputs(archetype))
+                XCTAssertEqual(a, b, "\(archetype.rawValue): same inputs -> same image frames")
+                XCTAssertEqual(a.count, PostcardComposer.frameCount)
+                let c = imageHashes(inputs(archetype, seed: 999))
+                XCTAssertNotEqual(a, c, "\(archetype.rawValue): different seed, different card")
+                // The grid fallback stays deterministic as well.
+                XCTAssertEqual(PostcardComposer.frameHashes(inputs(archetype)),
+                               PostcardComposer.frameHashes(inputs(archetype)))
+                continue
+            }
             let a = PostcardComposer.frameHashes(inputs(archetype))
             let b = PostcardComposer.frameHashes(inputs(archetype))
             XCTAssertEqual(a, b, "\(archetype.rawValue): same inputs -> same hashes")
@@ -82,11 +112,12 @@ final class HapticsAndPostcardTests: XCTestCase {
             // tail-tip cell, compass base mouth + happy patch, and nimbus
             // idleB foot step change the authored frames; willow and prism
             // first frames are unchanged.
-            .ember: 2_189_887_195_745_852_862,
-            .willow: 5_779_802_598_010_730_844,
-            .compass: 5_708_430_803_773_449_336,
-            .prism: 14_174_554_351_663_265_186,
-            .nimbus: 11_416_384_784_677_474_054,
+            // Re-pinned v40: pet downsample grids (image-backed companions).
+            .ember: 13_119_732_844_903_430_415,
+            .willow: 6_208_847_639_857_728_232,
+            .compass: 7_028_191_633_825_068_648,
+            .prism: 5_421_257_008_312_214_618,
+            .nimbus: 1_244_477_897_577_249_929,
             .lumen: 1_557_286_761_931_598_275,
         ]
         var recorded: [String] = []

@@ -67,6 +67,62 @@ nonisolated struct CompanionSprite: Sendable, Equatable {
     /// Ramp token -> hex string. Exactly 5 tokens per species.
     let paletteHex: [Character: String]
 
+    /// v40 HD pet pass: when set, renderers draw this asset image
+    /// (aspect-fit into the 20x15 cell box above the ground tile) and
+    /// animate it with `frameTransform(_:)` instead of cell patches — the
+    /// HD art has no cell-level poses. `base` remains as the deterministic
+    /// auto-downsampled fallback (postcard, complication icon, tests).
+    let imageAssetName: String?
+    /// UI accent for image-backed sprites (selection ring, disc): the
+    /// downsampled palette's body tone is muddy, so the vivid accent is
+    /// authored separately.
+    let accentHexOverride: String?
+
+    init(archetype: Archetype, base: [String], patches: [String: [CellDiff]],
+         paletteHex: [Character: String], imageAssetName: String? = nil,
+         accentHexOverride: String? = nil) {
+        self.archetype = archetype
+        self.base = base
+        self.patches = patches
+        self.paletteHex = paletteHex
+        self.imageAssetName = imageAssetName
+        self.accentHexOverride = accentHexOverride
+    }
+
+    nonisolated var isImageBacked: Bool { imageAssetName != nil }
+    nonisolated var uiAccentHex: String { accentHexOverride ?? paletteHex["B"] ?? "FF9E4A" }
+
+    /// v40: image-backed sprites animate as TRANSFORMS of the HD art — a
+    /// pure frameID -> transform mapping, so motion stays a deterministic
+    /// function of the director's frame clock (G7). Units: dx/dy in cells
+    /// (dy + = up), scales and rotation around the bottom-center anchor
+    /// (the feet on the ground tile).
+    nonisolated struct FrameTransform: Sendable, Equatable {
+        var dx: Double = 0
+        var dy: Double = 0
+        var scaleX: Double = 1
+        var scaleY: Double = 1
+        var rotation: Double = 0
+        static let identity = FrameTransform()
+    }
+
+    static func frameTransform(_ frameID: String) -> FrameTransform {
+        switch frameID {
+        case "breathe": return FrameTransform(dy: 0.5, scaleX: 1.015, scaleY: 1.045)
+        case "blink":   return FrameTransform(scaleX: 1.02, scaleY: 0.90)
+        case "sleepy":  return FrameTransform(scaleY: 0.94)
+        case "happy":   return FrameTransform(dy: 0.25, scaleY: 1.03, rotation: 0.02)
+        case "glanceL": return FrameTransform(dx: -0.7)
+        case "glanceR": return FrameTransform(dx: 0.7)
+        case "quirk":   return FrameTransform(dy: 1.1, scaleX: 1.03, scaleY: 1.05, rotation: 0.04)
+        case "perk":    return FrameTransform(dy: 0.5, scaleX: 1.02, scaleY: 1.02)
+        case "yawn":    return FrameTransform(dy: 0.4, scaleY: 1.07)
+        case "idleA":   return FrameTransform(rotation: -0.008)
+        case "idleB":   return FrameTransform(rotation: 0.008)
+        default:        return .identity
+        }
+    }
+
     // MARK: - Resolution
 
     /// Resolves a frame id to the 20x18 symbol grid (idle + patch), then
@@ -187,283 +243,210 @@ nonisolated enum AuthoredSprites {
         }
     }
 
-    // MARK: EMBER — fox
+    // MARK: v40 HD PETS — the five companions are cut from the authored
+    // HD pet sheet (avatars/, cut into avatars/cut/pet-*.png and shipped as
+    // imagesets `pet-<name>` in both app catalogs). The 20x18 grids below
+    // are deterministic auto-downsamples of the same art: they keep every
+    // grid consumer working (postcard, complication icon, tests) as a
+    // pixel-honest fallback; the live stage/picker/phone draw the HD image.
+
+    static let petFoxGrid: [String] = [
+    "W.......KWW.........",
+    "AA......AAW.........",
+    "AAB....AAAW.........",
+    "AWBB..BABAW.........",
+    "WAABBBAWBA..........",
+    ".AWABAAWWW..........",
+    ".WAAAAAWW...........",
+    "..AAAKAAW...........",
+    "..WWBWWW............",
+    "..WKWWWBDDAK........",
+    "...AAAADDDDDA.......",
+    "...KWWDAKKDDAAK.....",
+    "...KKDAAAKDDAAA.KDD.",
+    "....WWWAAKKABAAADDK.",
+    "....WWWAKAAABBAAAK.K",
+    "....BBAABBAAABAAAAKK",
+    ".....ABABBWWABBBAAKK",
+    ".....AAAKBBWAKBBBBK.",
+]
+    static let petFoxPalette: [Character: String] = [
+    "K": "44281C",
+    "D": "7C5642",
+    "B": "B77C55",
+    "W": "F2E1C5",
+    "A": "E1AF7B",
+]
+
+    static let petMockingbirdGrid: [String] = [
+    ".WW.................",
+    "KWKWD...............",
+    "KKKKW...............",
+    "KKKKKW.......AAAA...",
+    "WKKKKKK.....AAWAAKK.",
+    "WWKKKKK....KABBBBK..",
+    ".WAKKKK....AAWWBB...",
+    ".WWAKKKK.AAAAABBB...",
+    "..WWAKAAAAAAAABBB...",
+    "....WBAAKKKKKWBBB...",
+    ".....AADWKKKKWWWW...",
+    ".....KADKWWBWWWWW...",
+    ".....KKKKBBWWWWB..D.",
+    "....KKKKBBBBBB...DD.",
+    "....KKKK.KKAKKK.DDKD",
+    "..........KK.KKKDKKD",
+    "..........KKDKKK....",
+    "...........KKKKKK...",
+]
+    static let petMockingbirdPalette: [Character: String] = [
+    "K": "363A44",
+    "D": "6F6662",
+    "B": "B1B2B8",
+    "W": "E4E8EC",
+    "A": "828792",
+]
+
+    static let petShibaGrid: [String] = [
+    ".........KA.....AAA.",
+    ".........AWAA..AAWW.",
+    ".........AAWAAAAAAA.",
+    ".........AAAAAAAWAAK",
+    ".........AAAAKAAAAAA",
+    ".........AAWWWWWKKWW",
+    "..WWWWWD.AWWWWWWBWWB",
+    ".WWAAAAW.AAWWWWWABA.",
+    ".WAAAAAAAAKAAWWBBBA.",
+    ".WAAAADDDAADDDDDDDA.",
+    ".WWAADDDDDAAAWWBBWAK",
+    ".AAAADDDDDDDDAWBBAD.",
+    ".AAAAADDDDDDDDDWWDB.",
+    ".AAAAWBKDDDDDDDWKDD.",
+    ".AAAWBBKBDDDDDBBDD..",
+    ".AAWB.BBBDDDDBDDDD..",
+    "AAWW..BBBAAAA.BAAB..",
+    "AWW...BBB.AAA.BBA...",
+]
+    static let petShibaPalette: [Character: String] = [
+    "K": "37251B",
+    "D": "3E5364",
+    "B": "B69C82",
+    "W": "F0E1C7",
+    "A": "C98746",
+]
+
+    static let petCorgiGrid: [String] = [
+    ".......AA.......AAA.",
+    ".......BBAD....KABB.",
+    ".......BBBAK...AABB.",
+    ".......ABAAAAWAAABB.",
+    ".......ABAAAAAAAABA.",
+    ".......KAAAAAAWKAAA.",
+    ".....DDKDAAAKWWWAAK.",
+    ".....DDDAAWWWWKKWWA.",
+    ".WWW.DDKAWWWWWWWWWA.",
+    ".WAAKDDKAAWWWKABWAAK",
+    ".AAAADDKAAAWWWBWWADK",
+    ".AAADKDKAAKKWWWWWADB",
+    "AAAADDKKAAAWDDWWWAWW",
+    "AAAADDKAAAWWWWBWWAWW",
+    "AAAAAADAAAWWWWBBWDDD",
+    "AAAAAADAAAWWWWWWB...",
+    "AAAWBBKAAAABBWBBB...",
+    "KAWWBBBKAAABBBBD....",
+]
+    static let petCorgiPalette: [Character: String] = [
+    "K": "3E2F1C",
+    "D": "7F744A",
+    "B": "CEA791",
+    "W": "F1E5CC",
+    "A": "DF924C",
+]
+
+    static let petSphynxGrid: [String] = [
+    ".......DWD.......DDD",
+    ".......WWDDD....BDWW",
+    ".......DWWDDBBBBDWWD",
+    ".......KDWDBBBBBBDW.",
+    "........DDBBBBBBBBD.",
+    ".........DDBBBBBBB..",
+    "..........WDBBBBD...",
+    ".........BWWADDWB...",
+    "........BBWWAAWWW...",
+    ".....BBBBBBABABWW...",
+    "...BBBBBBBBBBBDBB...",
+    "..BBBBBBBBBBBBBBB...",
+    ".DBBBBBBBBBBBBDDB...",
+    ".BBBBBBDBBBDDDDB....",
+    ".BBBBBBDBBBDDDBK....",
+    "BBBBBBBDDBBDDDB.....",
+    "BBBBBBBBDBBDDDB.....",
+    "BBBBBBBBDDBBDBB.....",
+]
+    static let petSphynxPalette: [Character: String] = [
+    "K": "2F2624",
+    "D": "614F53",
+    "B": "847B80",
+    "W": "B58B67",
+    "A": "D5C478",
+]
+
+    // MARK: The five companions (image-backed)
 
     static let ember = CompanionSprite(
         archetype: .ember,
-        base: [
-            "....BB........BB....",
-            "...BBB........BBB...",
-            "...BBBBBBBBBBBBBB...",
-            "...BBBBBBBBBBBBBB...",
-            "..BBBBWKBBBBWKBBBB..",
-            "..BBBBKKBBBBKKBBBB..",
-            "..BBBBBBWWWWBBBBBB..",
-            "..BBBBBBWKKWBBBBBB..",
-            "...BBBBBBBBBBBBBB...",
-            "......BBBBBB....BBW.",
-            ".....BBBWWWWBBB..BBB",
-            "....BBBWWWWWWBBBBB..",
-            "....BBDDDDDDDDDDBB..",
-            ".....DDDDDDDDDD.....",
-            "......DD....DD......",
-            "....................",
-            "....................",
-            "....................",
-        ],
-        patches: [
-            "blink": [ CellDiff(6, 4, "B"), CellDiff(7, 4, "B"),
-                      CellDiff(12, 4, "B"), CellDiff(13, 4, "B") ],
-            "sleepy": [ CellDiff(6, 3, "D"), CellDiff(7, 3, "D"), CellDiff(6, 4, "B"), CellDiff(7, 4, "B"),
-                        CellDiff(12, 3, "D"), CellDiff(13, 3, "D"), CellDiff(12, 4, "B"), CellDiff(13, 4, "B") ],
-            "happy": [ CellDiff(6, 4, "B"), CellDiff(7, 4, "B"), CellDiff(12, 4, "B"), CellDiff(13, 4, "B"),
-                      CellDiff(8, 8, "K"), CellDiff(9, 8, "K"), CellDiff(10, 8, "K"), CellDiff(11, 8, "K") ],
-            "glanceL": [ CellDiff(7, 4, "B"), CellDiff(7, 5, "B"), CellDiff(5, 4, "W"), CellDiff(6, 4, "K"),
-                         CellDiff(5, 5, "K"), CellDiff(6, 5, "K"),
-                         CellDiff(13, 4, "B"), CellDiff(13, 5, "B"), CellDiff(11, 4, "W"), CellDiff(12, 4, "K"),
-                         CellDiff(11, 5, "K"), CellDiff(12, 5, "K") ],
-            "glanceR": [ CellDiff(6, 4, "B"), CellDiff(6, 5, "B"), CellDiff(7, 4, "W"), CellDiff(8, 4, "K"),
-                         CellDiff(7, 5, "K"), CellDiff(8, 5, "K"),
-                         CellDiff(12, 4, "B"), CellDiff(12, 5, "B"), CellDiff(13, 4, "W"), CellDiff(14, 4, "K"),
-                         CellDiff(13, 5, "K"), CellDiff(14, 5, "K") ],
-            "quirk": [ CellDiff(18, 9, "B"), CellDiff(19, 9, "W") ],  // tail wag, tip rides
-            "perk": [ CellDiff(3, 0, "B"), CellDiff(6, 0, "B"), CellDiff(13, 0, "B"), CellDiff(16, 0, "B") ],  // ears flare
-            "breathe": [ CellDiff(3, 11, "B"), CellDiff(18, 11, "B") ],
-            // v24: the white tail tip rides the wag (was cleared and the tail
-            // extended in body tone — the fox's identity anchor vanished).
-            "idleA": [ CellDiff(18, 9, "B"), CellDiff(17, 9, "W") ],
-            "idleB": [ CellDiff(5, 0, "."), CellDiff(3, 0, "B") ],
-            "yawn": [ CellDiff(6, 3, "D"), CellDiff(7, 3, "D"), CellDiff(6, 4, "B"), CellDiff(7, 4, "B"),
-                      CellDiff(12, 3, "D"), CellDiff(13, 3, "D"), CellDiff(12, 4, "B"), CellDiff(13, 4, "B"),
-                      CellDiff(9, 8, "K"), CellDiff(10, 8, "K") ],
-        ],
-        paletteHex: [
-            "B": "FF9E4A", "D": "C4621B", "K": "241206",
-            "W": "F5F4EF", "A": "FFC800",
-        ]
+        base: petFoxGrid,
+        // v40: HD image animates via CompanionSprite.frameTransform(_:);
+        // the grid is the static fallback (postcard / icon / tests).
+        patches: [:],
+        paletteHex: petFoxPalette,
+        imageAssetName: "pet-fox",
+        accentHexOverride: "FFC800"
     )
-
-    // MARK: WILLOW — frog
 
     static let willow = CompanionSprite(
         archetype: .willow,
-        base: [
-            "......BBB....BBB....",
-            ".....BBBBBBBBBBB....",
-            ".....BBWKBBWKBBB....",
-            ".....BBKKBBKKBBB....",
-            "....BBBBBBBBBBBB....",
-            "..BBBBKBBBBBBKBBBB..",
-            "..BBBBKKKKKKKKBBBB..",
-            "..BBBBBBBBBBBBBBBB..",
-            "....BBBBBBBBBBBB....",
-            "...BBBBBWWWWBBBBB...",
-            "..BBBBWWWWWWWWBBBB..",
-            "..BBBBWWWWWWWWBBBB..",
-            "..BBBBBWWWWWBBBBB...",
-            "..DDBBBBBBBBBBBBDD..",
-            "..DDDDDDDDDDDDDDDD..",
-            "...DDDDD....DDDDD...",
-            "....................",
-            "....................",
-        ],
-        patches: [
-            "blink": [ CellDiff(7, 2, "B"), CellDiff(8, 2, "B"),
-                      CellDiff(11, 2, "B"), CellDiff(12, 2, "B") ],
-            "sleepy": [ CellDiff(7, 1, "D"), CellDiff(8, 1, "D"), CellDiff(7, 2, "B"), CellDiff(8, 2, "B"),
-                        CellDiff(11, 1, "D"), CellDiff(12, 1, "D"), CellDiff(11, 2, "B"), CellDiff(12, 2, "B") ],
-            "happy": [ CellDiff(7, 2, "B"), CellDiff(8, 2, "B"), CellDiff(11, 2, "B"), CellDiff(12, 2, "B"),
-                       CellDiff(5, 5, "K"), CellDiff(14, 5, "K") ],  // smile corners lift
-            "glanceL": [ CellDiff(8, 2, "B"), CellDiff(8, 3, "B"), CellDiff(6, 2, "W"), CellDiff(7, 2, "K"),
-                         CellDiff(6, 3, "K"), CellDiff(7, 3, "K"),
-                         CellDiff(12, 2, "B"), CellDiff(12, 3, "B"), CellDiff(10, 2, "W"), CellDiff(11, 2, "K"),
-                         CellDiff(10, 3, "K"), CellDiff(11, 3, "K") ],
-            "glanceR": [ CellDiff(7, 2, "B"), CellDiff(7, 3, "B"), CellDiff(8, 2, "W"), CellDiff(9, 2, "K"),
-                         CellDiff(8, 3, "K"), CellDiff(9, 3, "K"),
-                         CellDiff(11, 2, "B"), CellDiff(11, 3, "B"), CellDiff(12, 2, "W"), CellDiff(13, 2, "K"),
-                         CellDiff(12, 3, "K"), CellDiff(13, 3, "K") ],
-            "quirk": [ CellDiff(9, 8, "A"), CellDiff(10, 8, "A") ],  // croak sac
-            "perk": [ CellDiff(6, 5, "B"), CellDiff(13, 5, "B") ],  // the listening mouth — smile corners lift
-            "breathe": [ CellDiff(1, 10, "B"), CellDiff(18, 10, "B") ],
-            "idleA": [ CellDiff(13, 5, "B") ],
-            "idleB": [ CellDiff(6, 5, "B") ],
-            "yawn": [ CellDiff(7, 1, "D"), CellDiff(8, 1, "D"), CellDiff(7, 2, "B"), CellDiff(8, 2, "B"),
-                      CellDiff(11, 1, "D"), CellDiff(12, 1, "D"), CellDiff(11, 2, "B"), CellDiff(12, 2, "B"),
-                      CellDiff(7, 6, "D"), CellDiff(8, 6, "D"), CellDiff(9, 6, "D"), CellDiff(10, 6, "D") ],
-        ],
-        paletteHex: [
-            "B": "55D98A", "D": "2A9C5E", "K": "0C2018",
-            "W": "F5F4EF", "A": "F2D64B",
-        ]
+        base: petShibaGrid,
+        // v40: HD image animates via CompanionSprite.frameTransform(_:);
+        // the grid is the static fallback (postcard / icon / tests).
+        patches: [:],
+        paletteHex: petShibaPalette,
+        imageAssetName: "pet-shiba",
+        accentHexOverride: "6FA0FF"
     )
-
-    // MARK: COMPASS — fish
 
     static let compass = CompanionSprite(
         archetype: .compass,
-        base: [
-            "....................",
-            "......BB............",
-            ".....BBBB...........",
-            "....BBBBBB....A.....",
-            "...BBBBBBBB..AAA....",
-            "..BBWKBBBBBB.AAAA...",
-            "..BBKKBBBBBBBAAAA...",
-            ".BBBBBBBBBBBBAAAAA..",
-            // v31: mouth shifted one cell off the left bezel edge (was x=0),
-            // and the tail fan reaches one row lower (A at x=15-16, row 11)
-            // so the fish fills its grid and centers its mass.
-            ".KKBBBBBBBBBBAAAAA..",
-            ".DBBBBBBBBBBBBAAAA..",
-            ".DWWWWWWWBBBBBAAA...",
-            "..DWWWWWWBBBBBBAA...",
-            "...DDDDDDDDBBB......",
-            ".....DDDD...........",
-            "....................",
-            "....................",
-            "....................",
-            "....................",
-        ],
-        patches: [
-            "blink": [ CellDiff(4, 5, "B"), CellDiff(5, 5, "B") ],
-            "sleepy": [ CellDiff(4, 4, "D"), CellDiff(5, 4, "D"), CellDiff(4, 5, "B"), CellDiff(5, 5, "B") ],
-            // v28: happy reads at a glance — closed eye plus a two-cell open
-            // mouth under the base 2-cell mouth (4 real diffs; the old (0,8)
-            // was a no-op against the v28 base row).
-            "happy": [ CellDiff(4, 5, "B"), CellDiff(5, 5, "B"),
-                       CellDiff(1, 9, "K"), CellDiff(2, 9, "K") ],
-            // v24: clear the old pupil cells (5,5)/(5,6) so the eye slides
-            // cleanly to x=3-4 instead of smearing 3-wide.
-            "glanceL": [ CellDiff(5, 5, "B"), CellDiff(5, 6, "B"), CellDiff(3, 5, "W"),
-                         CellDiff(4, 5, "K"), CellDiff(3, 6, "K") ],
-            "glanceR": [ CellDiff(4, 5, "B"), CellDiff(4, 6, "B"), CellDiff(5, 5, "W"), CellDiff(6, 5, "K"),
-                         CellDiff(5, 6, "K"), CellDiff(6, 6, "K") ],
-            // v31: (13,5) was a no-op against the base — the fin flick now
-            // clears (14,5) instead; idleB/yawn mouth cells follow the
-            // v31 mouth shift (x=1-2).
-            "quirk": [ CellDiff(14, 3, "."), CellDiff(16, 4, "A"), CellDiff(14, 5, ".") ],  // fin flick
-            "perk": [ CellDiff(5, 1, "B"), CellDiff(8, 1, "B"), CellDiff(4, 2, "B"), CellDiff(9, 2, "B") ],  // dorsal flare
-            "breathe": [ CellDiff(0, 9, "B"), CellDiff(14, 12, "B") ],
-            "idleA": [ CellDiff(14, 3, "."), CellDiff(15, 3, "A") ],
-            "idleB": [ CellDiff(1, 8, "B") ],
-            "yawn": [ CellDiff(4, 4, "D"), CellDiff(5, 4, "D"), CellDiff(4, 5, "B"), CellDiff(5, 5, "B"),
-                      CellDiff(0, 8, "K"), CellDiff(3, 8, "K") ],
-        ],
-        paletteHex: [
-            "B": "3E8EF7", "D": "1F5FA8", "K": "0C1524",
-            "W": "F5F4EF", "A": "7FD8FF",
-        ]
+        base: petCorgiGrid,
+        // v40: HD image animates via CompanionSprite.frameTransform(_:);
+        // the grid is the static fallback (postcard / icon / tests).
+        patches: [:],
+        paletteHex: petCorgiPalette,
+        imageAssetName: "pet-corgi",
+        accentHexOverride: "5FAE4A"
     )
-
-    // MARK: PRISM — chameleon
 
     static let prism = CompanionSprite(
         archetype: .prism,
-        base: [
-            "......AA............",
-            ".....ABBBB..........",
-            "....ABBBBBB.........",
-            "....BBBBBBBB...DDD..",
-            "...BBBBBBBBB.....DDD",
-            // v31: the coil's right edge is now 2 cells thick (x=18-19) so
-            // the ring survives downsampling to the 32 px icon.
-            "..BBWKKBBBBBB.D...DD",
-            "..BBWKKBBBBBB.D...DD",
-            "..KKKBBBBBBBBDD...DD",
-            "..BBBBBBBBBBBD.DDD..",
-            "..BBBBBBBBBBBDD.....",
-            "..BBBBBBBBBBBDD.....",
-            "...BBBBBBBBBBDD.....",
-            "...DDD..DDD.........",
-            "....DD...DD.........",
-            "....................",
-            "....................",
-            "....................",
-            "....................",
-        ],
-        patches: [
-            "blink": [ CellDiff(4, 5, "B"), CellDiff(5, 5, "B"), CellDiff(6, 5, "B"), CellDiff(4, 6, "B") ],
-            "sleepy": [ CellDiff(4, 5, "D"), CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(4, 6, "B") ],
-            "happy": [ CellDiff(4, 5, "B"), CellDiff(5, 5, "B"), CellDiff(6, 5, "B"), CellDiff(4, 6, "B"), CellDiff(1, 7, "K") ],
-            "glanceL": [ CellDiff(6, 5, "B"), CellDiff(6, 6, "B") ],  // pupil narrows left
-            "glanceR": [ CellDiff(4, 5, "B"), CellDiff(4, 6, "B"), CellDiff(5, 5, "W"), CellDiff(7, 5, "K"), CellDiff(7, 6, "K") ],
-            // v31: the old quirk was a zero-diff no-op ((18,7) was already D,
-            // (19,7) already '.') — the signature move rendered as plain idle.
-            // Now the coil visibly contracts: the hole (x=15-17) narrows to
-            // x=15-16. 3 real diffs, inside the patch budget.
-            "quirk": [ CellDiff(17, 5, "D"), CellDiff(17, 6, "D"), CellDiff(17, 7, "D") ],  // coil tighten
-            "perk": [ CellDiff(5, 0, "A"), CellDiff(7, 0, ".") ],  // casque tip sharpens
-            "breathe": [ CellDiff(1, 8, "B"), CellDiff(1, 9, "B") ],
-            "idleA": [ CellDiff(7, 0, ".") ],  // casque edge notch
-            "idleB": [ CellDiff(1, 7, "K") ],
-            "yawn": [ CellDiff(4, 5, "D"), CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(4, 6, "B"),
-                      CellDiff(5, 7, "K") ],
-        ],
-        paletteHex: [
-            "B": "EA6FF5", "D": "9C3AA8", "K": "1A0C20",
-            "W": "F5F4EF", "A": "FFC800",
-        ]
+        base: petSphynxGrid,
+        // v40: HD image animates via CompanionSprite.frameTransform(_:);
+        // the grid is the static fallback (postcard / icon / tests).
+        patches: [:],
+        paletteHex: petSphynxPalette,
+        imageAssetName: "pet-sphynx",
+        accentHexOverride: "2ED3C6"
     )
-
-    // MARK: NIMBUS — bird
 
     static let nimbus = CompanionSprite(
         archetype: .nimbus,
-        base: [
-            "....................",
-            "....................",
-            "......BBBBBB........",
-            ".....BBBBBBBBBB.....",
-            "....BBBBBBBBBBBB....",
-            "....BBWKBBBBWKBB....",
-            "....BBKKBBBBKKBB....",
-            ".....BBBAABBBB......",
-            "......BBAABB........",
-            "DD....BBBBBB........",
-            "DDD..BBBBBBBBBB.....",
-            "DDDD.BBBBWWBBBB.....",
-            ".BBBBBBBWWWBBBB.....",
-            "...BBBBBBBBBBB......",
-            "....DDDD.DDDD.......",
-            ".....DD....DD.......",
-            "....................",
-            "....................",
-        ],
-        patches: [
-            "blink": [ CellDiff(6, 5, "B"), CellDiff(7, 5, "B"),
-                       CellDiff(11, 5, "B"), CellDiff(12, 5, "B") ],
-            "sleepy": [ CellDiff(6, 4, "D"), CellDiff(7, 4, "D"), CellDiff(6, 5, "B"), CellDiff(7, 5, "B"),
-                        CellDiff(11, 4, "D"), CellDiff(12, 4, "D"), CellDiff(11, 5, "B"), CellDiff(12, 5, "B") ],
-            "happy": [ CellDiff(6, 5, "B"), CellDiff(7, 5, "B"), CellDiff(11, 5, "B"), CellDiff(12, 5, "B"),
-                       CellDiff(8, 9, "A"), CellDiff(9, 9, "A") ],  // beak opens
-            // v24: both eyes shift one cell (left for glanceL, right for
-            // glanceR), clearing the vacated cells — the old right-eye half
-            // of glanceR targeted x=11-13 (no-ops) and never moved the eye.
-            "glanceL": [ CellDiff(5, 5, "W"), CellDiff(6, 5, "K"), CellDiff(5, 6, "K"),
-                         CellDiff(7, 5, "B"), CellDiff(7, 6, "B"),
-                         CellDiff(11, 5, "W"), CellDiff(12, 5, "K"), CellDiff(11, 6, "K"),
-                         CellDiff(13, 5, "B"), CellDiff(13, 6, "B") ],
-            "glanceR": [ CellDiff(7, 5, "W"), CellDiff(8, 5, "K"), CellDiff(7, 6, "K"), CellDiff(8, 6, "K"),
-                         CellDiff(6, 5, "B"), CellDiff(6, 6, "B"),
-                         CellDiff(13, 5, "W"), CellDiff(14, 5, "K"), CellDiff(13, 6, "K"), CellDiff(14, 6, "K"),
-                         CellDiff(12, 5, "B"), CellDiff(12, 6, "B") ],
-            "quirk": [ CellDiff(0, 8, "D"), CellDiff(1, 8, "D"), CellDiff(1, 10, "."), CellDiff(2, 10, "."),
-                       CellDiff(2, 11, "."), CellDiff(3, 11, ".") ],  // wing flap
-            "perk": [ CellDiff(8, 1, "B"), CellDiff(9, 1, "B") ],  // crest tuft rises
-            "breathe": [ CellDiff(4, 11, "B"), CellDiff(15, 11, "B") ],
-            "idleA": [ CellDiff(0, 9, "."), CellDiff(2, 9, "D") ],
-            // v28: idleB steps the left foot one cell left (edge cells swap)
-            // — still two separated foot masses, never a plank.
-            "idleB": [ CellDiff(7, 14, "."), CellDiff(3, 14, "D") ],
-            "yawn": [ CellDiff(6, 4, "D"), CellDiff(7, 4, "D"), CellDiff(6, 5, "B"), CellDiff(7, 5, "B"),
-                      CellDiff(11, 4, "D"), CellDiff(12, 4, "D"), CellDiff(11, 5, "B"), CellDiff(12, 5, "B"),
-                      CellDiff(7, 8, "A"), CellDiff(10, 8, "A") ],
-        ],
-        paletteHex: [
-            "B": "8FA3FF", "D": "5A6ABF", "K": "101426",
-            "W": "F5F4EF", "A": "FFD84B",
-        ]
+        base: petMockingbirdGrid,
+        // v40: HD image animates via CompanionSprite.frameTransform(_:);
+        // the grid is the static fallback (postcard / icon / tests).
+        patches: [:],
+        paletteHex: petMockingbirdPalette,
+        imageAssetName: "pet-mockingbird",
+        accentHexOverride: "FFE066"
     )
+
     // MARK: LUMEN — moth (Aivatar 2.0, E10; night element, luminous)
 
     static let lumen = CompanionSprite(
@@ -586,5 +569,11 @@ nonisolated enum IconCuts {
     }
 
     /// Ember's stage palette reused for the icon (one hue family, 5 tokens).
-    static let emberFacePaletteHex: [Character: String] = AuthoredSprites.ember.paletteHex
+    /// The icon keeps its own pinned ramp (the v13 fox-head palette) —
+    /// v40 changed the STAGE palette to the downsampled pet art, but the
+    /// app icon is hash-pinned by icon_export.swift and must not drift.
+    static let emberFacePaletteHex: [Character: String] = [
+        "B": "FF9E4A", "D": "C4621B", "K": "241206",
+        "W": "F5F4EF", "A": "FFC800",
+    ]
 }

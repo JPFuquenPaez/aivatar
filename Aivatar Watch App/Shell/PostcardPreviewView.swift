@@ -74,8 +74,8 @@ struct PostcardPreviewView: View {
         .padding(.horizontal, 12)
         .onAppear {
             // Compose the card once (deterministic), then play it.
-            frames = PostcardComposer.frames(inputs)
-                .compactMap { CompanionIcon.cgImage(for: archetype, grid: $0) }
+            // v40: image-backed companions play the HD pet per frame.
+            frames = PostcardComposer.frameImages(inputs)
             start = Date()
         }
     }

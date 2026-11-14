@@ -22,8 +22,16 @@ final class PostcardCardTests: XCTestCase {
         }
         let corner = px(4, 4)
         XCTAssertTrue(corner.0 == 0 && corner.1 == 0 && corner.2 == 0, "corner stays pure black")
-        let center = px(540, 300)
-        XCTAssertFalse(center.0 == 0 && center.1 == 0 && center.2 == 0, "icon area is painted")
+        // v40: the HD pet icon has transparent pockets — scan the icon area
+        // instead of sampling a single pixel.
+        var painted = false
+        for yy in 260...340 where !painted {
+            for xx in 500...580 {
+                let p = px(xx, yy)
+                if p.0 != 0 || p.1 != 0 || p.2 != 0 { painted = true; break }
+            }
+        }
+        XCTAssertTrue(painted, "icon area is painted")
         // v35: the isometric ground tile sits just below the icon.
         let tile = px(540, 690)
         XCTAssertFalse(tile.0 == 0 && tile.1 == 0 && tile.2 == 0, "iso tile painted under the icon")

@@ -15,7 +15,7 @@ final class ProjectBootstrapTests: XCTestCase {
         let ns = UIColor(color)
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         XCTAssertTrue(ns.getRed(&r, green: &g, blue: &b, alpha: &a), "AccentColor must resolve in the app bundle")
-        let target = AuthoredSprites.ember.paletteHex["A"]!  // "FFC800"
+        let target = IconCuts.emberFacePaletteHex["A"]!  // "FFC800" — the icon ramp, hash-pinned
         let rgb = CompanionSprite.hexToRGB(target)
         XCTAssertLessThanOrEqual(abs(Float(r) - Float(rgb.r) / 255), 1.0 / 255, "red channel off")
         XCTAssertLessThanOrEqual(abs(Float(g) - Float(rgb.g) / 255), 1.0 / 255, "green channel off")

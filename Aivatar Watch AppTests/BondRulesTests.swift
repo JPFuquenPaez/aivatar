@@ -260,7 +260,16 @@ final class BondRulesTests: XCTestCase {
 
     func testConfidantMementoCellIsFreeInAllBaseGrids() {
         for archetype in Archetype.allCases {
-            let grid = AuthoredSprites.sprite(for: archetype).symbols(frameID: "idle")
+            let sprite = AuthoredSprites.sprite(for: archetype)
+            // v40: image-backed pets draw the memento over the ground tile
+            // (row 16 is tile), so the free-cell rule binds authored grids.
+            if sprite.isImageBacked {
+                let m = SpriteStageMetadata.meta(for: archetype)
+                XCTAssertTrue(m.shadowRow <= 16 && 16 < m.shadowRow + 3,
+                              "\(archetype.rawValue): memento cell sits on the tile")
+                continue
+            }
+            let grid = sprite.symbols(frameID: "idle")
             XCTAssertEqual(grid[16][9], ".", "\(archetype.rawValue): memento cell (9,16) must be empty in the idle base")
         }
     }

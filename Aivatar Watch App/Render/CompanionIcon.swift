@@ -29,10 +29,13 @@ nonisolated enum CompanionIcon {
     }
     private static let cache = Cache()
 
-    /// SwiftUI image for the picker, pixel-crisp.
+    /// SwiftUI image for the picker. v40: HD pet icons interpolate smoothly
+    /// (they are no longer pixel art); authored grids stay nearest-neighbor.
     static func image(for archetype: Archetype) -> Image? {
         guard let cg = cgImage(for: archetype) else { return nil }
-        return Image(decorative: cg, scale: 1).interpolation(.none)
+        let sprite = AuthoredSprites.sprite(for: archetype)
+        return Image(decorative: cg, scale: 1)
+            .interpolation(sprite.isImageBacked ? .high : .none)
     }
 
     /// The rendered icon, built once per process and cached.
@@ -54,9 +57,14 @@ nonisolated enum CompanionIcon {
     /// The raw RGBA8 pixels of the icon (grid-sized), test-visible.
     static func snapshotBytes(for archetype: Archetype, state: IconState = .awake) -> [UInt8] {
         let sprite = AuthoredSprites.sprite(for: archetype)
-        let grid = sprite.symbols(frameID: "idle")
         let w = CompanionSprite.gridWidth * cellScale
         let h = CompanionSprite.gridHeight * cellScale
+        // v40: image-backed companions icon with the HD pet itself
+        // (downscaled into the 20x15 cell box above the tile rows).
+        if sprite.isImageBacked, let img = PetImageRender.uiImage(sprite) {
+            return imageBackedBytes(img, sprite: sprite, state: state, w: w, h: h)
+        }
+        let grid = sprite.symbols(frameID: "idle")
         var pixels = [UInt8](repeating: 0, count: w * h * 4)
         for y in 0..<CompanionSprite.gridHeight {
             for x in 0..<CompanionSprite.gridWidth {
@@ -139,6 +147,91 @@ nonisolated enum CompanionIcon {
         CGImageDestinationAddImage(destination, cg, nil)
         guard CGImageDestinationFinalize(destination) else { return nil }
         return data as Data
+    }
+
+    /// One frame of a companion as a CGImage: the HD pet with the frame's
+    /// transform for image-backed sprites (animated postcard), else the
+    /// symbol grid (authored sprites). v40.
+    static func cgImage(for archetype: Archetype, frameID: String = "idle",
+                        overlay: [CompanionSprite.CellDiff] = []) -> CGImage? {
+        let sprite = AuthoredSprites.sprite(for: archetype)
+        if sprite.isImageBacked, let img = PetImageRender.uiImage(sprite) {
+            let w = CompanionSprite.gridWidth * cellScale
+            let h = CompanionSprite.gridHeight * cellScale
+            let bytes = imageBackedBytes(img, sprite: sprite, state: .awake, w: w, h: h,
+                                         frameID: frameID, overlay: overlay)
+            return cgImage(from: bytes, w: w, h: h)
+        }
+        return cgImage(for: archetype, grid: sprite.symbols(frameID: frameID, overlay: overlay))
+    }
+
+    private static func cgImage(from bytes: [UInt8], w: Int, h: Int) -> CGImage? {
+        guard bytes.count == w * h * 4,
+              let data = CFDataCreate(kCFAllocatorDefault, bytes, bytes.count),
+              let provider = CGDataProvider(data: data) else { return nil }
+        return CGImage(
+            width: w, height: h,
+            bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: w * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider, decode: nil,
+            shouldInterpolate: false, intent: .defaultIntent
+        )
+    }
+
+    /// v40: renders the pet image into the 60x54 icon buffer. Awake =
+    /// full color on transparency; asleep = the rest-LOD dim (matches the
+    /// stage: black 0.78 over the art); event = the empty cells flash in
+    /// the companion's accent (legible on every family, same contract as
+    /// the grid path's uniform flash). The frame transform animates the pet
+    /// around the bottom-center anchor of the 20x15 cell box (CG is y-up:
+    /// the box occupies the TOP of the buffer, anchor at its bottom edge).
+    private static func imageBackedBytes(_ img: UIImage, sprite: CompanionSprite,
+                                         state: IconState, w: Int, h: Int,
+                                         frameID: String = "idle",
+                                         overlay: [CompanionSprite.CellDiff] = []) -> [UInt8] {
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        guard let ctx = CGContext(data: &pixels, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let cg = img.cgImage else { return pixels }
+        if state == .event {
+            let rgb = CompanionSprite.hexToRGB(sprite.uiAccentHex)
+            ctx.setFillColor(CGColor(red: CGFloat(rgb.r) / 255, green: CGFloat(rgb.g) / 255,
+                                     blue: CGFloat(rgb.b) / 255, alpha: 1))
+            ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        }
+        let cell = CGFloat(w) / CGFloat(CompanionSprite.gridWidth)
+        let boxH = CGFloat(PetImageRender.imageBoxRows) * cell
+        let scale = min(CGFloat(w) / CGFloat(cg.width), boxH / CGFloat(cg.height))
+        let dw = CGFloat(cg.width) * scale, dh = CGFloat(cg.height) * scale
+        let t = CompanionSprite.frameTransform(frameID)
+        // y-up anchor: bottom-center of the 20x15 box = (w/2, h - boxH).
+        let anchorX = CGFloat(w) / 2, anchorY = CGFloat(h) - boxH
+        var tr = CGAffineTransform.identity
+            .translatedBy(x: anchorX, y: anchorY)
+            .rotated(by: CGFloat(t.rotation))
+            .scaledBy(x: CGFloat(t.scaleX), y: CGFloat(t.scaleY))
+            .translatedBy(x: CGFloat(t.dx) * cell - dw / 2, y: CGFloat(t.dy) * cell)
+        let rect = CGRect(origin: .zero, size: CGSize(width: dw, height: dh)).applying(tr)
+        ctx.interpolationQuality = .high
+        ctx.draw(cg, in: rect)
+        if state == .asleep {
+            ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 0.78))
+            ctx.fill(rect)
+        }
+        // Overlay cells (blush/stamp/week grid) at their grid rects, y-up.
+        for d in overlay {
+            guard d.x >= 0, d.x < CompanionSprite.gridWidth,
+                  d.y >= 0, d.y < CompanionSprite.gridHeight,
+                  let hex = sprite.paletteHex[d.symbol] else { continue }
+            let rgb = CompanionSprite.hexToRGB(hex)
+            ctx.setFillColor(CGColor(red: CGFloat(rgb.r) / 255, green: CGFloat(rgb.g) / 255,
+                                     blue: CGFloat(rgb.b) / 255, alpha: CGFloat(d.alpha)))
+            ctx.fill(CGRect(x: CGFloat(d.x) * cell, y: CGFloat(h) - CGFloat(d.y + 1) * cell,
+                            width: cell, height: cell))
+        }
+        return pixels
     }
 
     private static func render(_ archetype: Archetype, state: IconState = .awake) -> CGImage? {

@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 /// PostcardComposer (v22, Ambient Life F8): deterministic shareable
 /// postcards of the user's ACTUAL companion. Inputs are (archetype, seed,
@@ -83,10 +84,13 @@ nonisolated enum PostcardComposer {
     /// the confidant memento overlay at level 5). Corrupt inputs (unknown
     /// archetype, missing profile) degrade to the default companion's warm
     /// greeting — a postcard never fails to compose.
-    static func frames(_ inputs: PostcardInputs) -> [[[Character]]] {
+    /// v40: the card's frames as (frameID, overlay) pairs — the single
+    /// source both the grid path (frames) and the HD-image path
+    /// (frameImages) render from, so they can never diverge.
+    static func frameSpecs(_ inputs: PostcardInputs) -> [(frameID: String, overlay: [CompanionSprite.CellDiff])] {
         let archetype = Archetype(rawValue: inputs.archetypeRaw) ?? .ember
         guard let profile = try? PersonalityProfile.load(archetype) else {
-            return plainFrames(seed: inputs.seed)
+            return plainSpecs(seed: inputs.seed)
         }
         let director = SpriteDirector(profile: profile, seed: inputs.seed)
         director.bondLevel = min(max(inputs.bondLevel, 1), BondRules.maxLevel)
@@ -102,24 +106,38 @@ nonisolated enum PostcardComposer {
         if inputs.anniversary == true {
             overlay += PostcardStamp.cells()
         }
-        var out: [[[Character]]] = []
+        var out: [(frameID: String, overlay: [CompanionSprite.CellDiff])] = []
         for _ in 0..<frameCount {
             director.advance(toTick: director.tick + 1)
-            out.append(sprite.symbols(frameID: director.currentFrame, overlay: overlay))
+            out.append((director.currentFrame, overlay))
         }
         return out
     }
 
+    static func frames(_ inputs: PostcardInputs) -> [[[Character]]] {
+        let archetype = Archetype(rawValue: inputs.archetypeRaw) ?? .ember
+        let sprite = AuthoredSprites.sprite(for: archetype)
+        return frameSpecs(inputs).map { sprite.symbols(frameID: $0.frameID, overlay: $0.overlay) }
+    }
+
+    /// v40: the card's frames as rendered images — image-backed companions
+    /// play the HD pet with each frame's transform (the postcard is alive).
+    static func frameImages(_ inputs: PostcardInputs) -> [CGImage] {
+        let archetype = Archetype(rawValue: inputs.archetypeRaw) ?? .ember
+        return frameSpecs(inputs).compactMap {
+            CompanionIcon.cgImage(for: archetype, frameID: $0.frameID, overlay: $0.overlay)
+        }
+    }
+
     /// The warm-greeting fallback (default companion, plain idle run).
-    private static func plainFrames(seed: UInt64) -> [[[Character]]] {
+    private static func plainSpecs(seed: UInt64) -> [(frameID: String, overlay: [CompanionSprite.CellDiff])] {
         guard let profile = try? PersonalityProfile.load(.ember) else { return [] }
         let director = SpriteDirector(profile: profile, seed: seed)
         director.playSequence([.happy])
-        let sprite = AuthoredSprites.sprite(for: .ember)
-        var out: [[[Character]]] = []
+        var out: [(frameID: String, overlay: [CompanionSprite.CellDiff])] = []
         for _ in 0..<frameCount {
             director.advance(toTick: director.tick + 1)
-            out.append(sprite.symbols(frameID: director.currentFrame))
+            out.append((director.currentFrame, []))
         }
         return out
     }

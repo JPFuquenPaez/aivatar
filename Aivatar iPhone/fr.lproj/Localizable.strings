@@ -12,8 +12,8 @@
 "presence.noticed_something" = "a remarqué quelque chose";
 "identity.full" = "%1$@ le %2$@";
 "animal.ember.name" = "Renard";
-"animal.willow.name" = "Grenouille";
-"animal.compass.name" = "Poisson";
-"animal.prism.name" = "Caméléon";
-"animal.nimbus.name" = "Oiseau";
+"animal.willow.name" = "Shiba Inu";
+"animal.compass.name" = "Corgi";
+"animal.prism.name" = "Chat sphynx";
+"animal.nimbus.name" = "Oiseau-moqueur";
 "animal.lumen.name" = "Papillon de nuit";

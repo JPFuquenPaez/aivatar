@@ -40,17 +40,30 @@ struct PhoneCompanionView: View {
 
     private func drawFrame(ctx: GraphicsContext, frameID: String) {
         let sprite = AuthoredSprites.sprite(for: archetype)
-        var grid = sprite.symbols(frameID: frameID)
-        // Same isometric ground tile as the watch stage (awake frames only).
-        if presence != .asleep {
-            let tile = SpriteStageMetadata.shadowOverlayIfAwake(archetype, frame: frameID, farewellPending: false)
-            for diff in tile where diff.y >= 0 && diff.y < CompanionSprite.gridHeight
-                && diff.x >= 0 && diff.x < CompanionSprite.gridWidth {
-                grid[diff.y][diff.x] = diff.symbol
-            }
-        }
         let cell = size / CGFloat(CompanionSprite.gridWidth)
-        var top = size * 0.42 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+        let baseTop = size * 0.42 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+        // Same isometric ground tile as the watch stage (awake frames only).
+        let tile = presence != .asleep
+            ? SpriteStageMetadata.shadowOverlayIfAwake(archetype, frame: frameID, farewellPending: false)
+            : []
+        // v40: image-backed companions draw the HD pet — the SAME image the
+        // watch stage draws, animated by the same frame transform.
+        if sprite.isImageBacked, PetImageRender.uiImage(sprite) != nil {
+            PetImageRender.drawOverlay(ctx: ctx,
+                box: CGRect(x: 0, y: baseTop, width: size, height: size),
+                cell: cell, sprite: sprite, cells: tile)
+            PetImageRender.draw(ctx: ctx,
+                box: CGRect(x: 0, y: baseTop, width: size,
+                            height: CGFloat(PetImageRender.imageBoxRows) * cell),
+                sprite: sprite, frameID: frameID, rest: presence == .asleep)
+            return
+        }
+        var grid = sprite.symbols(frameID: frameID)
+        for diff in tile where diff.y >= 0 && diff.y < CompanionSprite.gridHeight
+            && diff.x >= 0 && diff.x < CompanionSprite.gridWidth {
+            grid[diff.y][diff.x] = diff.symbol
+        }
+        var top = baseTop
         // Same inhale lift as the watch stage.
         if frameID == "breathe" { top -= cell }
         var paths: [Character: Path] = [:]

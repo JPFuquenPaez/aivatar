@@ -90,7 +90,7 @@ struct SpriteStageRenderer: View {
             if luminanceReduced && !farewellPending {
                 Canvas { ctx, size in
                     drawFrame(ctx: ctx, size: size, frameID: "sleepy",
-                              overlay: [], rest: true, mote: nil)
+                              overlay: [], shadow: [], rest: true, mote: nil)
                 }
             } else {
                 TimelineView(.animation(minimumInterval: SpriteDirector.tickDuration)) { timeline in
@@ -155,18 +155,19 @@ struct SpriteStageRenderer: View {
             baseOverlay.removeAll { $0.x == 9 && $0.y == 16 && $0.symbol == "A" }
         }
         var overlay = baseOverlay + director.transientOverlayCells
-        overlay += SpriteStageMetadata.shadowOverlayIfAwake(
+        let shadow = SpriteStageMetadata.shadowOverlayIfAwake(
             director.currentArchetype, frame: director.currentFrame, farewellPending: farewellPending)
+        let fullOverlay = overlay + shadow
         let rampBucket = farewellPending ? Int(date.timeIntervalSince(farewellStartedAt ?? date) / 0.15) : -1
         // v31: the overlay joins the key by CONTENT, not count — a streakDays
         // change 3->4 keeps count but changes symbols, and the week grid must
         // not stay stale until the next frame change.
-        let overlayKey = overlay.map { "\($0.x),\($0.y),\($0.symbol)" }.joined()
+        let overlayKey = fullOverlay.map { "\($0.x),\($0.y),\($0.symbol)" }.joined()
         let key = "\(director.currentFrame)|\(overlayKey)|\(director.moteCell?.x ?? -1),\(director.moteCell?.y ?? -1)|\(director.weatherHueShiftDeg)|\(rampBucket)"
         if key == lastDrawKey { return }
         lastDrawKey = key
         drawFrame(ctx: ctx, size: size, frameID: director.currentFrame,
-                  overlay: overlay, rest: false, mote: director.moteCell)
+                  overlay: overlay, shadow: shadow, rest: false, mote: director.moteCell)
         if farewellPending, let start = farewellStartedAt, farewellTotalSeconds > 0 {
             // v28: the dim ramps over the LAST ticks (peak-end), not the whole
             // beat — the goodbye stays warm through idle+blink, then dims.
@@ -177,15 +178,35 @@ struct SpriteStageRenderer: View {
     }
 
     private func drawFrame(ctx: GraphicsContext, size: CGSize, frameID: String,
-                           overlay: [CompanionSprite.CellDiff], rest: Bool,
+                           overlay: [CompanionSprite.CellDiff],
+                           shadow: [CompanionSprite.CellDiff] = [],
+                           rest: Bool,
                            mote: (x: Int, y: Int)?) {
-        let grid = sprite.symbols(frameID: frameID, overlay: overlay)
-        let palette = palette(rest: rest)
         // Fill-width cell: the sprite spans the screen width exactly and
         // its content center sits slightly above the vertical middle (face
         // in the upper-third glance zone, §9).
         let cell = size.width / CGFloat(CompanionSprite.gridWidth)
-        var top = size.height * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+        let baseTop = size.height * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+        // v40: image-backed companions draw the HD pet image (aspect-fit
+        // into rows 0...15, tile underneath); the inhale lift rides the
+        // frame transform instead of shifting the grid origin.
+        if sprite.isImageBacked, PetImageRender.uiImage(sprite) != nil {
+            let fullBox = CGRect(x: 0, y: baseTop, width: size.width, height: size.height)
+            PetImageRender.drawOverlay(ctx: ctx, box: fullBox, cell: cell, sprite: sprite, cells: shadow)
+            let box = CGRect(x: 0, y: baseTop, width: size.width,
+                             height: CGFloat(PetImageRender.imageBoxRows) * cell)
+            PetImageRender.draw(ctx: ctx, box: box, sprite: sprite, frameID: frameID,
+                                rest: rest, overOverlay: overlay)
+            if let mote, !rest {
+                let rect = CGRect(x: CGFloat(mote.x) * cell, y: baseTop + CGFloat(mote.y) * cell,
+                                  width: cell, height: cell)
+                ctx.fill(Path(rect), with: .color(moteColor))
+            }
+            return
+        }
+        let grid = sprite.symbols(frameID: frameID, overlay: overlay + shadow)
+        let palette = palette(rest: rest)
+        var top = baseTop
         // v35: the inhale lifts the companion one cell off its tile —
         // squash-and-stretch without new art (the breathe frame + the
         // widened tile sell the volume).
