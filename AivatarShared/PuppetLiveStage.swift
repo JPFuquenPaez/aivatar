@@ -66,8 +66,10 @@ nonisolated struct PuppetLiveStage<Driver: PuppetLiveDriver>: View {
                 let drive = driver.puppetDrive(atTick: tick)
                 let (pose, props) = solver.step(drive: drive,
                                                 ambient: ambientEnabled && !driver.puppetIsResting)
-                let layout = PuppetDrawing.Layout.fit(canvas: size)
+                // v1.1 three-zone layout: the art is confined to the stage
+                // zone (18%..74% height) — it never reaches the dock captions.
                 let spec = CompanionToys.spec(for: driver.puppetArchetype)
+                let layout = PuppetDrawing.Layout.fitZoned(canvas: size, spec: spec)
                 PuppetDrawing.draw(
                     PuppetDrawing.CanvasSurface(
                         ctx: ctx, device: layout.deviceTransform),

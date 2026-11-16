@@ -85,6 +85,41 @@ final class CompanionToyTests: XCTestCase {
         XCTAssertTrue(CompanionToys.spec(for: .ember).muzzle)
     }
 
+    /// v1.1 §5.12.2: each species' ONE unmistakable tell, exaggerated past
+    /// comfort and pinned (the black-silhouette quiz at 48 px lives in
+    /// StageZoneTests; these are the spec-level pins behind it).
+    func testSpeciesTellsAreExaggerated() {
+        let ember = CompanionToys.spec(for: .ember)
+        XCTAssertGreaterThanOrEqual(ember.earHeight, 240, "fox ears are large and tall")
+        XCTAssertEqual(ember.tailKind, .brush, "the huge white-tipped brush is the fox tell")
+
+        let willow = CompanionToys.spec(for: .willow)
+        XCTAssertLessThanOrEqual(willow.earWidth, 120, "shiba ears are narrow triangles, not bunny ovals")
+        XCTAssertGreaterThanOrEqual(willow.earHeight, 150)
+        XCTAssertTrue(willow.ruff, "the cheek ruff is the shiba tell")
+
+        let compass = CompanionToys.spec(for: .compass)
+        XCTAssertGreaterThanOrEqual(compass.earWidth, 210, "corgi airplane ears are WIDE")
+        XCTAssertGreaterThanOrEqual(compass.earSplay, 0.55, "...and flare outward, not up (not rabbit)")
+        XCTAssertGreaterThanOrEqual(compass.bodyWidth, 640, "the loaf body is wider than tall")
+        XCTAssertLessThanOrEqual(compass.bodyHeight, 250)
+        XCTAssertEqual(compass.tailKind, .nub)
+
+        let prism = CompanionToys.spec(for: .prism)
+        XCTAssertGreaterThanOrEqual(prism.earHeight, 340, "sphynx bat ears are enormous")
+        XCTAssertGreaterThanOrEqual(prism.earWidth, 220, "...and wide")
+        XCTAssertGreaterThanOrEqual(prism.earSplay, 0.5, "...and flare outward")
+        XCTAssertTrue(prism.wrinkleRows)
+
+        let nimbus = CompanionToys.spec(for: .nimbus)
+        XCTAssertTrue(nimbus.crest, "the mockingbird wears a tiny crest")
+        XCTAssertTrue(nimbus.beak)
+        XCTAssertEqual(nimbus.wingKind, .oneSwept, "one swept wing, asymmetric")
+
+        XCTAssertFalse(CompanionToys.spec(for: .compass).crest)
+        XCTAssertTrue(CompanionToys.spec(for: .lumen).antennae)
+    }
+
     /// The pupil is the family ink deepened toward black (glossy discs).
     func testPupilsDeepenFamilyInk() {
         for archetype in Archetype.allCases {

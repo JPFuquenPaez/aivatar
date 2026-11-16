@@ -133,12 +133,76 @@ nonisolated enum PuppetDrawing {
             CGAffineTransform(scaleX: scale, y: scale)
                 .concatenating(CGAffineTransform(translationX: originX, y: originY))
         }
+
+        /// The v1.1 three-zone stage layout (doc §5.11): header top 18%,
+        /// stage middle 56%, dock bottom 26%. The art's worst-case bounds
+        /// (max growth, max hop/stretch) are fitted INSIDE the stage zone
+        /// with >= 10% lateral breathing room — the character never enters
+        /// the header or the dock, so dock captions can never collide with
+        /// art (pinned by StageZoneTests).
+        nonisolated static func fitZoned(canvas: CGSize, spec: ToySpec) -> Layout {
+            let w = canvas.width > 0 ? canvas.width : 1
+            let h = canvas.height > 0 ? canvas.height : 1
+            let zoneTop = h * 0.18
+            let zoneHeight = h * 0.56
+            let bounds = PuppetDrawing.artBounds(spec: spec, growth: 1.05, hop: 70)
+            let scale = min(w * 0.80 / bounds.width, zoneHeight / bounds.height)
+            return Layout(scale: scale,
+                          originX: (w - bounds.width * scale) / 2 - bounds.minX * scale,
+                          originY: zoneTop + (zoneHeight - bounds.height * scale) / 2 - bounds.minY * scale)
+        }
     }
 
-    /// The head's hit circle for the boop gesture, in canvas points.
+    /// The rest-pose art bounds in author space, padded for the worst act
+    /// frame (widen 1.10 / stretch 1.08 about the feet pivot, growth, hop
+    /// lift) — the anti-collision contract's measuring stick.
+    nonisolated static func artBounds(spec: ToySpec, growth: CGFloat = 1, hop: CGFloat = 0) -> CGRect {
+        var minX: CGFloat = 500 - spec.bodyWidth / 2
+        var maxX: CGFloat = 500 + spec.bodyWidth / 2
+        var minY: CGFloat = 400 - spec.headDiameter / 2
+        let bottom: CGFloat = 890 // feet + ground shadow
+        if spec.earHeight > 0 {
+            let baseY = 400 - spec.headDiameter * 0.42
+            minY = min(minY, baseY - spec.earHeight * cos(spec.earSplay))
+            let earReach = spec.headDiameter * 0.30 + spec.earWidth / 2
+                + spec.earHeight * sin(spec.earSplay)
+            minX = min(minX, 500 - earReach)
+            maxX = max(maxX, 500 + earReach)
+        }
+        if spec.antennae {
+            minY = min(minY, 400 - spec.headDiameter / 2 + 34 - 113)
+        }
+        if spec.crest {
+            minY = min(minY, 400 - spec.headDiameter / 2 - 62)
+        }
+        switch spec.wingKind {
+        case .none: break
+        case .oneSwept:
+            minX = min(minX, 160); minY = min(minY, 470)
+        case .mothPair:
+            minX = min(minX, 106); maxX = max(maxX, 894); minY = min(minY, 333)
+        }
+        switch spec.tailKind {
+        case .none: break
+        case .brush: maxX = max(maxX, 1002); minY = min(minY, 466)
+        case .curl: maxX = max(maxX, 777)
+        case .nub: maxX = max(maxX, 748)
+        case .slim: maxX = max(maxX, 836)
+        case .fan: maxX = max(maxX, 766); minY = min(minY, 596)
+        }
+        let widen: CGFloat = 1.10, stretch: CGFloat = 1.08
+        let x0 = 500 - (500 - minX) * widen * growth
+        let x1 = 500 + (maxX - 500) * widen * growth
+        let y0 = 850 - (850 - minY) * stretch * growth - hop
+        let y1 = 850 + (bottom - 850) * stretch * growth - hop
+        return CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
+    }
+
+    /// The head's hit circle for the boop gesture, in canvas points (the
+    /// zoned stage layout — one geometry source with the stage).
     nonisolated static func headHitCircle(archetype: Archetype, canvas: CGSize) -> (center: CGPoint, radius: CGFloat) {
         let spec = CompanionToys.spec(for: archetype)
-        let layout = Layout.fit(canvas: canvas)
+        let layout = Layout.fitZoned(canvas: canvas, spec: spec)
         let center = layout.point(x: 500, y: 400)
         let radius = (spec.headDiameter / 2 + spec.earHeight * 0.15) * layout.scale
         return (center, radius)
@@ -330,10 +394,10 @@ nonisolated enum PuppetDrawing {
         _ surface: S, spec: ToySpec, pose: PuppetPose,
         root: CGAffineTransform, tint: ToyTint, style: PuppetStyle
     ) {
-        let bean = roundedBean(cx: 500, cy: 700, w: 560, h: 300).applying(root)
+        let bean = roundedBean(cx: 500, cy: 700, w: spec.bodyWidth, h: spec.bodyHeight).applying(root)
         tint.styleFill(surface, path: bean, hex: spec.bodyHex, style: style,
                        gradientFrom: CGPoint(x: 500, y: 540), gradientTo: CGPoint(x: 500, y: 860))
-        let belly = ellipse(500, 722, 380, 208).applying(root)
+        let belly = ellipse(500, 722, spec.bodyWidth * 0.68, spec.bodyHeight * 0.69).applying(root)
         surface.fill(belly, tint.color(spec.bellyHex))
 
         if spec.saddle, spec.archetype == .compass {
@@ -375,16 +439,17 @@ nonisolated enum PuppetDrawing {
         case .none:
             break
         case .brush:
-            let stemC = CGPoint(x: 780, y: 660)
+            // The fox's huge white-tipped brush: the silhouette tell.
+            let stemC = CGPoint(x: 790, y: 656)
             let stemTilt = CGAffineTransform(translationX: -stemC.x, y: -stemC.y)
-                .concatenating(CGAffineTransform(rotationAngle: -0.5))
+                .concatenating(CGAffineTransform(rotationAngle: -0.52))
                 .concatenating(CGAffineTransform(translationX: stemC.x, y: stemC.y))
-            let stem = roundedBean(cx: 770, cy: 656, w: 300, h: 150)
+            let stem = roundedBean(cx: 782, cy: 650, w: 380, h: 180)
                 .applying(stemTilt)
                 .applying(world)
             tint.styleFill(surface, path: stem, hex: spec.bodyHex, style: style,
-                           gradientFrom: CGPoint(x: 780, y: 600), gradientTo: CGPoint(x: 780, y: 740))
-            surface.fill(ellipse(892, 566, 118, 108).applying(world),
+                           gradientFrom: CGPoint(x: 790, y: 580), gradientTo: CGPoint(x: 790, y: 740))
+            surface.fill(ellipse(928, 540, 148, 134).applying(world),
                          tint.color(spec.bellyHex))
         case .curl:
             surface.fill(ellipse(702, 646, 150, 140).applying(world),
@@ -476,6 +541,25 @@ nonisolated enum PuppetDrawing {
         tint.styleFill(surface, path: head, hex: spec.bodyHex, style: style,
                        gradientFrom: CGPoint(x: headCx, y: headCy - headD / 2),
                        gradientTo: CGPoint(x: headCx, y: headCy + headD / 2))
+
+        // Nimbus's tiny crest: three rounded tufts on the crown (the bird's
+        // second silhouette tell after the swept wing).
+        if spec.crest {
+            for (dx, h) in [(-26.0, 46.0), (0.0, 62.0), (26.0, 44.0)] {
+                var tuft = CGMutablePath()
+                let bx = headCx + CGFloat(dx)
+                let by = headCy - headD / 2 + 6
+                tuft.move(to: CGPoint(x: bx - 16, y: by + 10))
+                tuft.addQuadCurve(to: CGPoint(x: bx, y: by - CGFloat(h)),
+                                  control: CGPoint(x: bx - 12, y: by - CGFloat(h) * 0.55))
+                tuft.addQuadCurve(to: CGPoint(x: bx + 16, y: by + 10),
+                                  control: CGPoint(x: bx + 12, y: by - CGFloat(h) * 0.55))
+                surface.fill(tuft.copy(strokingWithWidth: 14, lineCap: .round,
+                                       lineJoin: .round, miterLimit: 10)
+                                .applying(total),
+                             tint.color(spec.shadeHex))
+            }
+        }
 
         if spec.muzzle, spec.archetype == .ember {
             let muzzle = ellipse(headCx + faceShift * 0.5, headCy + headD * 0.28,

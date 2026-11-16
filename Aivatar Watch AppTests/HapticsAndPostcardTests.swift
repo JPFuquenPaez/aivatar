@@ -101,12 +101,13 @@ final class HapticsAndPostcardTests: XCTestCase {
         // per archetype — pose truth layer. Re-record with zeros, paste below.
         let expected: [Archetype: UInt64] = [
             // Re-pinned v44 (Companion Cast v3): pose-run digests.
-            .ember: 14_696_253_718_230_453_466,
-            .willow: 14_696_254_817_742_083_448,
-            .compass: 14_696_255_917_253_706_137,
-            .prism: 14_696_253_718_230_452_352,
-            .nimbus: 14_696_254_817_742_080_456,
-            .lumen: 14_696_253_718_230_454_624,
+            // Re-pinned v45 (v1.1 base asymmetry on the neutral stance).
+            .ember: 14_696_253_718_230_454_446,
+            .willow: 14_696_254_817_742_080_586,
+            .compass: 14_696_255_917_253_709_522,
+            .prism: 14_696_253_718_230_452_750,
+            .nimbus: 14_696_254_817_742_081_472,
+            .lumen: 14_696_253_718_230_452_570,
         ]
         var recorded: [String] = []
         for archetype in Archetype.allCases {

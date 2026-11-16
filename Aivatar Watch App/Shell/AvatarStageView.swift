@@ -817,17 +817,13 @@ struct AvatarStageView: View {
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.25), value: beatCaption != nil)
             }
-            // v30: one line — a long custom name must never wrap into the
-            // state line below it.
-            Text(stageName)
-                .font(.footnote)
-                .lineLimit(1)
-            // v28: "resting" only after the farewell beat completes.
-            Text(isResting && director?.resting == true
-                 ? String(localized: "stage.tag_resting")
-                 : String(localized: "stage.tag_here"))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            // v1.1 §5.11: NO name and NO "is here" tag on the live stage —
+            // the character is the identification (the Snoopy pattern),
+            // presence is performed by the greeting behavior, and text never
+            // touches art (the stage layout confines art to the middle zone,
+            // this dock block to the bottom zone — pinned by StageZoneTests).
+            // The name lives where identity is the content: picker, naming,
+            // settings, iPhone card, postcard, and the VoiceOver label.
         }
         .padding(.bottom, 8 + insets.bottom)
         .padding(.horizontal, 12)

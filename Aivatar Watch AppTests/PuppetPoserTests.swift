@@ -165,6 +165,22 @@ final class PuppetPoserTests: XCTestCase {
         XCTAssertEqual(squashed.cheekGlow, 1)
     }
 
+    // MARK: - v1.1 base asymmetry (doc §5.12.1)
+
+    func testNeutralStanceIsNeverPerfectlySymmetric() {
+        for archetype in Archetype.allCases {
+            let pose = resolve(archetype, "idle").pose
+            XCTAssertFalse(pose.headTilt == 0 && pose.earL == pose.earR,
+                "\(archetype.rawValue): the neutral stance carries a base asymmetry (the anti-stiff rule)")
+            XCTAssertGreaterThanOrEqual(abs(pose.headTilt), 0.03,
+                "\(archetype.rawValue): default head tilt is 3-5 degrees or more")
+        }
+        // breathe shares the neutral stance (the ambient layer breathes).
+        for archetype in Archetype.allCases {
+            XCTAssertEqual(resolve(archetype, "idle").pose, resolve(archetype, "breathe").pose)
+        }
+    }
+
     // MARK: - Rest + accessibility
 
     func testRestPosePinsEverything() {

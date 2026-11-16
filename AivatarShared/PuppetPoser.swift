@@ -151,7 +151,10 @@ nonisolated enum PuppetPoser {
             pose.headTurn = 0.18
             pose.pupilX = 0.45
         default:
-            break // idle / breathe: the neutral stance; ambient carries life
+            // idle / breathe: the neutral stance carries a per-species base
+            // asymmetry (v1.1 §5.12.1 — no companion ever holds a perfectly
+            // symmetric pose); the ambient layer carries the life on top.
+            applyBaseStance(drive.archetype, &pose)
         }
 
         // E7 boop: the flush and the first-tick squash-and-glow pulse.
@@ -242,6 +245,37 @@ nonisolated enum PuppetPoser {
             pose.wing = 0
         }
         return (pose, props)
+    }
+
+    /// The neutral stance's base asymmetry (doc §5.12.1): a default head
+    /// tilt of 3-5°, one ear offset, a counterposed tail — symmetry is the
+    /// "stiff" signal, asymmetry is the cheapest aliveness upgrade. Acts
+    /// (happy, quirk, ...) override these with authored poses.
+    private nonisolated static func applyBaseStance(_ archetype: Archetype,
+                                                    _ pose: inout PuppetPose) {
+        switch archetype {
+        case .ember:
+            pose.headTilt = -0.055
+            pose.earL = 0.22
+            pose.tailAngle = -0.05
+        case .willow:
+            pose.headTilt = 0.048
+            pose.earR = 0.28
+            pose.tailAngle = 0.06
+        case .compass:
+            pose.headTilt = 0.062
+            pose.earL = 0.34   // one airplane ear up at rest
+            pose.tailAngle = -0.08
+        case .prism:
+            pose.headTilt = -0.05
+            pose.earR = 0.2
+        case .nimbus:
+            pose.headTilt = 0.058
+            pose.wing = 0.12   // the swept wing never fully rests
+        case .lumen:
+            pose.headTilt = -0.045
+            pose.earL = 0.15
+        }
     }
 
     /// The species' signature quirk (doc §5.7): the one move each companion
