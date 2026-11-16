@@ -41,6 +41,20 @@ nonisolated struct ToySpec: Sendable, Equatable {
     let earWidth: CGFloat
     /// Ear outward splay (radians).
     let earSplay: CGFloat
+    /// Ear set: base offset as a fraction of head diameter (x outward,
+    /// y up from head center) — the ear SET, not the ear size, carries
+    /// species (v1.3 §5.14A.2: side-of-crown cat ears vs crown-top bunny).
+    let earSetX: CGFloat
+    let earSetY: CGFloat
+    /// Species muzzle architecture (v1.3 §5.14A.1): every companion has a
+    /// muzzle mass that projects from / divides the head.
+    let muzzleKind: MuzzleKind
+    /// Compass's white blaze running up between the eyes.
+    let blaze: Bool
+    /// Prism's whisker-dot clusters.
+    let whiskerDots: Bool
+    /// Compass's brow stop (the tan patch above the eyes).
+    let browStop: Bool
     /// Identity tail: none / brush / curl / nub / slim / fan.
     let tailKind: TailKind
     /// Wings: none / oneSwept (Nimbus) / mothPair (Lumen).
@@ -56,12 +70,16 @@ nonisolated struct ToySpec: Sendable, Equatable {
     let saddle: Bool
     /// Prism's wrinkle shade rows.
     let wrinkleRows: Bool
-    /// Ember's cream muzzle patch.
-    let muzzle: Bool
-    /// Nimbus's accent beak bump.
-    let beak: Bool
     /// Lumen's antennae.
     let antennae: Bool
+
+    nonisolated enum MuzzleKind: Sendable, Equatable {
+        case none, fox, shiba, corgi, cat, beak
+    }
+
+    /// Legacy bool for tests/back-compat: any real muzzle (or beak).
+    nonisolated var muzzle: Bool { muzzleKind != .none }
+    nonisolated var beak: Bool { muzzleKind == .beak }
 
     nonisolated enum TailKind: Sendable, Equatable {
         case none, brush, curl, nub, slim, fan
@@ -92,11 +110,13 @@ nonisolated enum CompanionToys {
                 bodyHex: "FF7A45", bellyHex: "FFE8D1", shadeHex: "E8601F",
                 inkHex: "4A2C1E", accentHex: "76C893", uiAccentHex: "FF7A45",
                 headDiameter: 520, eyeRatio: 0.30,
-                earHeight: 255, earWidth: 138, earSplay: 0.44,
+                earHeight: 255, earWidth: 110, earSplay: 0.55,
+                earSetX: 0.30, earSetY: -0.42,
+                muzzleKind: .fox, blaze: false, whiskerDots: false, browStop: false,
                 tailKind: .brush, wingKind: .none,
                 bodyWidth: 560, bodyHeight: 300, crest: false,
                 ruff: false, saddle: false, wrinkleRows: false,
-                muzzle: true, beak: false, antennae: false)
+                antennae: false)
         case .willow:
             return ToySpec(
                 archetype: .willow,
@@ -104,10 +124,12 @@ nonisolated enum CompanionToys {
                 inkHex: "5C3A28", accentHex: "FFB7C5", uiAccentHex: "F0B060",
                 headDiameter: 540, eyeRatio: 0.30,
                 earHeight: 150, earWidth: 100, earSplay: 0.38,
+                earSetX: 0.30, earSetY: -0.42,
+                muzzleKind: .shiba, blaze: false, whiskerDots: false, browStop: false,
                 tailKind: .curl, wingKind: .none,
                 bodyWidth: 560, bodyHeight: 300, crest: false,
                 ruff: true, saddle: false, wrinkleRows: false,
-                muzzle: false, beak: false, antennae: false)
+                antennae: false)
         case .compass:
             return ToySpec(
                 archetype: .compass,
@@ -115,21 +137,27 @@ nonisolated enum CompanionToys {
                 inkHex: "8A8578", accentHex: "4FC1C0", uiAccentHex: "FFA02E",
                 headDiameter: 500, eyeRatio: 0.31,
                 earHeight: 180, earWidth: 270, earSplay: 1.15,
+                earSetX: 0.34, earSetY: -0.40,
+                muzzleKind: .corgi, blaze: true, whiskerDots: false, browStop: true,
                 tailKind: .nub, wingKind: .none,
                 bodyWidth: 660, bodyHeight: 238, crest: false,
                 ruff: false, saddle: true, wrinkleRows: false,
-                muzzle: false, beak: false, antennae: false)
+                antennae: false)
         case .prism:
             return ToySpec(
                 archetype: .prism,
                 bodyHex: "FFC9A8", bellyHex: "FFE8DC", shadeHex: "D89B85",
                 inkHex: "3E2A33", accentHex: "8FE3C8", uiAccentHex: "D89B85",
                 headDiameter: 520, eyeRatio: 0.30,
-                earHeight: 350, earWidth: 240, earSplay: 0.55,
+                // Sphynx cat ears on the SIDES of the crown, wider than
+                // tall, splayed outward — never crown-top parallel bunny ears.
+                earHeight: 250, earWidth: 320, earSplay: 0.66,
+                earSetX: 0.40, earSetY: -0.28,
+                muzzleKind: .cat, blaze: false, whiskerDots: true, browStop: false,
                 tailKind: .slim, wingKind: .none,
                 bodyWidth: 560, bodyHeight: 300, crest: false,
                 ruff: false, saddle: false, wrinkleRows: true,
-                muzzle: false, beak: false, antennae: false)
+                antennae: false)
         case .nimbus:
             return ToySpec(
                 archetype: .nimbus,
@@ -137,10 +165,12 @@ nonisolated enum CompanionToys {
                 inkHex: "2E3138", accentHex: "FFD166", uiAccentHex: "9AA3AE",
                 headDiameter: 480, eyeRatio: 0.32,
                 earHeight: 0, earWidth: 0, earSplay: 0,
+                earSetX: 0, earSetY: 0,
+                muzzleKind: .beak, blaze: false, whiskerDots: false, browStop: false,
                 tailKind: .fan, wingKind: .oneSwept,
                 bodyWidth: 520, bodyHeight: 280, crest: true,
                 ruff: false, saddle: false, wrinkleRows: false,
-                muzzle: false, beak: true, antennae: false)
+                antennae: false)
         case .lumen:
             return ToySpec(
                 archetype: .lumen,
@@ -148,10 +178,12 @@ nonisolated enum CompanionToys {
                 inkHex: "171226", accentHex: "FFE9A8", uiAccentHex: "A78BFA",
                 headDiameter: 470, eyeRatio: 0.31,
                 earHeight: 0, earWidth: 0, earSplay: 0,
+                earSetX: 0, earSetY: 0,
+                muzzleKind: .none, blaze: false, whiskerDots: false, browStop: false,
                 tailKind: .none, wingKind: .mothPair,
                 bodyWidth: 500, bodyHeight: 270, crest: false,
                 ruff: false, saddle: false, wrinkleRows: false,
-                muzzle: false, beak: false, antennae: true)
+                antennae: true)
         }
     }
 

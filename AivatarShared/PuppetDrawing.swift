@@ -162,9 +162,9 @@ nonisolated enum PuppetDrawing {
         var minY: CGFloat = 400 - spec.headDiameter / 2
         let bottom: CGFloat = 890 // feet + ground shadow
         if spec.earHeight > 0 {
-            let baseY = 400 - spec.headDiameter * 0.42
+            let baseY = 400 + spec.headDiameter * spec.earSetY
             minY = min(minY, baseY - spec.earHeight * cos(spec.earSplay))
-            let earReach = spec.headDiameter * 0.30 + spec.earWidth / 2
+            let earReach = spec.headDiameter * spec.earSetX + spec.earWidth / 2
                 + spec.earHeight * sin(spec.earSplay)
             minX = min(minX, 500 - earReach)
             maxX = max(maxX, 500 + earReach)
@@ -618,12 +618,69 @@ nonisolated enum PuppetDrawing {
             }
         }
 
-        if spec.muzzle, spec.archetype == .ember {
-            // The fox's cream muzzle breaks the head contour from inside.
-            let muzzle = blobPath(cx: headCx + faceShift * 0.5, cy: headCy + headD * 0.28,
+        // v1.3 §5.14A.1: every companion wears a muzzle mass (species read
+        // comes from muzzle + ear set, not ear size).
+        let muzzleY = headCy + headD * 0.28
+        switch spec.muzzleKind {
+        case .none, .beak:
+            break
+        case .fox:
+            surface.fill(blobPath(cx: headCx + faceShift * 0.5, cy: muzzleY,
                                   rx: headD * 0.29, ry: headD * 0.21,
-                                  harmonics: [(0.07, 2, 0.6), (0.05, 3, 2.8)]).applying(total)
-            surface.fill(muzzle, tint.color(spec.bellyHex))
+                                  harmonics: [(0.07, 2, 0.6), (0.05, 3, 2.8)]).applying(total),
+                         tint.color(spec.bellyHex))
+        case .shiba:
+            // Short broad muzzle with the crescent smile carved into it.
+            surface.fill(blobPath(cx: headCx + faceShift * 0.5, cy: muzzleY,
+                                  rx: headD * 0.26, ry: headD * 0.17,
+                                  harmonics: [(0.08, 2, 0.9), (0.05, 3, 1.6)]).applying(total),
+                         tint.color(spec.bellyHex))
+        case .corgi:
+            // Wide corgi muzzle + the white blaze running up between the eyes.
+            surface.fill(blobPath(cx: headCx + faceShift * 0.5, cy: muzzleY,
+                                  rx: headD * 0.30, ry: headD * 0.19,
+                                  harmonics: [(0.07, 2, 0.2), (0.05, 3, 2.2)]).applying(total),
+                         tint.color(spec.bellyHex))
+            if spec.blaze {
+                var blaze = CGMutablePath()
+                let topY = headCy - headD * 0.30
+                blaze.move(to: CGPoint(x: headCx - headD * 0.07, y: topY))
+                blaze.addQuadCurve(to: CGPoint(x: headCx + headD * 0.07, y: topY),
+                                   control: CGPoint(x: headCx, y: topY - headD * 0.06))
+                blaze.addQuadCurve(to: CGPoint(x: headCx + headD * 0.10, y: muzzleY - headD * 0.06),
+                                   control: CGPoint(x: headCx + headD * 0.13, y: (topY + muzzleY) / 2))
+                blaze.addQuadCurve(to: CGPoint(x: headCx - headD * 0.10, y: muzzleY - headD * 0.06),
+                                   control: CGPoint(x: headCx - headD * 0.13, y: (topY + muzzleY) / 2))
+                blaze.closeSubpath()
+                surface.fill(blaze.applying(total), tint.color(spec.bellyHex, alpha: 0.9))
+            }
+            if spec.browStop {
+                // The tan brow stop above the eyes.
+                surface.fill(blobPath(cx: headCx, cy: headCy - headD * 0.02,
+                                      rx: headD * 0.20, ry: headD * 0.09,
+                                      harmonics: [(0.10, 2, 0.0)]).applying(total),
+                             tint.color(spec.shadeHex, alpha: 0.55))
+            }
+        case .cat:
+            // Flat cat muzzle, nose set low, whisker-dot clusters.
+            surface.fill(blobPath(cx: headCx + faceShift * 0.5, cy: muzzleY,
+                                  rx: headD * 0.27, ry: headD * 0.15,
+                                  harmonics: [(0.09, 2, 1.4), (0.06, 3, 0.4)]).applying(total),
+                         tint.color(spec.bellyHex))
+            surface.fill(blobPath(cx: headCx + faceShift * 0.5, cy: muzzleY + headD * 0.02,
+                                  rx: headD * 0.045, ry: headD * 0.032,
+                                  harmonics: [(0.15, 3, 0.8)]).applying(total),
+                         tint.color(spec.inkHex))
+            if spec.whiskerDots {
+                for side in [-1.0, 1.0] {
+                    for (dx, dy) in [(0.0, 0.0), (0.09, 0.05), (-0.08, 0.07)] {
+                        surface.fill(circle(headCx + CGFloat(side) * headD * 0.30 + CGFloat(dx) * headD + faceShift,
+                                            muzzleY + CGFloat(dy) * headD,
+                                            headD * 0.016).applying(total),
+                                     tint.color(spec.shadeHex, alpha: 0.8))
+                    }
+                }
+            }
         }
         if spec.ruff, spec.archetype == .willow {
             // The shiba's cheek ruffs break the head contour twice (v1.2 note).
@@ -694,8 +751,9 @@ nonisolated enum PuppetDrawing {
         let ears: [(side: Double, perk: CGFloat)] = [(-1, pose.earL), (1, pose.earR)]
         for ear in ears {
             let side = CGFloat(ear.side)
-            let baseX = headCx + side * headD * 0.30
-            let baseY = headCy - headD * 0.42
+            // The ear SET (base position on the head mass) is species data.
+            let baseX = headCx + side * headD * spec.earSetX
+            let baseY = headCy + headD * spec.earSetY
             let rot = CGAffineTransform(translationX: -baseX, y: -baseY)
                 .concatenating(CGAffineTransform(rotationAngle:
                     side * spec.earSplay * (1 - Double(ear.perk) * 0.55)))

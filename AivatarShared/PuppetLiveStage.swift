@@ -34,7 +34,17 @@ nonisolated final class PuppetSolverController: @unchecked Sendable {
         let (target, props) = PuppetPoser.resolve(drive)
         var pose = bank.interpolate(target: target, dt: dt)
         let full = ambient && drive.motionFloor == .full && !drive.resting
-        PuppetAmbient.apply(to: &pose, at: now - startedAt, full: full)
+        // v1.3 §5.14B.3: the moving-hold amplitude rides the mood.
+        let moodAmp: Double = {
+            switch drive.mood {
+            case .playful: return 1.5
+            case .curious: return 1.15
+            case .calm: return 1.0
+            case .lonely: return 0.9
+            case .bored: return 0.8
+            }
+        }()
+        PuppetAmbient.apply(to: &pose, at: now - startedAt, full: full, moodAmp: moodAmp)
         return (pose, props)
     }
 

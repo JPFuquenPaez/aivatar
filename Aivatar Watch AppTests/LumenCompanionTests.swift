@@ -43,7 +43,9 @@ final class LumenCompanionTests: XCTestCase {
             XCTAssertNotNil(resolved.pose)
         }
         // The quirk is the luminous wing shimmer: wings lift, glow swells.
-        let quirk = PuppetPoser.resolve(PuppetDrive(archetype: .lumen, frameID: "quirk")).pose
+        var qd = PuppetDrive(archetype: .lumen, frameID: "quirk")
+        qd.frameAge = 3
+        let quirk = PuppetPoser.resolve(qd).pose
         XCTAssertGreaterThan(quirk.wing, 0.5, "wings lift on the shimmer")
         XCTAssertEqual(quirk.catchGlow, 1, "the glow is the tell")
     }

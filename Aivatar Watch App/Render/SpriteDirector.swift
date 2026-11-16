@@ -167,6 +167,18 @@ nonisolated final class SpriteDirector {
     /// v31: the low-rate idle micro-flick (ear/perk flick) — deterministic
     /// Bernoulli, tempo-scaled like the quirk rate.
     private let flickP: Float
+    /// v1.3 §5.14B.4: the surprise scheduler (the Snoopy decision-engine
+    /// pattern) — rare micro-events on a DEDICATED rng stream (the main
+    /// schedule's draws are untouched), recency-weighted so the event that
+    /// fired longest ago is likeliest, with a minimum gap per kind.
+    private var surpriseRng: SeededRandom
+    private var lastSurpriseTick: [Int] = [0, 0, 0]   // flick, lookL, lookR
+    /// Every surprise fired (test-visible: kind, tick — irregularity + min gap).
+    private(set) var surpriseFires: [(kind: Int, tick: Int)] = []
+    /// Min gap between surprises of one kind (ticks): ~36 s.
+    static let surpriseMinGapTicks = 240
+    /// Per-idle-tick surprise probability (~1 per 2.25 min at full mode).
+    static let surpriseP: Float = 1.0 / 900.0
     /// v28: the profile's blink grammar + anticipation now shape the live
     /// stage (they were only consumed by the frozen vector engine).
     private let blinkTicks: Int
@@ -267,6 +279,7 @@ nonisolated final class SpriteDirector {
         weatherDials = profile.weatherDials
         nextMoteTick = 140 + rng.nextInt(160)
         vaporRng = SeededRandom(seed ^ 0xFAE2_B04D)
+        surpriseRng = SeededRandom(seed ^ 0x5EED_5EED)
         vaporNextTick = 80 + vaporRng.nextInt(120)
     }
 
@@ -368,7 +381,42 @@ nonisolated final class SpriteDirector {
             // this rate, not an alert. Negligible motion-budget cost.
             play(.flick)
             actCount += 1
+        } else if mode == .full, !vaporActive, surpriseDue() {
+            // v1.3 §5.14B.4: a recency-weighted surprise micro-event — the
+            // idle is non-periodic ("full of surprises each time you check").
+            fireSurprise()
         }
+    }
+
+    /// v1.3 §5.14B.4: surprise due? Dedicated stream, so the main schedule's
+    /// draws (and its goldens) are untouched. Recency-weighted: each kind's
+    /// weight grows with the time since it last fired, gated by a min gap.
+    private func surpriseDue() -> Bool {
+        var weights: [Float] = []
+        for kind in 0..<3 {
+            let since = Float(tick - lastSurpriseTick[kind])
+            weights.append(since >= Float(Self.surpriseMinGapTicks) ? 1 + since / Float(Self.surpriseMinGapTicks) : 0)
+        }
+        let total = weights.reduce(0, +)
+        guard total > 0, surpriseRng.nextFloat() < Self.surpriseP * total / 3 else { return false }
+        return true
+    }
+
+    /// Fires one surprise, chosen recency-first among the due kinds.
+    private func fireSurprise() {
+        var due: [Int] = []
+        for kind in 0..<3 where Float(tick - lastSurpriseTick[kind]) >= Float(Self.surpriseMinGapTicks) {
+            due.append(kind)
+        }
+        guard let kind = due.max(by: { lastSurpriseTick[$0] < lastSurpriseTick[$1] }) else { return }
+        lastSurpriseTick[kind] = tick
+        surpriseFires.append((kind, tick))
+        switch kind {
+        case 0: play(.flick)                       // an ear flick
+        case 1: lastGazeDir = -1; play(.look, direction: -1)
+        default: lastGazeDir = 1; play(.look, direction: 1)
+        }
+        actCount += 1
     }
 
     /// v31: compass's metricSweep policy — a deterministic lighthouse sweep
@@ -834,7 +882,9 @@ nonisolated final class SpriteDirector {
             }
             var q: [(String, Int)] = []
             if perkWindupTicks > 0 { q.append(("perk", perkWindupTicks)) }
-            q += [("quirk", 2), ("idle", 2)]
+            // v1.3 §5.14B.2: two-phase quirk — the poser holds the
+            // anticipation pose on frameAge 1-2 and launches at 3+.
+            q += [("quirk", 4), ("idle", 2)]
             return q
         case .look:
             // v28: dart-and-hold instead of a 600 ms stare. v31: the gaze

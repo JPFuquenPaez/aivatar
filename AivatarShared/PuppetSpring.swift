@@ -11,9 +11,11 @@ import CoreGraphics
 ///   lids                 response 0.14 s, damping 0.85
 ///   face extras          response 0.20 s, damping 0.85
 ///   head (tilt/turn/nod)  response 0.28 s, damping 0.72
-///   appendages (ears)    response 0.28 s, damping 0.68
+///   appendages (ears)    response 0.36 s, damping 0.62 (v1.3 §5.14B.1:
+///                        ears visibly TRAIL the head — overlap budgets
+///                        communicate weight; settle ≈ 1.5x the head's)
 ///   body (squash/hop)    response 0.30 s, damping 0.60
-///   tail                 response 0.35 s, damping 0.70
+///   tail                 response 0.42 s, damping 0.65 (trails further)
 ///   wag/flutter          response 0.40 s, damping 0.75
 ///
 /// Pure integration of x'' = w^2 (xt - x) - 2 zeta w x' with
@@ -65,8 +67,8 @@ nonisolated struct PuppetSpringBank: Sendable {
         case 13, 14: return (0.12, 0.88)         // pupils (saccades)
         case 15: return (0.20, 0.85)              // dilation
         case 16: return (0.24, 0.80)             // cheeks
-        case 17, 18: return (0.28, 0.68)          // ears
-        case 19, 20: return (0.35, 0.70)          // tail
+        case 17, 18: return (0.36, 0.62)          // ears (trail the head)
+        case 19, 20: return (0.42, 0.65)          // tail (trails the body)
         case 21: return (0.40, 0.75)              // wag
         case 22, 23: return (0.35, 0.70)          // wings, catchlight glow
         default: return (0.30, 0.70)
@@ -208,10 +210,22 @@ nonisolated enum PuppetAmbient {
         return (x, y)
     }
 
+    /// v1.3 §5.14B.3 moving holds: per-part secondary micro-noise on the
+    /// ear and tail channels, each with its own phase — the ambient hold
+    /// between acts never reads as a breathing statue. `amp` is the
+    /// mood-modulated amplitude (playful > calm > bored).
+    nonisolated static func partMicro(at t: Double, amp: Double = 1.0) -> (earL: Double, earR: Double, tail: Double) {
+        let a = max(0, amp)
+        return (0.030 * a * sin(2.0 * .pi * 0.31 * t + 0.9),
+                0.030 * a * sin(2.0 * .pi * 0.37 * t + 2.4),
+                0.025 * a * sin(2.0 * .pi * 0.53 * t + 1.7))
+    }
+
     /// Applies the ambient layer onto the live pose (between springs and
     /// drawing). `full = true` keeps every amplitude (Reduce Motion pins
     /// the body: only tiny pupil micro survives, face-only).
-    nonisolated static func apply(to pose: inout PuppetPose, at t: Double, full: Bool) {
+    nonisolated static func apply(to pose: inout PuppetPose, at t: Double, full: Bool,
+                                  moodAmp: Double = 1.0) {
         if !full {
             pose.pupilX += CGFloat(pupilMicro(at: t).x * 0.35)
             pose.pupilY += CGFloat(pupilMicro(at: t).y * 0.35)
@@ -224,5 +238,9 @@ nonisolated enum PuppetAmbient {
         let micro = pupilMicro(at: t)
         pose.pupilX += CGFloat(micro.x)
         pose.pupilY += CGFloat(micro.y)
+        let parts = partMicro(at: t, amp: moodAmp)
+        pose.earL += CGFloat(parts.earL)
+        pose.earR += CGFloat(parts.earR)
+        pose.tailAngle += CGFloat(parts.tail)
     }
 }

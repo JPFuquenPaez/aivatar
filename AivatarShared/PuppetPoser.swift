@@ -278,13 +278,28 @@ nonisolated enum PuppetPoser {
         }
     }
 
-    /// The species' signature quirk (doc §5.7): the one move each companion
-    /// owns. Personality, not randomness — each is a small authored story.
+    /// The species' signature quirk (doc §5.7), TWO-PHASE (v1.3 §5.14B.2):
+    /// frameAge 1-2 is the anticipation beat — a separate pre-squash pose
+    /// (body squashed, ears back, NO launch) held before the action; the
+    /// launch lands at frameAge >= 3 with the per-species move. Anticipation
+    /// is a separate beat preceding the action, not a property of the same
+    /// frame.
     private nonisolated static func applyQuirk(_ drive: PuppetDrive,
                                                _ pose: inout PuppetPose,
                                                _ props: inout PuppetProps) {
-        // Small anticipation ramp within the hold so the move "lands".
-        let settle = CGFloat(min(max(drive.frameAge - 1, 0), 2)) / 2.0
+        if drive.frameAge <= 2 {
+            // Anticipation: wind-up only — squash in, ears back, chin down.
+            pose.bodyScaleY = min(pose.bodyScaleY, 0.94)
+            pose.bodyScaleX = max(pose.bodyScaleX, 1.04)
+            pose.earL = min(pose.earL, -0.6)
+            pose.earR = min(pose.earR, -0.6)
+            pose.headNod = max(pose.headNod, 0.12)
+            pose.hop = 0
+            pose.tailLift = 0
+            return
+        }
+        // Launch ramp within the hold so the move "lands".
+        let settle = CGFloat(min(max(drive.frameAge - 3, 0), 2)) / 2.0
         switch drive.archetype {
         case .ember:
             // Tail-coil firework hop: the wind-up coils, then the pop.

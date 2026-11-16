@@ -291,12 +291,15 @@ final class BondRulesTests: XCTestCase {
             // blinkTicks with a refractory, looks are 2-tick darts, and quirk
             // wind-ups follow the anticipation dial — the sequence grammar
             // changed deliberately, so all five hashes move.
-            .ember: 814_125_260_989_122_358,
-            .willow: 2_916_388_268_837_690_245,
-            .compass: 3_425_083_962_399_002_162,
-            .prism: 9_864_322_153_773_428_036,
-            .nimbus: 499_010_127_866_336_243,
-            .lumen: 7_893_875_153_974_737_327,
+            // Re-pinned v47 (v1.3): the quirk run is 4 ticks (two-phase
+            // anticipation + launch) and the surprise scheduler rides a
+            // dedicated stream, so the level-3 idle sequences move.
+            .ember: 3_552_131_605_872_549_230,
+            .willow: 1_361_534_258_177_240_291,
+            .compass: 15_238_154_097_207_857_468,
+            .prism: 5_899_495_643_124_915_273,
+            .nimbus: 6_595_797_885_174_563_455,
+            .lumen: 3_425_419_812_605_705_893,
         ]
         var recorded: [String] = []
         for archetype in Archetype.allCases {

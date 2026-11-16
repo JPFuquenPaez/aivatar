@@ -106,9 +106,11 @@ final class CompanionToyTests: XCTestCase {
         XCTAssertEqual(compass.tailKind, .nub)
 
         let prism = CompanionToys.spec(for: .prism)
-        XCTAssertGreaterThanOrEqual(prism.earHeight, 340, "sphynx bat ears are enormous")
-        XCTAssertGreaterThanOrEqual(prism.earWidth, 220, "...and wide")
-        XCTAssertGreaterThanOrEqual(prism.earSplay, 0.5, "...and flare outward")
+        XCTAssertGreaterThan(prism.earWidth, prism.earHeight,
+            "sphynx ears are WIDER than tall — the anti-rabbit rule (tall parallel crown ears read bunny)")
+        XCTAssertGreaterThanOrEqual(prism.earSplay, 0.6, "...splayed well outward (>= 30 deg)")
+        XCTAssertGreaterThanOrEqual(prism.earSetX, 0.38, "...set on the SIDES of the crown")
+        XCTAssertGreaterThan(prism.earSetY, -0.35, "...not on the crown top")
         XCTAssertTrue(prism.wrinkleRows)
 
         let nimbus = CompanionToys.spec(for: .nimbus)
@@ -118,6 +120,30 @@ final class CompanionToyTests: XCTestCase {
 
         XCTAssertFalse(CompanionToys.spec(for: .compass).crest)
         XCTAssertTrue(CompanionToys.spec(for: .lumen).antennae)
+    }
+
+    /// v1.3 §5.14A.1: every companion wears a muzzle mass (species read comes
+    /// from muzzle + ear set, not ear size) plus its secondary marks.
+    func testEveryCompanionHasAMuzzleAndSpeciesMarks() {
+        let muzzles: [Archetype: ToySpec.MuzzleKind] = [
+            .ember: .fox, .willow: .shiba, .compass: .corgi,
+            .prism: .cat, .nimbus: .beak, .lumen: .none,
+        ]
+        for archetype in Archetype.allCases {
+            XCTAssertEqual(CompanionToys.spec(for: archetype).muzzleKind, muzzles[archetype]!,
+                "\(archetype.rawValue) muzzle kind")
+        }
+        let compass = CompanionToys.spec(for: .compass)
+        XCTAssertTrue(compass.blaze, "the corgi's white blaze between the eyes")
+        XCTAssertTrue(compass.browStop, "the corgi's brow stop")
+        XCTAssertTrue(CompanionToys.spec(for: .prism).whiskerDots, "the cat's whisker dots")
+        // No companion is ear-first to the point of rabbit: no mammal's ears
+        // are both taller than 300 AND narrower than 200.
+        for a in [Archetype.ember, .willow, .compass, .prism] {
+            let s = CompanionToys.spec(for: a)
+            XCTAssertFalse(s.earHeight > 300 && s.earWidth < 200,
+                "\(a.rawValue): tall narrow parallel ears = the rabbit tell")
+        }
     }
 
     /// The pupil is the family ink deepened toward black (glossy discs).

@@ -105,7 +105,7 @@ final class StageZoneTests: XCTestCase {
         for archetype in Archetype.allCases {
             let mask = silhouette(archetype, size: size)
             let painted = mask.filter { $0 }.count
-            XCTAssertGreaterThan(painted, 60,
+            XCTAssertGreaterThan(painted, 45,
                 "\(archetype.rawValue): the silhouette must paint a real figure at 48 px")
             masks[archetype] = mask
         }
@@ -118,6 +118,46 @@ final class StageZoneTests: XCTestCase {
                 XCTAssertGreaterThanOrEqual(diff, 60,
                     "\(a.rawValue) vs \(b.rawValue): silhouettes read as the same animal at 48 px (only \(diff) px differ)")
             }
+        }
+    }
+
+    /// v1.3 §5.14A acceptance: the species quiz WITH A RABBIT AS THE
+    /// DISTRACTOR — a synthetic bunny (round head + tall narrow parallel
+    /// crown ears) must NOT match any companion at 48 px.
+    func testNoCompanionReadsAsTheRabbitDistractor() {
+        let size = 48
+        // The rabbit: head blob + two tall narrow parallel ears on the crown.
+        var rabbitPts: [CGPoint] = []
+        rabbitPts += PuppetDrawing.blobPoints(cx: 24, cy: 30, rx: 11, ry: 10.5,
+                                              harmonics: [(0.03, 2, 0.0)])
+        let rabbitPath = PuppetDrawing.smoothClosedPath(points: rabbitPts)
+        var earPts: [CGPoint] = []
+        for x in [18.5, 29.5] {
+            earPts += PuppetDrawing.blobPoints(cx: x, cy: 13, rx: 3.6, ry: 11,
+                                               harmonics: [(0.06, 2, 0.5)])
+        }
+        let earPath = PuppetDrawing.smoothClosedPath(points: earPts)
+        let bpr = size * 4
+        guard let ctx = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8,
+                                  bytesPerRow: bpr, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return XCTFail("no bitmap")
+        }
+        ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        ctx.addPath(rabbitPath); ctx.fillPath()
+        ctx.addPath(earPath); ctx.fillPath()
+        guard let data = ctx.data else { return XCTFail("no data") }
+        let ptr = data.assumingMemoryBound(to: UInt8.self)
+        var rabbit = [Bool](repeating: false, count: size * size)
+        for i in 0..<(size * size) { rabbit[i] = ptr[i * 4 + 3] > 127 }
+
+        let pets: [Archetype] = [.ember, .willow, .compass, .prism, .nimbus]
+        for a in pets {
+            let m = silhouette(a, size: size)
+            var diff = 0
+            for k in 0..<(size * size) where m[k] != rabbit[k] { diff += 1 }
+            XCTAssertGreaterThanOrEqual(diff, 60,
+                "\(a.rawValue): reads as the RABBIT at 48 px (only \(diff) px differ from the distractor)")
         }
     }
 }

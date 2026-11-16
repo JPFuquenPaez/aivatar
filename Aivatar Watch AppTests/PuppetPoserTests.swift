@@ -72,38 +72,56 @@ final class PuppetPoserTests: XCTestCase {
     // MARK: - Quirks are species signatures (doc §5.7)
 
     func testQuirkSignaturesPerSpecies() {
+        // Launch phase (frameAge >= 3):
         // Ember: the tail-coil firework hop with the ear flick.
-        let ember = resolve(.ember, "quirk").pose
+        let ember = resolve(.ember, "quirk", modify: { $0.frameAge = 3 }).pose
         XCTAssertEqual(ember.hop, 70, "the fox hops")
         XCTAssertGreaterThanOrEqual(ember.tailLift, 0.9)
         XCTAssertEqual(ember.earL, -0.5)
         XCTAssertEqual(ember.earR, 1, "ears flick asymmetrically")
-        XCTAssertTrue(resolve(.ember, "quirk").props.sunnyBurst)
+        XCTAssertTrue(resolve(.ember, "quirk", modify: { $0.frameAge = 3 }).props.sunnyBurst)
         // Willow: the shibe head-cock + smile (the tilt eases with settle).
-        let young = resolve(.willow, "quirk", modify: { $0.frameAge = 1 }).pose
-        let settled = resolve(.willow, "quirk", modify: { $0.frameAge = 3 }).pose
+        let young = resolve(.willow, "quirk", modify: { $0.frameAge = 3 }).pose
+        let settled = resolve(.willow, "quirk", modify: { $0.frameAge = 5 }).pose
         XCTAssertEqual(young.headTilt, 0.34, accuracy: 0.001)
         XCTAssertEqual(settled.headTilt, 0.24, accuracy: 0.001)
         XCTAssertEqual(settled.mouth, .ws)
         // Compass: butt-wiggle with airplane ears.
-        let compass = resolve(.compass, "quirk").pose
+        let compass = resolve(.compass, "quirk", modify: { $0.frameAge = 3 }).pose
         XCTAssertEqual(compass.bodyScaleX, 1.07, accuracy: 0.001)
         XCTAssertEqual(compass.earL, 1)
         XCTAssertEqual(compass.earR, -0.35)
         XCTAssertEqual(compass.wag, 1)
         // Prism: the ear-twitch inspection (asymmetric once the settle lands).
-        let prism = resolve(.prism, "quirk", modify: { $0.frameAge = 3 }).pose
+        let prism = resolve(.prism, "quirk", modify: { $0.frameAge = 5 }).pose
         XCTAssertEqual(prism.earL, 1)
         XCTAssertLessThan(prism.earR, 1, "the twitch is asymmetric (per family)")
         // Nimbus: the wing flip + the chirp, with accent notes as props.
-        let nimbus = resolve(.nimbus, "quirk")
+        let nimbus = resolve(.nimbus, "quirk", modify: { $0.frameAge = 3 })
         XCTAssertEqual(nimbus.pose.wing, 0.85, accuracy: 0.001)
         XCTAssertEqual(nimbus.pose.mouth, .o)
         XCTAssertTrue(nimbus.props.songNotes)
         // Lumen: the shimmer — wings lift, the glow swells.
-        let lumen = resolve(.lumen, "quirk").pose
+        let lumen = resolve(.lumen, "quirk", modify: { $0.frameAge = 3 }).pose
         XCTAssertEqual(lumen.wing, 0.8, accuracy: 0.001)
         XCTAssertEqual(lumen.catchGlow, 1)
+    }
+
+    /// v1.3 §5.14B.2 acceptance: every quirk contains an anticipation frame
+    /// (pre-squash, ears back, NO launch) before the launch frame.
+    func testEveryQuirkHasAnticipationBeforeLaunch() {
+        for archetype in Archetype.allCases {
+            let windup = resolve(archetype, "quirk", modify: { $0.frameAge = 1 }).pose
+            let launch = resolve(archetype, "quirk", modify: { $0.frameAge = 3 }).pose
+            XCTAssertEqual(windup.hop, 0, "\(archetype.rawValue): the wind-up never launches")
+            XCTAssertLessThanOrEqual(windup.bodyScaleY, 0.94,
+                "\(archetype.rawValue): the wind-up pre-squashes")
+            XCTAssertLessThanOrEqual(windup.earL, -0.6, "\(archetype.rawValue): ears back on wind-up")
+            XCTAssertLessThanOrEqual(windup.earR, -0.6)
+            XCTAssertNotEqual(windup, launch, "\(archetype.rawValue): anticipation != launch")
+        }
+        // Ember's launch actually launches (the doc's hop example).
+        XCTAssertEqual(resolve(.ember, "quirk", modify: { $0.frameAge = 3 }).pose.hop, 70)
     }
 
     // MARK: - Greeting, petting, songburst, boop
@@ -293,8 +311,9 @@ final class PuppetPoserTests: XCTestCase {
                 XCTAssertEqual(a.pose.hashValue64(), b.pose.hashValue64())
             }
         }
-        // The quirk separates species: ember's firework != lumen's shimmer.
-        XCTAssertNotEqual(resolve(.ember, "quirk").pose, resolve(.lumen, "quirk").pose)
+        // The quirk launch separates species: ember's firework != lumen's shimmer.
+        XCTAssertNotEqual(resolve(.ember, "quirk", modify: { $0.frameAge = 3 }).pose,
+                          resolve(.lumen, "quirk", modify: { $0.frameAge = 3 }).pose)
         // The fingerprint quantizes at 1/256 — tiny float drift is invisible.
         var drift = resolve(.ember, "idle").pose
         drift.lidOpen += 0.0001
