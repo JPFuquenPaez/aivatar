@@ -50,7 +50,7 @@ struct NamingCeremonyView: View {
                     // is the authored stage grid). The perk beat moved to
                     // the commit celebration (sparkle + haptic + the stage's
                     // happy act).
-                    SetupTheme.portraitDisc(for: archetype, size: compact ? 44 : 56)
+                    SetupTheme.puppetDisc(for: archetype, size: compact ? 44 : 56)
                         .padding(.top, compact ? 2 : 6)
                     Text(String(format: String(localized: "naming.title"), archetype.animalName))
                         .font(.title3.weight(.semibold))

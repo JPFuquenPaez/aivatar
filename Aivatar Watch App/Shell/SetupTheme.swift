@@ -23,19 +23,11 @@ import SwiftUI
 /// watchOS HIG: black backgrounds, tint-driven hierarchy, full-width buttons
 /// with 44 pt+ targets, text styles only (Dynamic Type).
 nonisolated enum SetupTheme {
-    /// The companion's body token ("B") from the authored sprite — the same
-    /// hue the icon renders in. Single source of truth for all chrome.
+    /// v3: the companion's family ui accent from the toy spec — the same
+    /// hue the puppet renders in. Single source of truth for all chrome.
     static func accentHex(for archetype: Archetype) -> String {
-        accentHexes[archetype] ?? "FF9E4A"
+        CompanionToys.spec(for: archetype).uiAccentHex
     }
-
-    private static let accentHexes: [Archetype: String] = {
-        var dict: [Archetype: String] = [:]
-        for archetype in Archetype.allCases {
-            dict[archetype] = AuthoredSprites.sprite(for: archetype).uiAccentHex
-        }
-        return dict
-    }()
 
     /// The companion's accent color as a SwiftUI Color.
     static func accent(for archetype: Archetype) -> Color {
@@ -43,7 +35,7 @@ nonisolated enum SetupTheme {
     }
 
     static func color(hex: String) -> Color {
-        let rgb = CompanionSprite.hexToRGB(hex)
+        let rgb = ColorHex.rgb(hex)
         return Color(.sRGB,
                      red: Double(rgb.r) / 255, green: Double(rgb.g) / 255, blue: Double(rgb.b) / 255)
     }
@@ -52,7 +44,7 @@ nonisolated enum SetupTheme {
 
     /// Relative luminance (WCAG 2.x) of a RRGGBB hex (no '#').
     static func relativeLuminance(_ hex: String) -> Double {
-        let rgb = CompanionSprite.hexToRGB(hex)
+        let rgb = ColorHex.rgb(hex)
         func lin(_ v: UInt8) -> Double {
             let c = Double(v) / 255
             return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
@@ -82,28 +74,40 @@ nonisolated enum SetupTheme {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    /// The glow-disc hero: the companion's icon on a flat tinted disc with a
-    /// soft radial halo, optionally ringed + badged when selected. Pixel-crisp
-    /// (`interpolation(.none)`), `accessibilityHidden` — text carries the a11y.
+    /// The glow-disc hero: the companion's puppet head-cut icon on a flat
+    /// tinted disc with a soft radial halo, optionally ringed + badged when
+    /// selected. `accessibilityHidden` — text carries the a11y.
     static func iconDisc(for archetype: Archetype, selected: Bool = false, size: CGFloat = 64) -> some View {
         SetupIconDisc(archetype: archetype, selected: selected, size: size)
     }
 
-    /// AMS v2 (v43): the PORTRAIT disc — the HD pet cut in the glow-disc
-    /// chrome (soft accent halo, static by contract: no surface animates
-    /// the HD art). Falls back to the pixel icon disc when the portrait
-    /// asset does not resolve (lumen, older installs).
-    static func portraitDisc(for archetype: Archetype, selected: Bool = false, size: CGFloat = 64) -> some View {
-        SetupPortraitDisc(archetype: archetype, selected: selected, size: size)
+    /// v3 "Meet them": the hero is the living soft-toy puppet itself, in the
+    /// glow-disc chrome — the exact animal the stage will animate (no photo
+    ///, no second cast: the toy IS the identity now).
+    static func puppetDisc(for archetype: Archetype, selected: Bool = false, size: CGFloat = 64) -> some View {
+        SetupPuppetDisc(archetype: archetype, selected: selected, size: size)
     }
 }
 
-/// The portrait-disc hero (AMS v2): the HD cut on the same glow-disc
-/// language as the pixel icon disc — identity chrome, never a stage.
-struct SetupPortraitDisc: View {
+/// The puppet hero disc (v3): the soft-toy companion in its contentment
+/// pose on the glow-disc chrome — identity art while choosing, the same
+/// renderer as the stage.
+struct SetupPuppetDisc: View {
     let archetype: Archetype
     var selected: Bool
     var size: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var heroPose: PuppetPose {
+        var pose = PuppetPose()
+        pose.mouth = .ws
+        pose.cheekGlow = 0.7
+        pose.earL = 0.5
+        pose.earR = 0.5
+        pose.tailLift = 0.2
+        pose.wag = 0.3
+        return pose
+    }
 
     var body: some View {
         let accent = SetupTheme.accent(for: archetype)
@@ -111,17 +115,14 @@ struct SetupPortraitDisc: View {
             Circle()
                 .fill(accent.opacity(0.12))
                 .frame(width: size, height: size)
-            if let portrait = PetImageRender.portraitImage(AuthoredSprites.sprite(for: archetype)) {
-                Image(uiImage: portrait)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
-                    .frame(width: size * 0.82, height: size * 0.82)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.white.opacity(0.10), lineWidth: 0.5))
-            } else {
-                SetupIconDisc(archetype: archetype, selected: false, size: size * 0.82)
-            }
+            PuppetPortraitView(
+                archetype: archetype,
+                pose: heroPose,
+                style: .flat,
+                time: 0)
+                .frame(width: size * 0.94, height: size * 0.94)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 0.5))
             if selected {
                 Circle()
                     .stroke(accent, lineWidth: 2.5)
@@ -134,10 +135,14 @@ struct SetupPortraitDisc: View {
             }
         }
         .frame(width: size, height: size)
+        .scaleEffect(selected ? 1.05 : 1)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: selected)
+        .accessibilityHidden(true)
     }
 }
 
-/// The glow-disc hero as a real view so it can read Reduce Motion (v30).
+/// The glow-disc icon hero (the head cut) as a real view so it can read
+/// Reduce Motion (v30).
 struct SetupIconDisc: View {
     let archetype: Archetype
     var selected: Bool
@@ -169,9 +174,7 @@ struct SetupIconDisc: View {
             }
         }
         // The layout size is exactly `size`; the soft halo is an OVERLAY so it
-        // glows beyond the disc without consuming layout width (v32 fix: the
-        // halo previously inflated the disc to 1.6x and crushed sibling text,
-        // e.g. the Settings identity card name).
+        // glows beyond the disc without consuming layout width (v32 fix).
         .frame(width: size, height: size)
         .overlay {
             Circle()

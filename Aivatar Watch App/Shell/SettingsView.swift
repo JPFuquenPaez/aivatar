@@ -88,6 +88,15 @@ struct SettingsView: View {
                     .accessibilityLabel(String(format: String(localized: "a11y.identity_card"),
                                                 stageName, archetype.fullName, aboutLine))
                 }
+                Section {
+                    // v3 keep mechanics (doc §5.7): the never-lose contract,
+                    // said out loud — the companion lives on this watch and
+                    // an update never deletes it.
+                    Text(String(localized: "settings.promise"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .listRowBackground(Color.clear)
+                }
                 Section(String(localized: "settings.companion")) {
                     Button {
                         showNaming = true

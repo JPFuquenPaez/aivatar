@@ -1,103 +1,108 @@
 import XCTest
+import CoreGraphics
 @testable import Aivatar_Watch_App
 
-/// Aivatar 2.0 E9 — ambient season overlays. PR-2 covers the ground shadow
-/// (E9.1, evolved v35 into a 3-row isometric pixel tile: D top face + K front
-/// lip); PR-9 extends this file with the cold-weather breath vapor (E9.2).
-/// Tile rules pinned here: present in every awake frame, every row +1 wide on
-/// the breathe frame, absent during the farewell wipe and in the rest LOD,
-/// and the tile rows must be empty in every base grid (the overlay never
-/// collides with authored art).
+/// Aivatar 2.0 E9 (v3) — the ground shadow and the cold-breath vapor on the
+/// puppet stage. The shadow (E9.1) is a soft ellipse under the feet: drawn
+/// in every awake scan, silent in the rest LOD (the stage's farewell dim
+/// ramp suppresses everything visually, so no drawing gate is needed), and
+/// its contact swells with squash-and-stretch — the v43 tile's "inhale on
+/// the breathe frame" carried into vector physics. The vapor (E9.2) rides
+/// the director's schedule and the drive's PROPS only — never a pose
+/// channel: the body never moves for weather.
 final class SeasonOverlayTests: XCTestCase {
 
-    func testShadowRowsAreEmptyInEveryBaseGrid() {
-        // v35: the ground tile spans shadowRow..shadowRow+2 (clamped) — every
-        // tile row must be empty in the base grid (overlay never collides
-        // with authored art).
-        for archetype in Archetype.allCases {
-            let sprite = AuthoredSprites.sprite(for: archetype)
-            let row = SpriteStageMetadata.meta(for: archetype).shadowRow
-            for dy in 0...2 {
-                let y = row + dy
-                guard y < CompanionSprite.gridHeight else { continue }
-                for x in 0..<CompanionSprite.gridWidth {
-                    XCTAssertEqual(sprite.base[y][sprite.base[y].index(sprite.base[y].startIndex, offsetBy: x)], ".",
-                                   "\(archetype): tile row \(y) must be empty in the base grid at x=\(x)")
-                }
+    /// Renders one flat scan onto a mid-gray stage (the shadow is a dark
+    /// ellipse: invisible on OLED black, obvious on gray) and returns the
+    /// bytes plus the shadow's device band rows.
+    private func render(archetype: Archetype, style: PuppetStyle = .flat,
+                        modify: (inout PuppetDrive) -> Void = { _ in }) -> ([UInt8], Int, Int, ClosedRange<Int>) {
+        let w = 200, h = 320
+        let ctx = CGContext(
+            data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(CGColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        let layout = PuppetDrawing.Layout.fit(canvas: CGSize(width: w, height: h), scaleFactor: 0.92)
+        let device = layout.deviceTransform.concatenating(PuppetDrawing.CGSurface.flip(height: CGFloat(h)))
+        let surface = PuppetDrawing.CGSurface(cg: ctx, device: device)
+        var drive = PuppetDrive(archetype: archetype, frameID: "idle")
+        modify(&drive)
+        let (pose, props) = PuppetPoser.resolve(drive)
+        PuppetDrawing.draw(surface, spec: CompanionToys.spec(for: archetype),
+                           pose: pose, props: props, style: style, time: 0.7)
+        var data = [UInt8](repeating: 0, count: w * h * 4)
+        let rctx = CGContext(
+            data: &data, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        rctx.draw(ctx.makeImage()!, in: CGRect(x: 0, y: 0, width: w, height: h))
+        let top = Int(CGPoint(x: 500, y: 872 - 17).applying(layout.deviceTransform).y.rounded())
+        let bottom = Int(CGPoint(x: 500, y: 872 + 17).applying(layout.deviceTransform).y.rounded())
+        return (data, w, h, max(0, top)...min(h - 1, bottom))
+    }
+
+    /// Dark pixels in the shadow band, canvas x 45...70 — LEFT of the feet
+    /// (feet start at author x ~339): only the shadow reaches there. The
+    /// threshold is RELATIVE to the gray stage fill (the shadow is a 0.22
+    /// black wash — about 12% below the background).
+    private func shadowPixels(_ r: ([UInt8], Int, Int, ClosedRange<Int>), x0: Int = 45, x1: Int = 70) -> Int {
+        let (data, w, h, band) = r
+        let bgO = ((h - 2) * w + 2) * 4
+        let bg = Int(data[bgO])
+        var count = 0
+        for y in band {
+            for x in x0...x1 {
+                let o = (y * w + x) * 4
+                if data[o] < bg - 12 && data[o + 1] < bg - 12 { count += 1 }
             }
+        }
+        return count
+    }
+
+    private func leftmostShadow(_ r: ([UInt8], Int, Int, ClosedRange<Int>), x0: Int = 30, x1: Int = 60) -> Int {
+        let (data, w, h, band) = r
+        let bgO = ((h - 2) * w + 2) * 4
+        let bg = Int(data[bgO])
+        for x in x0...x1 {
+            for y in band where data[(y * w + x) * 4] < bg - 12 { return x }
+        }
+        return x1 + 1
+    }
+
+    func testShadowUnderEveryAwakeDraw() {
+        // E9.1: present under every species' idle scan (v35 parity).
+        for archetype in Archetype.allCases {
+            let r = render(archetype: archetype)
+            XCTAssertGreaterThanOrEqual(shadowPixels(r), 8,
+                                         "\(archetype): the ground shadow paints")
         }
     }
 
-    func testTileShapeIsIsoSlabAndFollowsBreatheFrame() {
+    func testShadowAbsentInRestLOD() {
+        // The rest scan draws NO shadow (the guard is style .rest) and the
+        // dim feet start at author x~339, outside the measured zone.
         for archetype in Archetype.allCases {
-            let idle = SpriteStageMetadata.shadowCells(archetype, widthExtra: 0)
-            let breathe = SpriteStageMetadata.shadowCells(archetype, widthExtra: 1)
-            let row = SpriteStageMetadata.meta(for: archetype).shadowRow
-            let rows = Dictionary(grouping: idle, by: \.y).sorted { $0.key < $1.key }
-            // Iso slab by design: dy 0/1 = D top face, dy 2 = K front lip
-            // (clipped past the grid bottom). Each visible row contiguous+centered.
-            XCTAssertGreaterThanOrEqual(rows.count, 2, "\(archetype): tile has at least 2 visible rows")
-            for (y, cells) in rows {
-                let xs = cells.map(\.x).sorted()
-                XCTAssertEqual(xs.last! - xs.first! + 1, cells.count, "\(archetype): row \(y) contiguous")
-                // v40: image-backed pets center the tile under the body
-                // (shadowCenterX), not the canvas.
-                let meta = SpriteStageMetadata.meta(for: archetype)
-                let center = meta.shadowCenterX ?? CompanionSprite.gridWidth / 2
-                XCTAssertEqual(xs.first!, center - cells.count / 2, "\(archetype): row \(y) centered under the body")
-                let dy = y - row
-                let expected: Character = dy >= 2 ? "K" : "D"
-                XCTAssertTrue(cells.allSatisfy { $0.symbol == expected },
-                              "\(archetype): row \(y) is \(expected)")
-            }
-            // Breathe swells every row by exactly one cell (the tile inhales).
-            let idleByRow = Dictionary(grouping: idle, by: \.y)
-            let breatheByRow = Dictionary(grouping: breathe, by: \.y)
-            for (y, cells) in idleByRow {
-                XCTAssertEqual(breatheByRow[y]?.count ?? -1, cells.count + 1,
-                               "\(archetype): breathe widens tile row \(y) by 1")
-            }
-            XCTAssertEqual(Set(breathe.map(\.y)), Set(idle.map(\.y)), "same rows awake/breathe")
-            XCTAssertTrue(idle.allSatisfy { $0.y >= row && $0.y < CompanionSprite.gridHeight }, "clamped to grid")
+            let r = render(archetype: archetype, style: .rest,
+                           modify: { $0.resting = true })
+            XCTAssertEqual(shadowPixels(r), 0,
+                           "\(archetype): rest LOD keeps the band empty")
         }
     }
 
-    func testShadowAbsentDuringFarewellWipeAndRestGate() {
-        for archetype in Archetype.allCases {
-            XCTAssertTrue(SpriteStageMetadata.shadowOverlayIfAwake(archetype, frame: "idle", farewellPending: true).isEmpty,
-                          "farewell wipe: no shadow")
-            XCTAssertTrue(SpriteStageMetadata.shadowOverlayIfAwake(archetype, frame: "sleepy", farewellPending: true).isEmpty)
-            XCTAssertFalse(SpriteStageMetadata.shadowOverlayIfAwake(archetype, frame: "idle", farewellPending: false).isEmpty)
-            // Run-cycle frames are awake frames: shadow present.
-            XCTAssertFalse(SpriteStageMetadata.shadowOverlayIfAwake(archetype, frame: "idleA", farewellPending: false).isEmpty)
-            XCTAssertFalse(SpriteStageMetadata.shadowOverlayIfAwake(archetype, frame: "idleB", farewellPending: false).isEmpty)
-        }
+    func testShadowScalesWithSquashAndStretch() {
+        // The contact widens when the body squashes (the boop pulse is the
+        // extreme case: bodyScaleY 0.88, bodyScaleX 1.10 -> sway ~1.16).
+        let idle = render(archetype: .ember)
+        let boop = render(archetype: .ember, modify: { $0.boopPulse = true })
+        XCTAssertGreaterThanOrEqual(shadowPixels(boop), shadowPixels(idle),
+                                    "the squashed contact covers more of the band")
+        XCTAssertLessThanOrEqual(leftmostShadow(boop) + 4, leftmostShadow(idle),
+                                 "the widened shadow pokes further left than the idle contact")
     }
 
-    func testShadowComposesOverAnyFrameWithoutChangingIt() {
-        // The shadow is an overlay: resolving any frame with it must not alter
-        // the authored grid elsewhere.
-        for archetype in Archetype.allCases {
-            let sprite = AuthoredSprites.sprite(for: archetype)
-            let shadow = SpriteStageMetadata.shadowCells(archetype)
-            let with = sprite.symbols(frameID: "idle", overlay: shadow)
-            let without = sprite.symbols(frameID: "idle")
-            for y in 0..<CompanionSprite.gridHeight {
-                for x in 0..<CompanionSprite.gridWidth {
-                    if let diff = shadow.first(where: { $0.x == x && $0.y == y }) {
-                        XCTAssertEqual(with[y][x], diff.symbol, "\(archetype) overlay cell (\(x),\(y)) draws its own token")
-                    } else {
-                        XCTAssertEqual(with[y][x], without[y][x], "\(archetype) cell (\(x),\(y)) changed by overlay")
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - E9.2 cold breath vapor (PR-9)
-
-extension SeasonOverlayTests {
+    // MARK: - E9.2 cold breath vapor
 
     private func director(_ archetype: Archetype, seed: UInt64 = 20261010) throws -> SpriteDirector {
         let profile = try PersonalityProfile.load(archetype)
@@ -142,17 +147,25 @@ extension SeasonOverlayTests {
                 XCTAssertGreaterThanOrEqual(puffTicks[i] - start, 3 + SpriteDirector.vaporMinHiddenTicks)
             }
         }
-        // Overlay cells are the 2 authored ink cells.
-        d.setCondition(.cold)
-        for t in 2001...2600 {
-            d.advance(toTick: t)
-            if d.vaporActive {
-                let cells = d.transientOverlayCells.filter { $0.symbol == "K" }
-                XCTAssertEqual(cells.count, 2)
-                XCTAssertEqual(Set(cells.map { "\($0.x),\($0.y)" }),
-                               Set(SpriteStageMetadata.vaporCells(.ember).map { "\($0.x),\($0.y)" }))
-                break
-            }
+    }
+
+    func testVaporRidesPropsOnlyPosesNeverChange() {
+        // Weather never moves the body: the vapor channel changes PROPS only
+        // (two ink blobs above the face); the resolved pose is bit-identical,
+        // and the rest LOD suppresses the vapor entirely.
+        for archetype in Archetype.allCases {
+            let plain = PuppetDrive(archetype: archetype, frameID: "idle")
+            var vapy = plain
+            vapy.vapor = true
+            let a = PuppetPoser.resolve(plain)
+            let b = PuppetPoser.resolve(vapy)
+            XCTAssertEqual(a.pose, b.pose, "\(archetype): vapor never touches the pose")
+            XCTAssertFalse(a.props.vapor)
+            XCTAssertTrue(b.props.vapor, "\(archetype): vapor rides the props")
+            var resting = vapy
+            resting.resting = true
+            XCTAssertFalse(PuppetPoser.resolve(resting).props.vapor,
+                           "\(archetype): rest LOD suppresses vapor")
         }
     }
 

@@ -159,3 +159,18 @@
 "animal.lumen.name" = "Moth";
 "animal.lumen.element" = "night";
 "animal.lumen.temperament" = "Quiet and luminous — drawn to your light";
+
+/* v3 Companion Cast — the persona text moments (<= 6 words, once per day) */
+"persona.hello.ember" = "There you are. Show time?";
+"persona.hello.willow" = "Nap accepted. You're here.";
+"persona.hello.compass" = "Right on time. Always.";
+"persona.hello.prism" = "You look wonderful today.";
+"persona.hello.nimbus" = "Heard you coming.";
+"persona.hello.lumen" = "Followed your light back.";
+
+/* v3 keep mechanics — the never-lose contract + visible growth */
+"settings.promise" = "Your companion lives on this watch. Updates never delete it.";
+"toy.bandana" = "bandana";
+"toy.collar" = "collar";
+"toy.charm" = "leaf charm";
+"toy.bell" = "bell";

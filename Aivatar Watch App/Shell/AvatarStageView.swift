@@ -98,6 +98,8 @@ struct AvatarStageView: View {
     @State private var lastTabSelection = 0
     /// E8: the in-app Reduce Motion L2 setting (drives the session captions).
     @AppStorage("reduceMotionL2") private var reduceMotionL2Stage = false
+    /// v3: the persona text moment's day gate (once per day, rare by rule).
+    @AppStorage("personaHelloShownDay") private var personaHelloShownDay = 0
 
     init(archetype: Archetype? = nil) {
         launchOverride = archetype
@@ -322,7 +324,6 @@ struct AvatarStageView: View {
                     if let director {
                         SpriteStageRenderer(
                             director: director,
-                            sprite: AuthoredSprites.sprite(for: archetype),
                             forceAwake: AvatarStageView.forceAwake
                         )
                         // v28: companion switch rebuilds the renderer (no epoch hitch)
@@ -376,17 +377,16 @@ struct AvatarStageView: View {
                         guard size.width > 0, size.height > 0 else { return }
                         let nx = Float((value.location.x - size.width / 2) / (size.width / 2))
                         let ny = Float((value.location.y - size.height / 2) / (size.height / 2))
-                        // E7 boop-the-face: resolve the touched cell with the
-                        // stage's own layout math and hit-test the face rect.
-                        // Accepted boop = happy-squint ack + 6-tick blush flush
-                        // + soft haptic; during the 90 s refractory (or a
+                        // E7 boop-the-face (v3): hit-test the puppet's head
+                        // circle (the drawing's own geometry — one source).
+                        // Accepted boop = happy-squash ack + blush flush +
+                        // soft haptic; during the 90 s refractory (or a
                         // session) the tap falls through to the normal
                         // reaction pool below — nothing is ever dead (U7).
-                        let cell = size.width / CGFloat(CompanionSprite.gridWidth)
-                        let top = size.height * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
-                        let cx = Int(value.location.x / cell)
-                        let cy = Int((value.location.y - top) / cell)
-                        if SpriteStageMetadata.isFaceCell(archetype, x: cx, y: cy),
+                        let hit = PuppetDrawing.headHitCircle(archetype: archetype, canvas: size)
+                        let dx = value.location.x - hit.center.x
+                        let dy = value.location.y - hit.center.y
+                        if sqrt(dx * dx + dy * dy) <= hit.radius,
                            director?.boopFace() == true {
                             HapticsChannel.shared.boop()
                         }
@@ -541,7 +541,10 @@ struct AvatarStageView: View {
             }
             return
         }
-        guard let beat = WakeBeatSelector.beat(memory: memory, archetype: archetype, now: now) else { return }
+        guard let beat = WakeBeatSelector.beat(memory: memory, archetype: archetype, now: now) else {
+            showPersonaHelloOncePerDay()
+            return
+        }
         director.playSequence(WakeBeatSelector.acts(for: beat, archetype: archetype))
         WakeBeatSelector.markShown(&memory, now: now)
         store.save(memory)
@@ -551,6 +554,27 @@ struct AvatarStageView: View {
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
                 if beatCaption == caption { beatCaption = nil }
             }
+        }
+    }
+
+    /// v3 persona layer (doc §5.6): the rare character-voiced text moment —
+    /// 3-6 words in the companion's own voice, at most once per day, and
+    /// only when no story beat already spoke (never more than one text
+    /// moment per session).
+    @MainActor
+    private func showPersonaHelloOncePerDay() {
+        let today = CompanionMemoryStore.dayIndex(of: Date())
+        guard personaHelloShownDay != today else { return }
+        personaHelloShownDay = today
+        let key = "persona.hello.\(archetype.rawValue)"
+        beatCaption = NSLocalizedString(key, comment: "persona hello moment")
+        #if DEBUG
+        assert(beatCaption != key, "missing localization for \(key)")
+        #endif
+        let caption = beatCaption
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 4_500_000_000)
+            if beatCaption == caption { beatCaption = nil }
         }
     }
 

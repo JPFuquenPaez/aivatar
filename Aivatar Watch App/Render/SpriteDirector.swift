@@ -33,6 +33,11 @@ nonisolated final class SpriteDirector {
     static let tickDuration: Double = 0.15
     /// Ticks per minute on the director clock.
     private static let ticksPerMinute: Float = 60.0 / 0.15
+    /// The self-play mote's stage-space bounds (v3: the bounds the puppet
+    /// props map onto stage fractions 0...1 — 20x18 kept as the coordinate
+    /// vocabulary so the seeded mote goldens are untouched).
+    static let moteStageWidth = 20
+    static let moteStageHeight = 18
 
     /// v28: the blink hold in ticks from the profile's durationScale — 300 ms
     /// is the visibility floor at the 150 ms clock (willow 1.8 -> 4 ticks, a
@@ -48,30 +53,41 @@ nonisolated final class SpriteDirector {
         anticipation > 0 ? max(1, Int(round(anticipation * 2))) : 0
     }
 
-    private let sprite: CompanionSprite
     private let archetype: Archetype
-    /// The archetype this director acts (stage-metadata / hit-routing key).
+    /// The archetype this director acts (drive/hit-routing key).
     var currentArchetype: Archetype { archetype }
-    /// Aivatar 2.0: transient tell overlays (E7 blush, E9.2 vapor, E5 memento
-    /// deposit) — merged into the stage overlay by the renderer; the authored
-    /// grids and frame patches never change for these.
-    var transientOverlayCells: [CompanionSprite.CellDiff] {
-        var cells: [CompanionSprite.CellDiff] = []
-        // E5 level-5 memento deposit: the confidant cell fades in over 4 ticks.
-        if let alpha = mementoDepositAlpha {
-            cells.append(CompanionSprite.CellDiff(9, 16, "A", alpha: alpha))
-        }
-        cells += transientTellCells
-        return cells
-    }
-    /// E7/E9 transient tells (blush / vapor).
-    private var transientTellCells: [CompanionSprite.CellDiff] {
-        var cells: [CompanionSprite.CellDiff] = []
-        // E7: the happy-flush blush — 2 accent cells at face mid-height.
-        if blushTicksLeft > 0 { cells += SpriteStageMetadata.blushCells(archetype) }
-        // E9.2: the cold breath vapor — 2 ink cells above the face center.
-        if vaporOnTicksLeft > 0 { cells += SpriteStageMetadata.vaporCells(archetype) }
-        return cells
+
+    // MARK: - Act tells (v3: pose-channel tells, not cell overlays)
+
+    /// The act the current queue is playing (nil once it settles).
+    private(set) var currentAct: SpriteAct?
+    /// The wrist-raise greeting sequence plays (pupils up at the user,
+    /// weather ceremony, happy blink — then settles).
+    private(set) var greetingActive = false
+    /// Nimbus's songburst (a sustained voice just came in).
+    private(set) var songburstActive = false
+    /// E7 boop flush on.
+    var blushing: Bool { blushTicksLeft > 0 }
+    /// The boop pulse's first tick (the squash-and-glow beat).
+    var boopPulse: Bool { blushTicksLeft == Self.blushDurationTicks }
+    private var lastGreetTick = -100_000
+    /// The slow-blink ritual (long-press petting) is mid-run.
+    var slowBlinkActive: Bool { currentAct == .slowBlink && !queue.isEmpty }
+
+    /// v3 (doc §5.5): the wrist-raise greeting — a 600 ms sequence: perk
+    /// (pupils snap up at the user), the happy blink, tail swing. Input-
+    /// driven only (never the idle scheduler), so the act goldens hold.
+    /// Rate-capped at 20 ticks (3 s) so wake storms queue one greeting.
+    func greet() {
+        guard !resting, !sessionMode, tick - lastGreetTick >= 20 else { return }
+        lastGreetTick = tick
+        markInteraction()
+        currentAct = nil
+        greetingActive = true
+        songburstActive = false
+        blinkCount += 1
+        queue = [("perk", 1), ("happy", 2), ("blink", blinkTicks), ("idle", 1)]
+        actCount += 1
     }
 
     // MARK: - E9.2 cold breath vapor
@@ -96,7 +112,8 @@ nonisolated final class SpriteDirector {
     private var blushTicksLeft = 0
     private var lastBoopTick = -1_000_000
 
-    /// A face tap landed (hit math done by the caller via SpriteStageMetadata).
+    /// A face tap landed (hit math done by the caller via
+    /// PuppetDrawing.headHitCircle — one geometry source with the stage).
     /// Returns true when the boop was accepted: ack act (happy squint) plays
     /// within <= 2 ticks and the 6-tick blush overlay starts. Suppressed while
     /// resting or during a breath session.
@@ -135,27 +152,12 @@ nonisolated final class SpriteDirector {
         return Float(Self.mementoDepositTicks - mementoDepositTicksLeft + 1) / Float(Self.mementoDepositTicks)
     }
 
-    // MARK: - AMS v2 tail part (LPR)
-
-    /// The ambient tail channel: PetMotion proposes, CellQuantizer steps
-    /// (>= 2-tick holds), and the selected authored pose renders as overlay
-    /// diffs (SpriteStageMetadata.tailOverlay). A dedicated SplitMix64
-    /// stream keeps the act-schedule goldens unchanged. One focal story:
-    /// no wags while a quirk owns the tail, during a breath session, under
-    /// Reduce Motion L2, or during a vapor puff.
-    private var tailChannel: TailChannel
-    private let tailWagTicksPerMinute: Float = 60.0 / 0.15
-    private let tailTempoScale: Float
-    /// The current quantized tail pose (-1 tailL, 0 neutral, +1 tailR).
-    var tailPose: Int { tailChannel.pose }
-    /// The tail overlay diffs for the current pose (empty when neutral / lumen).
-    var tailOverlayCells: [CompanionSprite.CellDiff] {
-        SpriteStageMetadata.tailOverlay(archetype, pose: tailChannel.pose)
-    }
+    // MARK: - The seeded schedule (SplitMix64, memory-as-input)
 
     private var rng: SeededRandom
-    /// The raw stream seed (test/render-visible — PetMotion derives the
-    /// ambient pose phases from it, so motion is pure in (seed, tick)).
+    /// The raw stream seed (the v3 ambient phases are pure functions of
+    /// display time; the seed stays the journey-visible identity of the
+    /// director's stochastic schedule).
     nonisolated let seed: UInt64
     /// Ticks the current frame has been showing (act envelopes key on this).
     private(set) var frameAge = 0
@@ -251,7 +253,6 @@ nonisolated final class SpriteDirector {
         let resolved = Archetype(rawValue: profile.id) ?? .ember
         self.seed = seed
         archetype = resolved
-        sprite = AuthoredSprites.sprite(for: resolved)
         rng = SeededRandom(seed ^ 0x51_DE_51_CE)
         blinkP = profile.gazeProfile.blinkRatePerMin / Self.ticksPerMinute
         glanceP = profile.gazeProfile.saccadeRatePerMin / Self.ticksPerMinute * 0.35
@@ -267,8 +268,6 @@ nonisolated final class SpriteDirector {
         nextMoteTick = 140 + rng.nextInt(160)
         vaporRng = SeededRandom(seed ^ 0xFAE2_B04D)
         vaporNextTick = 80 + vaporRng.nextInt(120)
-        tailChannel = TailChannel(seed: seed)
-        tailTempoScale = profile.motionProfile.tempoScale
     }
 
     // MARK: - Reading state
@@ -299,22 +298,13 @@ nonisolated final class SpriteDirector {
         if resting { return }
         if vaporOnTicksLeft > 0 { vaporOnTicksLeft -= 1 }  // E9.2 puff lifetime
         if blushTicksLeft > 0 { blushTicksLeft -= 1 }      // E7 flush lifetime
-        // AMS v2 tail part (LPR): the ambient wag steps every tick from its
-        // dedicated stream; suppressed while a quirk owns the tail, during a
-        // breath session, a vapor puff, or under Reduce Motion L2 (one focal
-        // story, G2). The quantizer guarantees >= 2-tick holds and
-        // re-convergence to neutral.
-        let tailOwnedByAct = queue.contains { $0.frame == "quirk" }
-        _ = tailChannel.step(
-            modeAllows: mode == .full && !sessionMode && !vaporActive && !tailOwnedByAct,
-            ticksPerMinute: tailWagTicksPerMinute,
-            tempoScale: tailTempoScale)
         // E8 session grammar runs instead of the idle schedule entirely.
         if sessionMode { stepSession(); return }
         updateMoodAndAutonomy()
         if !queue.isEmpty {
             queue[0].ticks -= 1
             if queue[0].ticks <= 0 { queue.removeFirst() }
+            if queue.isEmpty { clearActTells() }
             return
         }
         // E5: a due ceremony plays as soon as the queue is free (suppressed
@@ -440,8 +430,8 @@ nonisolated final class SpriteDirector {
             if var mote = moteCell {
                 moteTicksLeft -= 1
                 if moteTicksLeft % 4 == 0 {
-                    mote.x = min(max(mote.x + moteDriftX, 0), CompanionSprite.gridWidth - 1)
-                    mote.y = min(max(mote.y + moteDriftY, 0), CompanionSprite.gridHeight - 1)
+                    mote.x = min(max(mote.x + moteDriftX, 0), SpriteDirector.moteStageWidth - 1)
+                    mote.y = min(max(mote.y + moteDriftY, 0), SpriteDirector.moteStageHeight - 1)
                     moteCell = mote
                 }
                 if moteTicksLeft <= 0 {
@@ -455,16 +445,16 @@ nonisolated final class SpriteDirector {
                 let edge = rng.nextInt(4)
                 let pos: (x: Int, y: Int)
                 switch edge {
-                case 0: pos = (rng.nextInt(CompanionSprite.gridWidth), 0)
-                case 1: pos = (rng.nextInt(CompanionSprite.gridWidth), CompanionSprite.gridHeight - 1)
-                case 2: pos = (0, rng.nextInt(CompanionSprite.gridHeight))
-                default: pos = (CompanionSprite.gridWidth - 1, rng.nextInt(CompanionSprite.gridHeight))
+                case 0: pos = (rng.nextInt(SpriteDirector.moteStageWidth), 0)
+                case 1: pos = (rng.nextInt(SpriteDirector.moteStageWidth), SpriteDirector.moteStageHeight - 1)
+                case 2: pos = (0, rng.nextInt(SpriteDirector.moteStageHeight))
+                default: pos = (SpriteDirector.moteStageWidth - 1, rng.nextInt(SpriteDirector.moteStageHeight))
                 }
                 moteCell = pos
                 moteTicksLeft = 24
                 moteDriftX = rng.nextInt(3) - 1
                 moteDriftY = rng.nextInt(3) - 1
-                play(.look, direction: pos.x < CompanionSprite.gridWidth / 2 ? -1 : 1)
+                play(.look, direction: pos.x < SpriteDirector.moteStageWidth / 2 ? -1 : 1)
             }
         }
     }
@@ -603,7 +593,9 @@ nonisolated final class SpriteDirector {
             case .willow: play(.slowBlink)           // the listening blink
             case .compass: play(.quirk)              // the metronome answers
             case .prism: play(.look, direction: 1)   // the turret locks on you
-            case .nimbus: play(.happy)                // the chirp
+            case .nimbus:                            // the songburst answer
+                play(.happy)
+                songburstActive = true
             case .lumen: play(.slowBlink)             // the moth listens softly
             }
         }
@@ -690,6 +682,7 @@ nonisolated final class SpriteDirector {
         if !queue.isEmpty {
             queue[0].ticks -= 1
             if queue[0].ticks <= 0 { queue.removeFirst() }
+            if queue.isEmpty { clearActTells() }
             return
         }
         if elapsed >= BreathSessionController.totalTicks {
@@ -875,8 +868,19 @@ nonisolated final class SpriteDirector {
             nextMoteTick = tick + 120 + rng.nextInt(160)
         }
         if act == .blink { blinkCount += 1 }
+        currentAct = act
+        // A new act supersedes the transient act-tells (one story, G2).
+        greetingActive = false
+        songburstActive = false
         queue = frames(for: act, direction: direction)
         if act != .blink { actCount += 1 }
+    }
+
+    /// Clears the act-tell flags once the queue settles.
+    private func clearActTells() {
+        currentAct = nil
+        greetingActive = false
+        songburstActive = false
     }
 
     /// v19 F5: a morning-beat sequence plays as one queued run of acts
@@ -890,7 +894,57 @@ nonisolated final class SpriteDirector {
             if act == .blink { blinkCount += 1 }
             q += frames(for: act)
         }
+        currentAct = acts.last
+        greetingActive = false
+        songburstActive = false
         queue = q
         actCount += acts.count
     }
+
+    // MARK: - Puppet drive (v3: the renderer's flattened view of the brain)
+
+    /// Advances to `target` (idempotent) and returns the drive snapshot for
+    /// the puppet poser — one pure mapping, so the watch stage and every
+    /// offline consumer (postcards, icons, tests) see the same animal.
+    func puppetDrive(atTick target: Int) -> PuppetDrive {
+        advance(toTick: target)
+        var drive = PuppetDrive(archetype: archetype, frameID: currentFrame)
+        drive.frameAge = frameAge
+        drive.tick = tick
+        drive.mood = {
+            switch mood {
+            case .calm: return .calm
+            case .curious: return .curious
+            case .bored: return .bored
+            case .lonely: return .lonely
+            case .playful: return .playful
+            }
+        }()
+        drive.bondLevel = bondLevel
+        drive.condition = condition
+        drive.resting = resting
+        drive.greeting = greetingActive
+        drive.slowBlink = slowBlinkActive
+        drive.songburst = songburstActive
+        drive.blushing = blushing
+        drive.boopPulse = boopPulse
+        drive.vapor = vaporActive
+        drive.mementoAlpha = Double(mementoDepositAlpha ?? 0)
+        drive.mementoSteady = interiority.confidantMemento && mementoDepositAlpha == nil
+        if let mote = moteCell {
+            drive.moteX = mote.x
+            drive.moteY = mote.y
+        }
+        drive.interiority = interiority
+        drive.lastGazeDir = lastGazeDir
+        drive.motionFloor = mode == .reduceMotionL2 ? .lidsOnly : .full
+        drive.hueShiftDeg = Double(weatherHueShiftDeg)
+        return drive
+    }
+}
+
+extension SpriteDirector: PuppetLiveDriver {
+    nonisolated var puppetTickDuration: Double { Self.tickDuration }
+    nonisolated var puppetArchetype: Archetype { currentArchetype }
+    nonisolated var puppetIsResting: Bool { resting }
 }

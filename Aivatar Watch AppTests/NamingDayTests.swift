@@ -71,17 +71,18 @@ final class NamingDayTests: XCTestCase {
         XCTAssertEqual(WakeBeatSelector.acts(for: .namingAnniversary(years: 1), archetype: .willow), [.slowBlink])
     }
 
-    func testPostcardStampChangesHashesDeterministically() {
+    func testPostcardAnniversaryIsPrintChromeOnly() throws {
+        // v3: the anniversary is a static corner stamp on the card front —
+        // three accent dots (pinned in PostcardCardTests). It never alters
+        // the animated moment, so the pinned frame hashes stay identical.
         let base = PostcardInputs(archetypeRaw: "ember", seed: 20261010, name: "Ember")
         let stamped = PostcardInputs(archetypeRaw: "ember", seed: 20261010, name: "Ember", anniversary: true)
-        let h1 = PostcardComposer.frameHashes(base)
-        let h2 = PostcardComposer.frameHashes(stamped)
-        XCTAssertEqual(h1.count, PostcardComposer.frameCount)
-        XCTAssertNotEqual(h1, h2, "the stamp must change the card's pinned hashes")
-        // Deterministic: same inputs -> same hashes.
-        XCTAssertEqual(h2, PostcardComposer.frameHashes(stamped))
-        // The stamp is exactly the 3x3 accent block at the top-right corner.
-        XCTAssertEqual(PostcardStamp.cells().count, 9)
-        XCTAssertTrue(PostcardStamp.cells().allSatisfy { $0.symbol == "A" && $0.x >= 17 && $0.y <= 2 })
+        XCTAssertEqual(PostcardComposer.frameHashes(base).count, PostcardComposer.frameCount)
+        XCTAssertEqual(PostcardComposer.frameHashes(base), PostcardComposer.frameHashes(stamped),
+                       "the stamp must not change the card's pinned hashes")
+        // Legacy payloads (no anniversary key) decode with anniversary nil.
+        let legacy = #"{"archetypeRaw":"ember","seed":5,"name":"Ember","bondLevel":3,"dayCount":2,"streakDays":0}"#
+        let decoded = try JSONDecoder().decode(PostcardInputs.self, from: legacy.data(using: .utf8)!)
+        XCTAssertNil(decoded.anniversary)
     }
 }

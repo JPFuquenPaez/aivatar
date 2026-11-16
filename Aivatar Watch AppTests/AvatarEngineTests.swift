@@ -633,14 +633,10 @@ final class AvatarEngineTests: XCTestCase {
     }
 
     func testCompanionPickerIconsRender() throws {
-        // The v10 picker shows the real avatar as a static pixel icon
-        // (Render/CompanionIcon): every animal must rasterize to a lit,
-        // grid-sized icon at the pinned frame, and build a CGImage.
-        // v13: the icon is the AUTHORED sprite's idle pose (20x18 cells
-        // at 3 device px per cell — 60x54), the same grid the stage
-        // animates; deliberate re-pin alongside the sprite path.
-        let w = CompanionSprite.gridWidth * CompanionIcon.cellScale
-        let h = CompanionSprite.gridHeight * CompanionIcon.cellScale
+        // v3: the picker icon is the puppet's head-only render (132x120 px
+        // device-space vector art — the same drawing path the stage runs).
+        let w = CompanionIcon.iconWidth
+        let h = CompanionIcon.iconHeight
         for archetype in Archetype.allCases {
             let bytes = CompanionIcon.snapshotBytes(for: archetype)
             XCTAssertEqual(bytes.count, w * h * 4, "\(archetype.rawValue): icon snapshot size")

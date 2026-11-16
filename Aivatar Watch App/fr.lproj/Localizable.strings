@@ -156,3 +156,18 @@
 "animal.lumen.name" = "Papillon de nuit";
 "animal.lumen.element" = "nuit";
 "animal.lumen.temperament" = "Discret et lumineux — attiré par ta lumière";
+
+/* v3 Companion Cast — les moments de voix du compagnon (<= 6 mots, une fois par jour) */
+"persona.hello.ember" = "Te revoilà. Le show ?";
+"persona.hello.willow" = "Sieste validée. Te voilà.";
+"persona.hello.compass" = "Pile à l'heure. Comme toujours.";
+"persona.hello.prism" = "Tu es resplendissant aujourd'hui.";
+"persona.hello.nimbus" = "Je t'ai entendu arriver.";
+"persona.hello.lumen" = "J'ai suivi ta lumière.";
+
+/* v3 keep mechanics — la promesse jamais-perdu + la croissance visible */
+"settings.promise" = "Votre compagnon vit sur cette montre. Aucune mise à jour ne l'effacera.";
+"toy.bandana" = "bandana";
+"toy.collar" = "collier";
+"toy.charm" = "porte-bonheur feuille";
+"toy.bell" = "clochette";

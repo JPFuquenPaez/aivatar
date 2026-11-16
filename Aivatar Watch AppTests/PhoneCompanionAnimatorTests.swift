@@ -58,17 +58,30 @@ final class PhoneCompanionAnimatorTests: XCTestCase {
         }
     }
 
-    func testSpriteSymbolsStayWithinFiveTokenRamp() {
+    func testEmittedFramesResolveThroughThePoser() {
+        // v3: the animator emits frame ids only; every id it can ever emit
+        // must resolve to a deterministic pose per archetype (the phone
+        // shell renders through the same PuppetPoser as the watch stage).
         for archetype in Archetype.allCases {
-            let sprite = AuthoredSprites.sprite(for: archetype)
-            XCTAssertLessThanOrEqual(sprite.paletteHex.count, 5, "\(archetype): palette budget")
-            for frame in CompanionSprite.frameIDs {
-                let grid = sprite.symbols(frameID: frame)
-                for row in grid {
-                    for s in row where s != "." {
-                        XCTAssertNotNil(sprite.paletteHex[s], "\(archetype) \(frame): symbol \(s) has a palette entry")
-                    }
-                }
+            let emitted = Set(frames(archetype, .awake, 600) + frames(archetype, .asleep, 600)
+                              + frames(archetype, .event, 600))
+            XCTAssertFalse(emitted.isEmpty)
+            var hashes: [String: UInt64] = [:]
+            let known = ["idle", "idleA", "idleB", "breathe", "blink", "sleepy",
+                         "happy", "glanceL", "glanceR", "quirk", "perk", "yawn"]
+            for frame in emitted {
+                XCTAssertTrue(known.contains(frame),
+                              "\(archetype): unexpected frame id \(frame)")
+                let drive = PuppetDrive(archetype: archetype, frameID: frame)
+                let resolved = PuppetPoser.resolve(drive)
+                // Awake and asleep drives of the same frame resolve equal
+                // (presence is scheduling, not posing).
+                hashes[frame] = resolved.pose.hashValue64()
+            }
+            // Same frame id -> same pose hash, always.
+            for (frame, hash) in hashes {
+                let again = PuppetPoser.resolve(PuppetDrive(archetype: archetype, frameID: frame)).pose.hashValue64()
+                XCTAssertEqual(again, hash, "\(archetype)/\(frame): solver is deterministic")
             }
         }
     }

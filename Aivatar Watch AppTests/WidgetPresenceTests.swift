@@ -168,12 +168,19 @@ final class WidgetPresenceTests: XCTestCase {
             // paper and the body flashes accent, uniformly for all five
             // animals (a legibility floor is pinned in SpriteFixTests).
             XCTAssertNotEqual(awake, event, "\(archetype.rawValue): event icon always differs from awake")
-            // Asleep dims every non-transparent pixel (rest LOD factors).
-            for i in stride(from: 0, to: awake.count, by: 4) where awake[i + 3] == 255 {
-                XCTAssertLessThanOrEqual(asleep[i], awake[i])
-                XCTAssertLessThanOrEqual(asleep[i + 1], awake[i + 1])
-                XCTAssertLessThanOrEqual(asleep[i + 2], awake[i + 2])
+            // Asleep is a global dim of the same art + closed lids: total
+            // painted energy strictly drops. (A per-pixel cap no longer holds
+            // in vector art — closed lids repaint dark pupil pixels with the
+            // dimmed head color.)
+            func energy(_ d: [UInt8]) -> Double {
+                var sum = 0.0
+                for i in stride(from: 0, to: d.count, by: 4) where d[i + 3] == 255 {
+                    sum += Double(d[i]) + Double(d[i + 1]) + Double(d[i + 2])
+                }
+                return sum
             }
+            XCTAssertLessThan(energy(asleep), energy(awake) * 0.75,
+                              "\(archetype.rawValue): asleep is the dim LOD")
             XCTAssertNotNil(CompanionIcon.pngData(for: archetype, state: .asleep))
             XCTAssertNotNil(CompanionIcon.pngData(for: archetype, state: .awake))
             XCTAssertNotNil(CompanionIcon.pngData(for: archetype, state: .event))

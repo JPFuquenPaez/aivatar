@@ -9,7 +9,7 @@ import CommonCrypto
 //
 // Usage: swift Tools/icon_export.swift <path-to-repo-root>
 //
-// Reads the authored 32x32 grid from Render/CompanionSprite.swift
+// Reads the authored 32x32 grid from AivatarShared/IconCuts.swift
 // (IconCuts.emberFace — single source of truth, grid not drawing) and renders:
 //   build/icon/AppIcon-Background.png  1088x1088 pure #000000 (layer 1)
 //   build/icon/AppIcon-Foreground.png  1088x1088 transparent, head at 34 px/cell (layer 2)
@@ -36,6 +36,7 @@ let root = URL(fileURLWithPath: CommandLine.arguments[1])
 // ---- 1. Parse the authored grid from the Swift source (single source of truth) ----
 // v36 moved the sprite core to AivatarShared; try both locations.
 let candidates = [
+    "AivatarShared/IconCuts.swift",
     "AivatarShared/CompanionSprite.swift",
     "Aivatar Watch App/Render/CompanionSprite.swift",
 ]
@@ -60,7 +61,7 @@ for (i, row) in rows.enumerated() where Set(row).isSubset(of: allowed) == false 
     fail("row \(i) contains a symbol outside the 5-token ramp")
 }
 
-// Ember stage palette (must match AuthoredSprites.ember.paletteHex).
+// Ember icon palette (must match IconCuts.emberFacePaletteHex).
 let palette: [Character: (UInt8, UInt8, UInt8)] = [
     "B": (0xFF, 0x9E, 0x4A),
     "D": (0xC4, 0x62, 0x1B),

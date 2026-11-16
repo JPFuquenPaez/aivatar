@@ -75,32 +75,46 @@ final class HapticsAndPostcardTests: XCTestCase {
         }
     }
 
+    /// FNV-1a digest over the whole drive run (frame id + pose hash per
+    /// frame). The neutral idle frame is family-independent, so a single
+    /// frame hash cannot separate archetypes — the run digest can.
+    private func runDigest(_ inputs: PostcardInputs) -> UInt64 {
+        var h: UInt64 = 0xcbf29ce484222325
+        for byte in inputs.archetypeRaw.utf8 {
+            h ^= UInt64(byte); h &+= 0x100000001b3
+        }
+        for drive in PostcardComposer.drives(inputs) {
+            var p = PuppetPoser.resolve(drive).pose.hashValue64()
+            for byte in drive.frameID.utf8 {
+                h ^= UInt64(byte); h &+= 0x100000001b3
+            }
+            for _ in 0..<8 {
+                h ^= p & 0xff; h &+= 0x100000001b3; p >>= 8
+            }
+        }
+        return h
+    }
+
     func testPostcardGoldenPins() {
-        // v22 golden pins (first pin 2026-11-07): frame-hash prefixes per
-        // archetype (seed 20261111, bond 3, day 23, streak 5, rain).
+        // v22 golden pins (first pin 2026-11-07) re-pinned for v3: the digest
+        // of the drive run (seed 20261111, bond 3, day 23, streak 5, rain)
+        // per archetype — pose truth layer. Re-record with zeros, paste below.
         let expected: [Archetype: UInt64] = [
-            // Pinned 2026-11-07 (v22); re-pinned 2026-11-07 (v28): ember base
-            // tail-tip cell, compass base mouth + happy patch, and nimbus
-            // idleB foot step change the authored frames; willow and prism
-            // first frames are unchanged.
-            // Re-pinned v40: pet downsample grids (image-backed companions).
-            // Re-pinned v41: complete pet cuts (legs included).
-            // Re-pinned v43 (AMS v2): hand-authored grids + restored patches.
-            .ember: 6_869_640_515_071_700_998,
-            .willow: 2_738_666_425_771_914_526,
-            .compass: 652_045_976_902_692_158,
-            .prism: 5_934_566_669_287_846_895,
-            .nimbus: 12_457_843_435_727_514_617,
-            .lumen: 1_557_286_761_931_598_275,
+            // Re-pinned v44 (Companion Cast v3): pose-run digests.
+            .ember: 14_696_253_718_230_453_466,
+            .willow: 14_696_254_817_742_083_448,
+            .compass: 14_696_255_917_253_706_137,
+            .prism: 14_696_253_718_230_452_352,
+            .nimbus: 14_696_254_817_742_080_456,
+            .lumen: 14_696_253_718_230_454_624,
         ]
         var recorded: [String] = []
         for archetype in Archetype.allCases {
-            let hashes = PostcardComposer.frameHashes(inputs(archetype))
-            let first = hashes.first ?? 0
-            recorded.append("\(archetype.rawValue) = \(first)")
+            let digest = runDigest(inputs(archetype))
+            recorded.append("\(archetype.rawValue) = \(digest)")
             let pin = expected[archetype] ?? 0
             if pin != 0 {
-                XCTAssertEqual(first, pin, "\(archetype.rawValue) postcard changed")
+                XCTAssertEqual(digest, pin, "\(archetype.rawValue) postcard changed")
             }
         }
         PinRecorder.requirePinned(expected, recorded: recorded.joined(separator: ", "), label: "postcard pins")
@@ -135,12 +149,24 @@ final class HapticsAndPostcardTests: XCTestCase {
         XCTAssertEqual(hashes, fallback)
     }
 
-    func testPostcardFramesStayOnGrid() {
+    func testPostcardFramesResolveAsPoses() throws {
+        // v3: a card's frames are puppet drives — all 20 resolve through
+        // the poser, and the clay moment images render for every one.
         for archetype in Archetype.allCases {
-            for grid in PostcardComposer.frames(inputs(archetype)) {
-                XCTAssertEqual(grid.count, CompanionSprite.gridHeight)
-                for row in grid { XCTAssertEqual(row.count, CompanionSprite.gridWidth) }
+            let drives = PostcardComposer.drives(inputs(archetype))
+            XCTAssertEqual(drives.count, PostcardComposer.frameCount, "\(archetype.rawValue): 20 drives")
+            for drive in drives {
+                let resolved = PuppetPoser.resolve(drive)
+                XCTAssertNotNil(resolved.pose)
             }
+            let images = PostcardComposer.frameImages(inputs(archetype))
+            XCTAssertEqual(images.count, PostcardComposer.frameCount,
+                           "\(archetype.rawValue): every frame renders a clay moment")
         }
+        // Corrupt inputs degrade the SAME way in drives space.
+        let corrupt = PostcardInputs(archetypeRaw: "not-an-animal", seed: 5, name: "???",
+                                     bondLevel: 3, dayCount: -4)
+        XCTAssertEqual(PostcardComposer.drives(corrupt).count, PostcardComposer.frameCount,
+                       "a corrupt card still composes")
     }
 }

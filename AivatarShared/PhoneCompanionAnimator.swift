@@ -1,13 +1,13 @@
 import Foundation
 
-/// PhoneCompanionAnimator (v36): the iPhone shell's living avatar. It runs the
-/// SAME authored 20x18 sprite (AivatarShared.CompanionSprite — the exact grids
-/// the watch renders) on the SAME 150 ms director clock, with the same life
-/// floor (breathe 4-tick hold every 24 ticks), idle drift, blink, glance and
-/// quirk — so the companion on the phone is the same animal doing the same
-/// things as on the watch. Pure and deterministic: every stochastic draw comes
-/// from one SplitMix64 stream seeded per archetype XOR a private constant
-/// (house rule), so same (seed, tick) -> same frame, pinned by tests.
+/// PhoneCompanionAnimator (v36, v3): the iPhone shell's living avatar. It
+/// runs the same director grammar as the watch stage on the same 150 ms
+/// clock, now feeding the shared PUPPET pipeline (PuppetDrive + PuppetPoser)
+/// — the companion on the phone is the same animal doing the same things as
+/// on the watch, in the claymorphic style. Pure and deterministic: every
+/// stochastic draw comes from one SplitMix64 stream seeded per archetype
+/// XOR a private constant (house rule), so same (seed, tick) -> same frame,
+/// pinned by tests.
 ///
 /// The phone never polls the watch: the snapshot only supplies identity and
 /// presence; all motion is computed locally from the tick.
@@ -18,18 +18,9 @@ nonisolated final class PhoneCompanionAnimator: @unchecked Sendable {
     private var rng: SeededRandom
     private var queue: [(frame: String, ticks: Int)] = []
     private(set) var currentFrame = "idle"
-    /// Ticks the current frame has been showing (act envelopes key on this).
+    /// Ticks the current frame has been showing.
     private(set) var frameAge = 0
-    /// AMS v2 (v43): the ambient tail channel — the same PetMotion envelope
-    /// -> CellQuantizer -> authored pose path as the watch stage, on its own
-    /// stream, so the phone's companion wags the same way (deterministic per
-    /// archetype seed).
-    private var tailChannel: TailChannel
-    var tailPose: Int { tailChannel.pose }
-    var tailOverlayCells: [CompanionSprite.CellDiff] {
-        SpriteStageMetadata.tailOverlay(archetype, pose: tailChannel.pose)
-    }
-    /// The animator's dedicated stream seed (PetMotion pose phases derive from it).
+    /// The animator's dedicated stream seed.
     var seed: UInt64 { Self.phoneSeed(archetype) }
 
     /// The stage's per-archetype base seed (same constant the watch uses),
@@ -43,7 +34,6 @@ nonisolated final class PhoneCompanionAnimator: @unchecked Sendable {
         self.archetype = archetype
         self.presence = presence
         self.rng = SeededRandom(Self.phoneSeed(archetype))
-        self.tailChannel = TailChannel(seed: Self.phoneSeed(archetype))
     }
 
     /// Advances the clock to `target` ticks (idempotent).
@@ -59,11 +49,7 @@ nonisolated final class PhoneCompanionAnimator: @unchecked Sendable {
     }
 
     private func stepBody() {
-        // AMS v2: the tail part steps every tick — awake + alive only
-        // (asleep and events stay calm; Random Motion freezes upstream).
-        _ = tailChannel.step(modeAllows: presence == .awake,
-                             ticksPerMinute: 400, tempoScale: 1)
-        // Asleep: the rest face with a slow blink only.
+        // Asleep: the rest pose with a slow blink only.
         if presence == .asleep {
             if queue.isEmpty {
                 if tick % 60 == 0 { queue.append(("blink", 2)) }
@@ -91,4 +77,22 @@ nonisolated final class PhoneCompanionAnimator: @unchecked Sendable {
         currentFrame = queue[0].frame
         if queue[0].ticks <= 0 { queue.removeFirst() }
     }
+}
+
+extension PhoneCompanionAnimator: PuppetLiveDriver {
+    /// The flattened drive the shared renderer consumes (same animal, same
+    /// grammar as the watch stage).
+    nonisolated func puppetDrive(atTick target: Int) -> PuppetDrive {
+        advance(toTick: target)
+        var drive = PuppetDrive(archetype: archetype, frameID: currentFrame)
+        drive.frameAge = frameAge
+        drive.tick = tick
+        drive.resting = presence == .asleep
+        drive.mood = presence == .event ? .playful : .calm
+        return drive
+    }
+
+    nonisolated var puppetTickDuration: Double { 0.15 }
+    nonisolated var puppetArchetype: Archetype { archetype }
+    nonisolated var puppetIsResting: Bool { presence == .asleep }
 }

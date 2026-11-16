@@ -145,39 +145,42 @@ final class WeatherSenseTests: XCTestCase {
 
     func testHueRotation() {
         // Identity at 0 and 360.
-        XCTAssertEqual(CompanionSprite.hueRotated("FF9E4A", degrees: 0), "FF9E4A")
-        XCTAssertEqual(CompanionSprite.hueRotated("FF9E4A", degrees: 360), "FF9E4A")
+        XCTAssertEqual(ColorHex.hueRotated("FF9E4A", degrees: 0), "FF9E4A")
+        XCTAssertEqual(ColorHex.hueRotated("FF9E4A", degrees: 360), "FF9E4A")
         // Output is always a valid 6-digit hex.
         for deg in stride(from: -30.0, through: 30.0, by: 5) {
-            let out = CompanionSprite.hueRotated("D53F8C", degrees: deg)
+            let out = ColorHex.hueRotated("D53F8C", degrees: deg)
             XCTAssertEqual(out.count, 6)
             XCTAssertTrue(out.allSatisfy { $0.isHexDigit })
         }
-        // The real invariant: hue rotation preserves VALUE (max channel) and
-        // saturation, so each species' ramp ORDERING (K < D < B < W) survives
-        // small shifts — the value-locked family read is safe.
+        // The real invariant: hue rotation preserves VALUE (max channel), so
+        // each species' family ramp ordering (ink < shade < body <= belly)
+        // survives small shifts — the value-locked family read is safe.
         func vmax(_ hex: String) -> Double {
-            let rgb = CompanionSprite.hexToRGB(hex)
+            let rgb = ColorHex.rgb(hex)
             return Double(max(rgb.r, rgb.g, rgb.b))
         }
         func lum(_ hex: String) -> Double {
-            let rgb = CompanionSprite.hexToRGB(hex)
+            let rgb = ColorHex.rgb(hex)
             return 0.299 * Double(rgb.r) + 0.587 * Double(rgb.g) + 0.114 * Double(rgb.b)
         }
         for hex in ["FF9E4A", "55D98A", "5DA0EA", "D53F8C", "8FA3E8"] {
-            let rotated = CompanionSprite.hueRotated(hex, degrees: 12)
+            let rotated = ColorHex.hueRotated(hex, degrees: 12)
             XCTAssertEqual(vmax(rotated), vmax(hex), accuracy: 1.5,
                            "\(hex): 12-degree shift preserves value")
         }
-        // Ordering survives on the real species palettes.
+        // Ordering survives on the real species palettes (doc §5.3 tokens).
         for archetype in Archetype.allCases {
-            let palette = AuthoredSprites.sprite(for: archetype).paletteHex
-            let rotated = palette.mapValues { CompanionSprite.hueRotated($0, degrees: 12) }
-            XCTAssertLessThan(lum(rotated["K"]!), lum(rotated["D"]!), "\(archetype.rawValue): ink < shade after shift")
-            XCTAssertLessThan(lum(rotated["D"]!), lum(rotated["B"]!), "\(archetype.rawValue): shade < body after shift")
-            XCTAssertGreaterThan(lum(rotated["W"]!), lum(rotated["B"]!), "\(archetype.rawValue): paper > body after shift")
+            let spec = CompanionToys.spec(for: archetype)
+            let ink = ColorHex.hueRotated(spec.inkHex, degrees: 12)
+            let shade = ColorHex.hueRotated(spec.shadeHex, degrees: 12)
+            let body = ColorHex.hueRotated(spec.bodyHex, degrees: 12)
+            let belly = ColorHex.hueRotated(spec.bellyHex, degrees: 12)
+            XCTAssertLessThan(lum(ink), lum(shade), "\(archetype.rawValue): ink < shade after shift")
+            XCTAssertLessThan(lum(shade), lum(body), "\(archetype.rawValue): shade < body after shift")
+            XCTAssertLessThanOrEqual(lum(body), lum(belly), "\(archetype.rawValue): belly reads lightest")
         }
         // Shifting actually changes the color (non-gray input).
-        XCTAssertNotEqual(CompanionSprite.hueRotated("FF9E4A", degrees: 14), "FF9E4A")
+        XCTAssertNotEqual(ColorHex.hueRotated("FF9E4A", degrees: 14), "FF9E4A")
     }
 }

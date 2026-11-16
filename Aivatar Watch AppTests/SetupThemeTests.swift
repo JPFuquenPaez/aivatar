@@ -7,13 +7,19 @@ import XCTest
 /// palette put compass at 4.36:1 with black ink, a fail.
 final class SetupThemeTests: XCTestCase {
 
-    func testAccentHexIsTheSpriteAccentToken() {
-        // v40: the chrome accent is the sprite's UI accent — the body token
-        // for authored grids, the vivid override for image-backed pets.
+    func testAccentHexIsTheFamilyAccentToken() {
+        // v3: the chrome accent is the toy family's ui accent — one hue for
+        // the puppet art and every chrome surface (picker, disc, buttons).
+        let pinned: [Archetype: String] = [
+            .ember: "FF7A45", .willow: "F0B060", .compass: "FFA02E",
+            .prism: "D89B85", .nimbus: "9AA3AE", .lumen: "A78BFA",
+        ]
         for archetype in Archetype.allCases {
             XCTAssertEqual(SetupTheme.accentHex(for: archetype),
-                           AuthoredSprites.sprite(for: archetype).uiAccentHex,
-                           "\(archetype.rawValue): chrome accent must equal the sprite's UI accent")
+                           CompanionToys.spec(for: archetype).uiAccentHex,
+                           "\(archetype.rawValue): chrome accent must equal the family accent")
+            XCTAssertEqual(SetupTheme.accentHex(for: archetype), pinned[archetype],
+                           "\(archetype.rawValue): doc §5.3 palette pin")
         }
     }
 

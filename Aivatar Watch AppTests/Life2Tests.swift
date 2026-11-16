@@ -165,59 +165,68 @@ final class Life2Tests: XCTestCase {
         }
     }
 
-    // MARK: - Interiority overlays (memory made visible)
+    // MARK: - Interiority (memory made visible, v3: props only)
 
-    func testInteriorityOverlaysAreAuthoredCells() throws {
-        let willow = AuthoredSprites.sprite(for: .willow)
+    func testInteriorityRidesPropsPerFamily() throws {
+        // Willow's mature sprout is a head prop; at growth 0 it is hidden.
         var t = InteriorityTuning()
         t.sproutGrowth = 1.0
-        let sprout = willow.interiorityDiffs(t)
-        XCTAssertEqual(sprout.count, 2, "mature sprout = two leaf cells")
-        let grid = willow.symbols(frameID: "idle", overlay: sprout)
-        XCTAssertEqual(grid[0][10], "A")
-        XCTAssertEqual(grid[0][11], "A")
+        var willowDrive = PuppetDrive(archetype: .willow, frameID: "idle")
+        willowDrive.interiority = t
+        XCTAssertTrue(PuppetPoser.resolve(willowDrive).props.sprout, "mature sprout visible")
+        var bare = willowDrive
+        bare.interiority = InteriorityTuning(sproutGrowth: 0, streakDays: 0,
+                                              trinketPresent: false, confidantMemento: false)
+        XCTAssertFalse(PuppetPoser.resolve(bare).props.sprout)
+        // The sprout never leaks onto another family.
+        var foreign = bare
+        foreign.archetype = .ember
+        foreign.interiority = t
+        XCTAssertFalse(PuppetPoser.resolve(foreign).props.sprout, "sprout is willow-only")
 
-        let compass = AuthoredSprites.sprite(for: .compass)
-        t = InteriorityTuning()
-        t.streakDays = 4
-        let week = compass.interiorityDiffs(t)
-        XCTAssertEqual(week.count, 7, "the week grid is seven cells")
-        let fishGrid = compass.symbols(frameID: "idle", overlay: week)
-        XCTAssertEqual(fishGrid[14][5], "A", "lit streak day")
-        XCTAssertEqual(fishGrid[14][8], "A")
-        XCTAssertEqual(fishGrid[14][9], "K", "pending day stays ink")
+        // Compass's week grid: lit streak days, total seven, clamped.
+        var week = InteriorityTuning()
+        week.streakDays = 4
+        var compassDrive = PuppetDrive(archetype: .compass, frameID: "idle")
+        compassDrive.interiority = week
+        let weekProps = PuppetPoser.resolve(compassDrive).props
+        XCTAssertEqual(weekProps.weekLit, 4)
+        XCTAssertEqual(weekProps.weekTotal, 7)
 
-        let prism = AuthoredSprites.sprite(for: .prism)
-        t = InteriorityTuning()
-        t.trinketPresent = true
-        let trinket = prism.interiorityDiffs(t)
-        XCTAssertEqual(trinket.count, 2)
-        let chamGrid = prism.symbols(frameID: "idle", overlay: trinket)
-        XCTAssertEqual(chamGrid[4][12], "A")
+        // Prism's trinket.
+        var trinket = InteriorityTuning()
+        trinket.trinketPresent = true
+        var prismDrive = PuppetDrive(archetype: .prism, frameID: "idle")
+        prismDrive.interiority = trinket
+        XCTAssertTrue(PuppetPoser.resolve(prismDrive).props.trinket)
 
-        let ember = AuthoredSprites.sprite(for: .ember)
-        XCTAssertTrue(ember.interiorityDiffs(.default).isEmpty, "ember keeps no trace cells")
+        // Ember keeps no trace props at default interiority.
+        let idle = PuppetPoser.resolve(PuppetDrive(archetype: .ember, frameID: "idle")).props
+        XCTAssertFalse(idle.sprout)
+        XCTAssertEqual(idle.weekLit, 0)
+        XCTAssertFalse(idle.trinket)
+        XCTAssertEqual(idle.mementoAlpha, 0)
     }
 
-    func testInteriorityOverlayComposesWithinPatchBudget() throws {
-        // Overlay + any frame together still respect the craft budget.
+    func testInteriorityNeverMovesTheBody() throws {
+        // The strongest form of the old budget rule: memory is visible via
+        // PROPS (drawn beside/on the puppet); it never changes the pose, on
+        // any frame, for any family.
         for archetype in Archetype.allCases {
-            let sprite = AuthoredSprites.sprite(for: archetype)
-            var t = InteriorityTuning()
-            t.sproutGrowth = 1.4
-            t.streakDays = 7
-            t.trinketPresent = true
-            let overlay = sprite.interiorityDiffs(t)
-            let idle = sprite.symbols(frameID: "idle")
-            for frameID in CompanionSprite.frameIDs.dropFirst() {
-                let frame = sprite.symbols(frameID: frameID, overlay: overlay)
-                var diff = 0
-                for y in 0..<CompanionSprite.gridHeight {
-                    for x in 0..<CompanionSprite.gridWidth {
-                        if idle[y][x] != frame[y][x] { diff += 1 }
-                    }
-                }
-                XCTAssertLessThanOrEqual(diff, 20, "\(archetype.rawValue)/\(frameID) + overlay within budget")
+            for frame in ["idle", "idleA", "idleB", "blink", "sleepy", "happy",
+                          "glanceL", "glanceR", "quirk", "perk", "yawn"] {
+                var rich = InteriorityTuning()
+                rich.sproutGrowth = 1.4
+                rich.streakDays = 7
+                rich.trinketPresent = true
+                rich.confidantMemento = true
+                var plain = PuppetDrive(archetype: archetype, frameID: frame)
+                var laden = plain
+                laden.interiority = rich
+                laden.mementoSteady = true
+                XCTAssertEqual(PuppetPoser.resolve(plain).pose,
+                               PuppetPoser.resolve(laden).pose,
+                               "\(archetype.rawValue)/\(frame): memory never poses the body")
             }
         }
     }

@@ -109,11 +109,14 @@ final class BondRulesCeremonyTests: XCTestCase {
         XCTAssertEqual(alphas, [0.25, 0.5, 0.75, 1.0])
         d.advance(toTick: 5)
         XCTAssertNil(d.mementoDepositAlpha, "deposit completes and the cell persists via interiority")
-        // The transient overlay carries exactly the stepped cell.
+        // The puppet's memento glow disc rides the drive with the stepped
+        // alpha (a fractional ramp tick — exact step count is covered above).
         d.depositMemento()
         d.advance(toTick: 6)
-        let cells = d.transientOverlayCells
-        XCTAssertTrue(cells.contains { $0.x == 9 && $0.y == 16 && $0.symbol == "A" && $0.alpha < 1 })
+        let drive = d.puppetDrive(atTick: d.tick)
+        XCTAssertGreaterThan(drive.mementoAlpha, 0)
+        XCTAssertLessThan(drive.mementoAlpha, 1)
+        XCTAssertEqual(PuppetPoser.resolve(drive).props.mementoAlpha, drive.mementoAlpha, accuracy: 0.001)
     }
 }
 

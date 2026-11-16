@@ -107,7 +107,7 @@ struct CompanionPickerView: View {
                     if dynamicTypeSize.isAccessibilitySize {
                         SetupTheme.iconDisc(for: archetype, selected: isSelected, size: hero)
                     } else {
-                        SetupTheme.portraitDisc(for: archetype, selected: isSelected, size: hero)
+                        SetupTheme.puppetDisc(for: archetype, selected: isSelected, size: hero)
                     }
                 }
                 .padding(.bottom, compact ? 8 : 14)

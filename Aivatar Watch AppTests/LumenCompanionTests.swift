@@ -2,10 +2,11 @@ import XCTest
 @testable import Aivatar_Watch_App
 
 /// Aivatar 2.0 Phase 3, E10 — the sixth companion (lumen, the moth). Parity
-/// across every per-archetype surface: profile loads + weights sum, sprite
-/// grid contract (20x18, 5 tokens, all 12 frames resolve), metadata present,
-/// reaction tables answer, haptic grammar maps, unlock gating + one-time
-/// reveal, picker shows five pages until revealed.
+/// across every per-archetype surface: profile loads + weights sum, the toy
+/// spec contract (lavender family, moth wings + antennae, every director
+/// frame resolves, the glow quirk), hit-circle + vapor wiring, reaction
+/// tables answer, haptic grammar maps, unlock gating + one-time reveal,
+/// picker shows five pages until revealed.
 final class LumenCompanionTests: XCTestCase {
 
     func testProfileLoadsAndWeightsSum() throws {
@@ -20,34 +21,47 @@ final class LumenCompanionTests: XCTestCase {
         XCTAssertEqual(profile.blink?.durationScale, 1.2)
     }
 
-    func testSpriteGridContract() {
-        let sprite = AuthoredSprites.sprite(for: .lumen)
-        XCTAssertEqual(sprite.base.count, 18)
-        for row in sprite.base { XCTAssertEqual(row.count, 20) }
-        let used = Set(sprite.base.joined()).subtracting(["."])
-        XCTAssertLessThanOrEqual(used.count, 5)
-        XCTAssertTrue(used.isSubset(of: Set("KDBWA")))
-        // All 12 frame IDs resolve to a valid 20x18 grid.
-        for frame in CompanionSprite.frameIDs {
-            let grid = sprite.symbols(frameID: frame)
-            XCTAssertEqual(grid.count, 18)
-            XCTAssertTrue(grid.allSatisfy { $0.count == 20 })
+    func testToyContract() {
+        // v3: lumen is the moth — lavender family, winged, antennae, no
+        // tail, one of the six toy specs (same rig, unique identity parts).
+        let spec = CompanionToys.spec(for: .lumen)
+        XCTAssertEqual(spec.bodyHex, "A78BFA", "lavender body (doc §5.3)")
+        XCTAssertEqual(spec.bellyHex, "F5F4EF")
+        XCTAssertEqual(spec.shadeHex, "6D5BD0")
+        XCTAssertEqual(spec.inkHex, "171226")
+        XCTAssertEqual(spec.accentHex, "FFE9A8", "glow accent")
+        XCTAssertEqual(spec.uiAccentHex, "A78BFA")
+        XCTAssertEqual(spec.wingKind, .mothPair)
+        XCTAssertTrue(spec.antennae)
+        XCTAssertEqual(spec.tailKind, .none)
+        XCTAssertGreaterThanOrEqual(spec.eyeRatio, 0.30, "baby-schema eye ratio")
+        // Every director frame id resolves to a real pose.
+        for frame in ["idle", "idleA", "idleB", "breathe", "blink", "sleepy",
+                      "happy", "glanceL", "glanceR", "quirk", "perk", "yawn"] {
+            let drive = PuppetDrive(archetype: .lumen, frameID: frame)
+            let resolved = PuppetPoser.resolve(drive)
+            XCTAssertNotNil(resolved.pose)
         }
-        // The quirk patch is the 6-cell luminous wing shimmer.
-        let quirk = sprite.patches["quirk"] ?? []
-        XCTAssertEqual(quirk.count, 6)
-        XCTAssertTrue(quirk.allSatisfy { $0.symbol == "A" })
-        // Palette has exactly the 5 tokens.
-        XCTAssertEqual(sprite.paletteHex.count, 5)
+        // The quirk is the luminous wing shimmer: wings lift, glow swells.
+        let quirk = PuppetPoser.resolve(PuppetDrive(archetype: .lumen, frameID: "quirk")).pose
+        XCTAssertGreaterThan(quirk.wing, 0.5, "wings lift on the shimmer")
+        XCTAssertEqual(quirk.catchGlow, 1, "the glow is the tell")
     }
 
-    func testMetadataPresent() {
-        let m = SpriteStageMetadata.meta(for: .lumen)
-        XCTAssertTrue(SpriteStageMetadata.isFaceCell(.lumen, x: 9, y: 2))
-        XCTAssertFalse(SpriteStageMetadata.isFaceCell(.lumen, x: 9, y: 14))
-        XCTAssertFalse(SpriteStageMetadata.shadowCells(.lumen).isEmpty)
-        XCTAssertEqual(SpriteStageMetadata.blushCells(.lumen).count, 2)
-        XCTAssertEqual(SpriteStageMetadata.vaporCells(.lumen).count, 2)
+    func testHitCircleAndVaporTellWiring() throws {
+        // v3: lumen's hit circle matches the shared head geometry, and the
+        // cold-vapor tell rides the drive as a prop (rest suppresses it).
+        let canvas = CGSize(width: 200, height: 320)
+        let hit = PuppetDrawing.headHitCircle(archetype: .lumen, canvas: canvas)
+        XCTAssertTrue(hit.radius > 30, "moth head is boopable")
+        let center = CGPoint(x: 200, y: 320).applying(CGAffineTransform(scaleX: 0.5, y: 0.5))
+        XCTAssertLessThan(hypot(hit.center.x - center.x, hit.center.y - center.y), hit.radius,
+                          "the hit circle contains the canvas center")
+        var drive = PuppetDrive(archetype: .lumen, frameID: "idle")
+        drive.vapor = true
+        XCTAssertTrue(PuppetPoser.resolve(drive).props.vapor, "vapor rides the props")
+        drive.resting = true
+        XCTAssertFalse(PuppetPoser.resolve(drive).props.vapor, "rest LOD suppresses vapor")
     }
 
     func testReactionTablesAnswerForLumen() {

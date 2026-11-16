@@ -1,13 +1,12 @@
 import Foundation
 import CoreGraphics
 
-/// PostcardComposer (v22, Ambient Life F8): deterministic shareable
-/// postcards of the user's ACTUAL companion. Inputs are (archetype, seed,
-/// memory snapshot, moment) — all persisted or derivable — and the output
-/// is a run of authored frames through the same director+sprite path as the
-/// live stage, so a postcard is bit-exact reproducible: identical inputs ->
-/// identical frame hashes (pinned). No server, no account; the share-sheet
-/// export lands with the iPhone companion shell — the composer API is ready.
+/// PostcardComposer (v22 F8, v3): deterministic shareable postcards of the
+/// user's ACTUAL companion. Inputs are (archetype, seed, memory snapshot,
+/// moment) — all persisted or derivable — and the output is a run of the
+/// same director + puppet path as the live stage, so a postcard is
+/// bit-exact reproducible: identical inputs -> identical pose hashes
+/// (pinned). No server, no account.
 ///
 /// Privacy: captions are built from name/day/bond/weather-class words only —
 /// never life-log content.
@@ -19,8 +18,8 @@ nonisolated struct PostcardInputs: Codable, Sendable, Equatable {
     var dayCount: Int
     var streakDays: Int
     var weatherClassRaw: String?
-    /// Aivatar 2.0 E4: true on the naming-day anniversary — the card carries a
-    /// 3x3 accent stamp in the top corner. Optional so legacy payloads decode.
+    /// Aivatar 2.0 E4: true on the naming-day anniversary — the card carries
+    /// the accent stamp in the top corner. Optional so legacy payloads decode.
     var anniversary: Bool?
 
     init(archetypeRaw: String, seed: UInt64, name: String,
@@ -37,28 +36,12 @@ nonisolated struct PostcardInputs: Codable, Sendable, Equatable {
     }
 }
 
-/// E4: the anniversary stamp — a 3x3 accent block in the card's top-right
-/// corner, composed from the same seeded inputs and FNV-hash-pinned like the
-/// frames themselves.
-nonisolated enum PostcardStamp {
-    static func cells() -> [CompanionSprite.CellDiff] {
-        var cells: [CompanionSprite.CellDiff] = []
-        for y in 0..<3 {
-            for x in 17..<20 {
-                cells.append(CompanionSprite.CellDiff(x, y, "A"))
-            }
-        }
-        return cells
-    }
-}
-
 nonisolated enum PostcardComposer {
     /// Frames per card (a ~3 s loop at the 150 ms director clock).
     static let frameCount = 20
 
     /// The auto-generated caption: "<name> · day N" + bond/weather words.
     /// House voice, <= 8 words; never raw kinds or life-log content.
-    /// v25: localized (en/fr) with placeholders.
     static func caption(_ inputs: PostcardInputs) -> String {
         var parts = [String(format: String(localized: "postcard.day"), inputs.name, max(1, inputs.dayCount))]
         if BondRules.isConfidant(inputs.bondLevel) {
@@ -66,12 +49,9 @@ nonisolated enum PostcardComposer {
         }
         if let weatherClassRaw = inputs.weatherClassRaw,
            let klass = ConditionClass(rawValue: weatherClassRaw), klass != .unknown {
-            // v30: the class name is localized (was the raw English enum,
-            // leaking into fr captions as "jour rain").
             let weatherKey = "weather.\(klass.rawValue)"
             let weatherName = NSLocalizedString(weatherKey, comment: "weather class name")
             #if DEBUG
-            // v31: a missing weather key must fail loudly, not echo the key.
             assert(weatherName != weatherKey, "missing localization for \(weatherKey)")
             #endif
             parts.append(String(format: String(localized: "postcard.weather_day"), weatherName))
@@ -79,80 +59,53 @@ nonisolated enum PostcardComposer {
         return parts.joined(separator: " · ")
     }
 
-    /// The card's frames as symbol grids, deterministic per inputs. The
-    /// card plays a seed-picked two-act moment at the bonded level (plus
-    /// the confidant memento overlay at level 5). Corrupt inputs (unknown
-    /// archetype, missing profile) degrade to the default companion's warm
-    /// greeting — a postcard never fails to compose.
-    /// v40: the card's frames as (frameID, overlay) pairs — the single
-    /// source both the grid path (frames) and the HD-image path
-    /// (frameImages) render from, so they can never diverge.
-    static func frameSpecs(_ inputs: PostcardInputs) -> [(frameID: String, tick: Int, frameAge: Int, overlay: [CompanionSprite.CellDiff])] {
+    /// The card's frames as director drives, deterministic per inputs. The
+    /// card plays a seed-picked two-act moment at the bonded level. Corrupt
+    /// inputs (unknown archetype, missing profile) degrade to the default
+    /// companion's warm greeting — a postcard never fails to compose.
+    static func drives(_ inputs: PostcardInputs) -> [PuppetDrive] {
         let archetype = Archetype(rawValue: inputs.archetypeRaw) ?? .ember
         guard let profile = try? PersonalityProfile.load(archetype) else {
-            return plainSpecs(seed: inputs.seed)
+            return plainDrives(seed: inputs.seed)
         }
         let director = SpriteDirector(profile: profile, seed: inputs.seed)
         director.bondLevel = min(max(inputs.bondLevel, 1), BondRules.maxLevel)
-        // Seed-picked moment: the card is a genuine function of the seed.
         var rng = SeededRandom(inputs.seed)
         let pool: [SpriteDirector.SpriteAct] = [.quirk, .happy, .slowBlink, .perk]
         director.playSequence([pool[rng.nextInt(pool.count)], pool[rng.nextInt(pool.count)]])
-        let sprite = AuthoredSprites.sprite(for: archetype)
-        var overlay = sprite.interiorityDiffs(
-            InteriorityTuning(sproutGrowth: 1, streakDays: inputs.streakDays,
-                              trinketPresent: false,
-                              confidantMemento: BondRules.isConfidant(director.bondLevel)))
-        if inputs.anniversary == true {
-            overlay += PostcardStamp.cells()
-        }
-        var out: [(frameID: String, tick: Int, frameAge: Int, overlay: [CompanionSprite.CellDiff])] = []
+        director.interiority = InteriorityTuning(
+            sproutGrowth: 1,
+            streakDays: inputs.streakDays,
+            trinketPresent: false,
+            confidantMemento: BondRules.isConfidant(director.bondLevel))
+        var out: [PuppetDrive] = []
         for _ in 0..<frameCount {
-            director.advance(toTick: director.tick + 1)
-            out.append((director.currentFrame, director.tick, director.frameAge, overlay))
+            out.append(director.puppetDrive(atTick: director.tick + 1))
         }
         return out
     }
 
-    static func frames(_ inputs: PostcardInputs) -> [[[Character]]] {
-        let archetype = Archetype(rawValue: inputs.archetypeRaw) ?? .ember
-        let sprite = AuthoredSprites.sprite(for: archetype)
-        return frameSpecs(inputs).map { sprite.symbols(frameID: $0.frameID, overlay: $0.overlay) }
+    /// The card's frame images: the clay-styled puppet posed by the drive
+    /// run — the same resolver the stage renders, bit-exact per inputs.
+    static func frameImages(_ inputs: PostcardInputs) -> [CGImage] {
+        drives(inputs).compactMap { CompanionIcon.cgImage(for: $0) }
     }
 
-    /// v43 (AMS v2): the card's animated moment is the AUTHORED GRID — the
-    /// same patches the stage plays, rendered through the icon grid path.
-    /// The HD portrait may sit on the card front (PostcardCard), but never
-    /// animates: identical inputs -> identical images, bit-exact.
-    static func frameImages(_ inputs: PostcardInputs) -> [CGImage] {
-        let archetype = Archetype(rawValue: inputs.archetypeRaw) ?? .ember
-        return frameSpecs(inputs).compactMap { spec in
-            CompanionIcon.cgImage(for: archetype, frameID: spec.frameID, overlay: spec.overlay)
-        }
+    /// FNV-1a hashes of each frame's resolved POSE — the determinism pins
+    /// (the parameter-set truth layer, doc §5.5).
+    static func frameHashes(_ inputs: PostcardInputs) -> [UInt64] {
+        drives(inputs).map { PuppetPoser.resolve($0).pose.hashValue64() }
     }
 
     /// The warm-greeting fallback (default companion, plain idle run).
-    private static func plainSpecs(seed: UInt64) -> [(frameID: String, tick: Int, frameAge: Int, overlay: [CompanionSprite.CellDiff])] {
+    private static func plainDrives(seed: UInt64) -> [PuppetDrive] {
         guard let profile = try? PersonalityProfile.load(.ember) else { return [] }
         let director = SpriteDirector(profile: profile, seed: seed)
         director.playSequence([.happy])
-        var out: [(frameID: String, tick: Int, frameAge: Int, overlay: [CompanionSprite.CellDiff])] = []
+        var out: [PuppetDrive] = []
         for _ in 0..<frameCount {
-            director.advance(toTick: director.tick + 1)
-            out.append((director.currentFrame, director.tick, director.frameAge, []))
+            out.append(director.puppetDrive(atTick: director.tick + 1))
         }
         return out
-    }
-
-    /// FNV-1a hashes of the frame grids — the determinism pins.
-    static func frameHashes(_ inputs: PostcardInputs) -> [UInt64] {
-        frames(inputs).map { grid in
-            var h: UInt64 = 0xcbf29ce484222325
-            for row in grid { for c in row {
-                h ^= UInt64(c.asciiValue ?? 0)
-                h = h &* 0x100000001b3
-            } }
-            return h
-        }
     }
 }

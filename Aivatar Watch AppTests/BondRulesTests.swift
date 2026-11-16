@@ -256,26 +256,26 @@ final class BondRulesTests: XCTestCase {
         XCTAssertEqual(try bloom(level: 4), 18, "level 4+ earns the signature goodbye beat")
     }
 
-    // MARK: - Confidant memento cell is empty in every base grid
+    // MARK: - Confidant memento rides the drive (v3: the puppet's props)
 
-    func testConfidantMementoCellIsFreeInAllBaseGrids() {
+    func testConfidantMementoRidesConfidantDrives() throws {
         for archetype in Archetype.allCases {
-            let sprite = AuthoredSprites.sprite(for: archetype)
-            let grid = sprite.symbols(frameID: "idle")
-            XCTAssertEqual(grid[16][9], ".", "\(archetype.rawValue): memento cell (9,16) must be empty in the idle base")
+            let profile = try PersonalityProfile.load(archetype)
+            let director = SpriteDirector(profile: profile, seed: 20261116)
+            director.bondLevel = BondRules.maxLevel
+            director.interiority = InteriorityTuning(
+                sproutGrowth: 0, streakDays: 0, trinketPresent: false, confidantMemento: true)
+            let props = PuppetPoser.resolve(director.puppetDrive(atTick: 1)).props
+            XCTAssertGreaterThan(props.mementoAlpha, 0,
+                                 "\(archetype.rawValue): confidant memento visible at max bond")
         }
     }
 
-    func testConfidantMementoAppearsInOverlay() {
+    func testNoMementoBelowConfidant() {
         for archetype in Archetype.allCases {
-            let sprite = AuthoredSprites.sprite(for: archetype)
-            let t = InteriorityTuning(sproutGrowth: 1, streakDays: 0, trinketPresent: false, confidantMemento: true)
-            let diffs = sprite.interiorityDiffs(t)
-            XCTAssertTrue(diffs.contains { $0.x == 9 && $0.y == 16 && $0.symbol == "A" },
-                          "\(archetype.rawValue): confidant memento drawn")
-            let off = sprite.interiorityDiffs(.default)
-            XCTAssertFalse(off.contains { $0.x == 9 && $0.y == 16 },
-                           "\(archetype.rawValue): no memento below confidant")
+            let drive = PuppetDrive(archetype: archetype, frameID: "idle")
+            XCTAssertEqual(PuppetPoser.resolve(drive).props.mementoAlpha, 0,
+                           "\(archetype.rawValue): no memento at default interiority")
         }
     }
 

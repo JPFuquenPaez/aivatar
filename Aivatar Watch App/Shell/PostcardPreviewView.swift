@@ -41,13 +41,12 @@ struct PostcardPreviewView: View {
 
     var body: some View {
         // v30: the preview rides the accent-tinted card idiom (was a white-0.07
-        // slab) and is big enough to read the pixel art (90x81 pt = 4.5x the
-        // 20x18 grid).
+        // slab) and is big enough to read the puppet moment (90x81 pt).
         SetupTheme.card(tint: SetupTheme.accent(for: archetype)) {
             VStack(spacing: 10) {
                 if reduceMotion, let first = frames.first {
                     Image(decorative: first, scale: 1)
-                        .interpolation(.none)
+                        .interpolation(.high)
                         .accessibilityHidden(true)
                         .frame(width: 90, height: 81)
                 } else {
@@ -56,7 +55,7 @@ struct PostcardPreviewView: View {
                             : Int(timeline.date.timeIntervalSince(start) / SpriteDirector.tickDuration) % frames.count
                         if !frames.isEmpty {
                             Image(decorative: frames[idx], scale: 1)
-                                .interpolation(.none)
+                                .interpolation(.high)
                                 .accessibilityHidden(true)
                         }
                     }
@@ -74,7 +73,7 @@ struct PostcardPreviewView: View {
         .padding(.horizontal, 12)
         .onAppear {
             // Compose the card once (deterministic), then play it.
-            // v40: image-backed companions play the HD pet per frame.
+            // v3: the moment is the clay puppet posed by the director run.
             frames = PostcardComposer.frameImages(inputs)
             start = Date()
         }
