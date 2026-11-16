@@ -184,7 +184,7 @@ nonisolated enum PuppetDrawing {
         }
         switch spec.tailKind {
         case .none: break
-        case .brush: maxX = max(maxX, 1002); minY = min(minY, 466)
+        case .brush: maxX = max(maxX, 1012); minY = min(minY, 470)
         case .curl: maxX = max(maxX, 777)
         case .nub: maxX = max(maxX, 748)
         case .slim: maxX = max(maxX, 836)
@@ -394,19 +394,36 @@ nonisolated enum PuppetDrawing {
         _ surface: S, spec: ToySpec, pose: PuppetPose,
         root: CGAffineTransform, tint: ToyTint, style: PuppetStyle
     ) {
-        let bean = roundedBean(cx: 500, cy: 700, w: spec.bodyWidth, h: spec.bodyHeight).applying(root)
-        tint.styleFill(surface, path: bean, hex: spec.bodyHex, style: style,
+        // v1.2 §5.13.2: the body is an authored compound contour (pear / bean
+        // / loaf / teardrop per species), never a rounded rectangle.
+        let body = bodyPath(spec).applying(root)
+        tint.styleFill(surface, path: body, hex: spec.bodyHex, style: style,
                        gradientFrom: CGPoint(x: 500, y: 540), gradientTo: CGPoint(x: 500, y: 860))
-        let belly = ellipse(500, 722, spec.bodyWidth * 0.68, spec.bodyHeight * 0.69).applying(root)
+        let belly = blobPath(cx: 500, cy: 722,
+                             rx: spec.bodyWidth * 0.34, ry: spec.bodyHeight * 0.345,
+                             harmonics: [(0.05, 2, 1.9), (0.04, 3, 0.3)]).applying(root)
         surface.fill(belly, tint.color(spec.bellyHex))
 
+        // v1.2 §5.13.3: the neck joint — a soft contact shadow where the head
+        // mass settles over the body (overlap, not tangent contact).
+        if style != .rest {
+            surface.fill(blobPath(cx: 500, cy: 652, rx: 205, ry: 30,
+                                  harmonics: [(0.08, 2, 0.5)]).applying(root),
+                         tint.color(spec.shadeHex, alpha: 0.25))
+        }
+
         if spec.saddle, spec.archetype == .compass {
-            let saddle = roundedBean(cx: 560, cy: 634, w: 430, h: 148).applying(root)
+            let saddle = blobPath(cx: 560, cy: 634, rx: 215, ry: 74,
+                                  harmonics: [(0.07, 2, 0.9), (0.05, 3, 2.2)]).applying(root)
             surface.fill(saddle, tint.color(spec.shadeHex))
         }
         if spec.wrinkleRows, spec.archetype == .prism {
+            // Interior wrinkle arcs — linework that also directs the eye
+            // toward the face (v1.2 §5.13.7).
             for (i, dy) in [0, 34, 68].enumerated() {
-                let row = ellipse(500, 650 + CGFloat(dy), 300 - CGFloat(i) * 22, 12).applying(root)
+                let row = blobPath(cx: 500, cy: 650 + CGFloat(dy),
+                                   rx: (300 - CGFloat(i) * 22) / 2, ry: 7,
+                                   harmonics: [(0.18, 2, 0.0), (0.1, 3, 1.4)]).applying(root)
                 surface.fill(row, tint.color(spec.shadeHex, alpha: 0.5))
             }
         }
@@ -416,8 +433,10 @@ nonisolated enum PuppetDrawing {
         _ surface: S, spec: ToySpec, root: CGAffineTransform,
         tint: ToyTint, style: PuppetStyle
     ) {
+        // Stub feet sunk INTO the body mass (overlap at the joint).
         for x: CGFloat in [398, 602] {
-            let foot = ellipse(x, 842, 118, 58).applying(root)
+            let foot = blobPath(cx: x, cy: 838, rx: 62, ry: 31,
+                                harmonics: [(0.10, 2, 0.7), (0.06, 3, 2.1)]).applying(root)
             tint.styleFill(surface, path: foot, hex: spec.shadeHex, style: style,
                            gradientFrom: CGPoint(x: x, y: 815), gradientTo: CGPoint(x: x, y: 880))
         }
@@ -439,39 +458,68 @@ nonisolated enum PuppetDrawing {
         case .none:
             break
         case .brush:
-            // The fox's huge white-tipped brush: the silhouette tell.
-            let stemC = CGPoint(x: 790, y: 656)
-            let stemTilt = CGAffineTransform(translationX: -stemC.x, y: -stemC.y)
-                .concatenating(CGAffineTransform(rotationAngle: -0.52))
-                .concatenating(CGAffineTransform(translationX: stemC.x, y: stemC.y))
-            let stem = roundedBean(cx: 782, cy: 650, w: 380, h: 180)
-                .applying(stemTilt)
-                .applying(world)
-            tint.styleFill(surface, path: stem, hex: spec.bodyHex, style: style,
-                           gradientFrom: CGPoint(x: 790, y: 580), gradientTo: CGPoint(x: 790, y: 740))
-            surface.fill(ellipse(928, 540, 148, 134).applying(world),
+            // The fox's huge white-tipped brush (v1.2): ONE flowing compound
+            // S-curve tapering from the base to the tip — not a bean + disc.
+            let p0 = CGPoint(x: 520, y: 758)
+            let p1 = CGPoint(x: 690, y: 806)
+            let p2 = CGPoint(x: 872, y: 726)
+            let p3 = CGPoint(x: 928, y: 548)
+            var spine: [CGPoint] = []
+            for i in 0...10 {
+                spine.append(bezier(p0, p1, p2, p3, CGFloat(i) / 10))
+            }
+            var outline: [CGPoint] = []
+            for (i, p) in spine.enumerated() {
+                let t = CGFloat(i) / 10
+                let half = (78 + (34 - 78) * t)
+                let tan = bezierTangent(p0, p1, p2, p3, t)
+                let len = max(1, hypot(tan.x, tan.y))
+                let n = CGPoint(x: -tan.y / len, y: tan.x / len)
+                outline.append(CGPoint(x: p.x + n.x * half, y: p.y + n.y * half))
+            }
+            for (i, p) in spine.enumerated().reversed() {
+                let t = CGFloat(i) / 10
+                let half = (78 + (34 - 78) * t)
+                let tan = bezierTangent(p0, p1, p2, p3, t)
+                let len = max(1, hypot(tan.x, tan.y))
+                let n = CGPoint(x: -tan.y / len, y: tan.x / len)
+                outline.append(CGPoint(x: p.x - n.x * half, y: p.y - n.y * half))
+            }
+            let brush = smoothClosedPath(points: outline).applying(world)
+            tint.styleFill(surface, path: brush, hex: spec.bodyHex, style: style,
+                           gradientFrom: CGPoint(x: 600, y: 800), gradientTo: CGPoint(x: 928, y: 548))
+            // The white tip: one compound blob riding the curve's end.
+            surface.fill(blobPath(cx: 928, cy: 548, rx: 80, ry: 72,
+                                  harmonics: [(0.08, 2, 0.5), (0.06, 3, 1.7)]).applying(world),
                          tint.color(spec.bellyHex))
         case .curl:
-            surface.fill(ellipse(702, 646, 150, 140).applying(world),
+            // The shiba's curled tail: a spiral arc (two nested compound blobs).
+            surface.fill(blobPath(cx: 702, cy: 646, rx: 76, ry: 71,
+                                  harmonics: [(0.10, 3, 0.4), (0.06, 2, 1.8)]).applying(world),
                          tint.color(spec.shadeHex))
-            surface.fill(ellipse(702, 646, 84, 76).applying(world),
+            surface.fill(blobPath(cx: 702, cy: 646, rx: 42, ry: 38,
+                                  harmonics: [(0.12, 3, 2.1)]).applying(world),
                          tint.color(spec.bellyHex))
         case .nub:
             let pop = 1 + pose.wag * 0.3
-            surface.fill(ellipse(702, 690, 92 * pop, 88).applying(world),
+            surface.fill(blobPath(cx: 702, cy: 690, rx: 47 * pop, ry: 45,
+                                  harmonics: [(0.09, 2, 0.8)]).applying(world),
                          tint.color(spec.shadeHex))
         case .slim:
             let slimC = CGPoint(x: 726, y: 714)
             let slimTilt = CGAffineTransform(translationX: -slimC.x, y: -slimC.y)
                 .concatenating(CGAffineTransform(rotationAngle: -0.35))
                 .concatenating(CGAffineTransform(translationX: slimC.x, y: slimC.y))
-            let slim = roundedBean(cx: 716, cy: 714, w: 240, h: 68)
+            let slim = blobPath(cx: 716, cy: 714, rx: 120, ry: 35,
+                                harmonics: [(0.08, 2, 1.3), (0.06, 3, 0.2)])
                 .applying(slimTilt)
                 .applying(world)
             surface.fill(slim, tint.color(spec.shadeHex))
         case .fan:
             for (dx, dy) in [(0.0, 0.0), (0.16, 0.42), (-0.12, 0.78)] {
-                let feather = ellipse(716 + CGFloat(dx) * 80, 700 + CGFloat(dy) * 76, 74, 52)
+                let feather = blobPath(cx: 716 + CGFloat(dx) * 80, cy: 700 + CGFloat(dy) * 76,
+                                       rx: 38, ry: 27,
+                                       harmonics: [(0.14, 2, 0.6 + dx), (0.08, 3, dy)])
                     .applying(world)
                 surface.fill(feather, tint.color(spec.shadeHex))
             }
@@ -488,15 +536,19 @@ nonisolated enum PuppetDrawing {
         case .none:
             break
         case .oneSwept:
+            // The mockingbird's wing crosses the body contour decisively
+            // (v1.2 §5.13.3 overlap rule) as one compound teardrop.
             let base = CGPoint(x: 430, y: 690)
             let tilt = CGAffineTransform(translationX: -base.x, y: -base.y)
                 .concatenating(CGAffineTransform(rotationAngle: -0.55 - Double(flap) * 0.5))
                 .concatenating(CGAffineTransform(translationX: base.x, y: base.y))
             let world = tilt.concatenating(root)
-            let wing = roundedBean(cx: 322, cy: 620, w: 260, h: 128).applying(world)
+            let wing = blobPath(cx: 322, cy: 620, rx: 132, ry: 66,
+                                harmonics: [(0.10, 2, 0.8), (0.07, 3, 2.0)]).applying(world)
             tint.styleFill(surface, path: wing, hex: spec.shadeHex, style: style,
                            gradientFrom: CGPoint(x: 322, y: 560), gradientTo: CGPoint(x: 322, y: 690))
-            surface.fill(ellipse(244, 564, 84, 56).applying(world),
+            surface.fill(blobPath(cx: 244, cy: 564, rx: 43, ry: 29,
+                                  harmonics: [(0.12, 2, 1.1)]).applying(world),
                          tint.color(spec.accentHex, alpha: 0.75))
         case .mothPair:
             let glow = max(pose.catchGlow, CGFloat(PuppetAmbient.flutter(at: phase)))
@@ -507,11 +559,14 @@ nonisolated enum PuppetDrawing {
                     .concatenating(CGAffineTransform(rotationAngle: CGFloat(side) * Double(flap) * 0.45))
                     .concatenating(CGAffineTransform(translationX: base.x, y: base.y))
                 let world = tilt.concatenating(root)
-                surface.fill(ellipse(bx, 452, 300, 238).applying(world),
+                surface.fill(blobPath(cx: bx, cy: 452, rx: 152, ry: 120,
+                                      harmonics: [(0.07, 2, 0.4 + side), (0.05, 3, 1.9)]).applying(world),
                              tint.color(spec.shadeHex))
-                surface.fill(ellipse(bx + CGFloat(side) * 36, 588, 190, 150).applying(world),
+                surface.fill(blobPath(cx: bx + CGFloat(side) * 36, cy: 588, rx: 96, ry: 76,
+                                      harmonics: [(0.09, 3, 0.8)]).applying(world),
                              tint.color(spec.shadeHex, alpha: 0.85))
-                surface.fill(ellipse(bx - CGFloat(side) * 26, 442, 118, 88).applying(world),
+                surface.fill(blobPath(cx: bx - CGFloat(side) * 26, cy: 442, rx: 60, ry: 45,
+                                      harmonics: [(0.10, 2, 2.2)]).applying(world),
                              tint.color(spec.accentHex, alpha: 0.28 + 0.30 * glow))
             }
         }
@@ -537,7 +592,9 @@ nonisolated enum PuppetDrawing {
                          headCx: headCx, headCy: headCy, headD: headD)
         }
 
-        let head = circle(headCx, headCy, headD / 2).applying(total)
+        // v1.2 §5.13.2/5.13.5: the head is one tilted authored mass (compound
+        // contour), not a circle — flat crown, cheek bulges, tapered chin.
+        let head = headPath(cx: headCx, cy: headCy, d: headD).applying(total)
         tint.styleFill(surface, path: head, hex: spec.bodyHex, style: style,
                        gradientFrom: CGPoint(x: headCx, y: headCy - headD / 2),
                        gradientTo: CGPoint(x: headCx, y: headCy + headD / 2))
@@ -562,15 +619,20 @@ nonisolated enum PuppetDrawing {
         }
 
         if spec.muzzle, spec.archetype == .ember {
-            let muzzle = ellipse(headCx + faceShift * 0.5, headCy + headD * 0.28,
-                                 headD * 0.58, headD * 0.42).applying(total)
+            // The fox's cream muzzle breaks the head contour from inside.
+            let muzzle = blobPath(cx: headCx + faceShift * 0.5, cy: headCy + headD * 0.28,
+                                  rx: headD * 0.29, ry: headD * 0.21,
+                                  harmonics: [(0.07, 2, 0.6), (0.05, 3, 2.8)]).applying(total)
             surface.fill(muzzle, tint.color(spec.bellyHex))
         }
         if spec.ruff, spec.archetype == .willow {
+            // The shiba's cheek ruffs break the head contour twice (v1.2 note).
             for side in [-1.0, 1.0] {
                 surface.fill(
-                    circle(headCx + CGFloat(side) * headD * 0.42,
-                           headCy + headD * 0.12, headD * 0.20).applying(total),
+                    blobPath(cx: headCx + CGFloat(side) * headD * 0.42,
+                             cy: headCy + headD * 0.12,
+                             rx: headD * 0.105, ry: headD * 0.085,
+                             harmonics: [(0.14, 3, CGFloat(side) * 1.3), (0.07, 2, 0.4)]).applying(total),
                     tint.color(spec.shadeHex))
             }
         }
@@ -582,7 +644,9 @@ nonisolated enum PuppetDrawing {
         let window = eyeR * 0.34
         for side in [-1.0, 1.0] {
             let ex = headCx + CGFloat(side) * headD * 0.30 + faceShift
-            surface.fill(circle(ex, eyeY, eyeR).applying(total),
+            // The eye disc is a soft egg, not a perfect circle.
+            surface.fill(blobPath(cx: ex, cy: eyeY, rx: eyeR, ry: eyeR * 1.06,
+                                  harmonics: [(0.04, 2, 0.3), (0.03, 3, 1.5)]).applying(total),
                          tint.color(spec.pupilHex))
             let px = ex + CGFloat(pose.pupilX) * window
             let py = eyeY + CGFloat(pose.pupilY) * window * 0.8
@@ -612,8 +676,10 @@ nonisolated enum PuppetDrawing {
         let blushAlpha = 0.10 + 0.36 * Double(pose.cheekGlow)
         for side in [-1.0, 1.0] {
             surface.fill(
-                ellipse(headCx + CGFloat(side) * headD * 0.40 + faceShift * 0.7,
-                        headCy + headD * 0.25, headD * 0.15, headD * 0.09).applying(total),
+                blobPath(cx: headCx + CGFloat(side) * headD * 0.40 + faceShift * 0.7,
+                         cy: headCy + headD * 0.25,
+                         rx: headD * 0.075, ry: headD * 0.045,
+                         harmonics: [(0.12, 2, CGFloat(side) * 0.9)]).applying(total),
                 tint.color(spec.accentHex, alpha: blushAlpha))
         }
 
@@ -638,29 +704,19 @@ nonisolated enum PuppetDrawing {
                 .concatenating(CGAffineTransform(translationX: baseX, y: baseY))
             let w = spec.earWidth
             let h = spec.earHeight
-            let tipY = baseY - h
-            var outline = CGMutablePath()
-            outline.move(to: CGPoint(x: baseX - w / 2, y: baseY + h * 0.12))
-            outline.addQuadCurve(to: CGPoint(x: baseX, y: tipY),
-                                 control: CGPoint(x: baseX - w * 0.52, y: baseY - h * 0.78))
-            outline.addQuadCurve(to: CGPoint(x: baseX + w / 2, y: baseY + h * 0.12),
-                                 control: CGPoint(x: baseX + w * 0.52, y: baseY - h * 0.78))
-            outline.addQuadCurve(to: CGPoint(x: baseX - w / 2, y: baseY + h * 0.12),
-                                 control: CGPoint(x: baseX, y: baseY + h * 0.30))
-            // Stroked with round joins = the swell-tip "no sharp corners" rule.
-            let earPath = outline
-                .copy(strokingWithWidth: max(w * 0.18, 20), lineCap: .round, lineJoin: .round, miterLimit: 10)
+            // v1.2 §5.13: an asymmetrically tapered compound ear, its base
+            // sunk a quarter into the head mass (joint overlap, no tangency).
+            // Top stays at baseY - h; bottom at baseY + h*0.25.
+            let earPath = blobPath(cx: baseX, cy: baseY - h * 0.375,
+                                   rx: w / 2, ry: h * 0.625,
+                                   harmonics: [(0.10, 2, 0.9 + side * 0.5),
+                                               (0.07, 3, 2.4 - side)])
                 .applying(rot).applying(total)
             surface.fill(earPath, tint.color(spec.bodyHex))
 
-            var inner = CGMutablePath()
-            inner.move(to: CGPoint(x: baseX - w * 0.24, y: baseY - h * 0.04))
-            inner.addQuadCurve(to: CGPoint(x: baseX, y: tipY + h * 0.16),
-                              control: CGPoint(x: baseX - w * 0.28, y: baseY - h * 0.55))
-            inner.addQuadCurve(to: CGPoint(x: baseX + w * 0.24, y: baseY - h * 0.04),
-                              control: CGPoint(x: baseX + w * 0.28, y: baseY - h * 0.55))
-            let innerPath = inner
-                .copy(strokingWithWidth: 12, lineCap: .round, lineJoin: .round, miterLimit: 10)
+            let innerPath = blobPath(cx: baseX, cy: baseY - h * 0.42,
+                                     rx: w * 0.26, ry: h * 0.42,
+                                     harmonics: [(0.09, 2, 1.2 + side)])
                 .applying(rot).applying(total)
             surface.fill(innerPath, tint.color(spec.shadeHex, alpha: 0.75))
         }
@@ -744,7 +800,9 @@ nonisolated enum PuppetDrawing {
         }
         if spec.beak, spec.archetype == .nimbus {
             // The accent beak bump sits just under the mouth anchor.
-            let beak = ellipse(mx, my + headD * 0.02, headD * 0.16, headD * 0.10).applying(total)
+            let beak = blobPath(cx: mx, cy: my + headD * 0.02,
+                                rx: headD * 0.08, ry: headD * 0.05,
+                                harmonics: [(0.12, 2, 0.3)]).applying(total)
             surface.fill(beak, tint.color(spec.accentHex))
         }
     }
@@ -894,18 +952,115 @@ nonisolated enum PuppetDrawing {
 
     // MARK: - Path helpers
 
+    /// v1.2 §5.13.2: an authored compound contour. Anchor points sit on an
+    /// ellipse whose radius is modulated by a few low-frequency harmonics —
+    /// the contour deviates from a perfect circle/ellipse in at least two
+    /// places, so no final part contour is a raw primitive. Pure math:
+    /// tests sample `blobPoints` directly for the contour-deviation rule.
+    nonisolated static func blobPoints(cx: CGFloat, cy: CGFloat,
+                                       rx: CGFloat, ry: CGFloat,
+                                       harmonics: [(amp: CGFloat, freq: Int, phase: CGFloat)],
+                                       segments: Int = 28) -> [CGPoint] {
+        var pts: [CGPoint] = []
+        for i in 0..<segments {
+            let t = CGFloat(i) / CGFloat(segments) * 2 * .pi
+            var f: CGFloat = 1
+            for h in harmonics {
+                f += h.amp * cos(CGFloat(h.freq) * t + h.phase)
+            }
+            pts.append(CGPoint(x: cx + rx * f * cos(t), y: cy + ry * f * sin(t)))
+        }
+        return pts
+    }
+
+    nonisolated static func blobPath(cx: CGFloat, cy: CGFloat,
+                                     rx: CGFloat, ry: CGFloat,
+                                     harmonics: [(amp: CGFloat, freq: Int, phase: CGFloat)],
+                                     segments: Int = 28) -> CGPath {
+        smoothClosedPath(points: blobPoints(cx: cx, cy: cy, rx: rx, ry: ry,
+                                             harmonics: harmonics, segments: segments))
+    }
+
+    /// A smooth closed curve through the given anchor points (quad curves
+    /// via midpoint smoothing — the "drawn line", not a polygon).
+    nonisolated static func smoothClosedPath(points: [CGPoint]) -> CGPath {
+        let p = CGMutablePath()
+        let n = points.count
+        guard n >= 3 else { return p }
+        p.move(to: CGPoint(x: (points[0].x + points[n - 1].x) / 2,
+                           y: (points[0].y + points[n - 1].y) / 2))
+        for i in 0..<n {
+            let next = points[(i + 1) % n]
+            p.addQuadCurve(to: CGPoint(x: (points[i].x + next.x) / 2,
+                                       y: (points[i].y + next.y) / 2),
+                          control: points[i])
+        }
+        p.closeSubpath()
+        return p
+    }
+
+    /// The head mass (v1.2 §5.13.5): flat-topped skull, bulging cheeks,
+    /// tapered chin — deviates from a circle in >= 3 places.
+    nonisolated static func headPoints(cx: CGFloat, cy: CGFloat, d: CGFloat) -> [CGPoint] {
+        blobPoints(cx: cx, cy: cy, rx: d / 2, ry: d * 0.49,
+                   harmonics: [(0.045, 2, 0.0),      // flattened crown + jaw
+                               (0.05, 1, .pi / 2),    // chin taper (bottom only)
+                               (0.04, 2, 1.2),        // asymmetric cheek bulge
+                               (0.025, 3, 2.3)])      // hand-drawn wobble
+    }
+
+    nonisolated static func headPath(cx: CGFloat, cy: CGFloat, d: CGFloat) -> CGPath {
+        smoothClosedPath(points: headPoints(cx: cx, cy: cy, d: d))
+    }
+
+    /// The body mass, one authored shape per species (v1.2 §5.13 per-companion
+    /// notes): pear (fox/sphynx — heavy hindquarters), bean (shiba),
+    /// loaf (corgi — wide, low, flat-topped), teardrop (mockingbird).
+    nonisolated static func bodyPoints(_ spec: ToySpec) -> [CGPoint] {
+        let harmonics: [(amp: CGFloat, freq: Int, phase: CGFloat)]
+        switch spec.archetype {
+        case .ember, .prism:
+            harmonics = [(0.07, 2, .pi), (0.04, 1, .pi / 2), (0.035, 3, 0.7)]
+        case .willow:
+            harmonics = [(0.05, 2, 0.3), (0.05, 3, 1.9)]
+        case .compass:
+            harmonics = [(-0.06, 2, .pi), (0.03, 4, 0.4), (0.04, 1, -.pi / 2)]
+        case .nimbus:
+            harmonics = [(0.08, 2, .pi / 2), (0.04, 3, 2.6), (0.03, 1, .pi / 2)]
+        case .lumen:
+            harmonics = [(0.05, 2, 1.1), (0.04, 3, 0.2)]
+        }
+        return blobPoints(cx: 500, cy: 700, rx: spec.bodyWidth / 2, ry: spec.bodyHeight / 2,
+                          harmonics: harmonics)
+    }
+
+    nonisolated static func bodyPath(_ spec: ToySpec) -> CGPath {
+        smoothClosedPath(points: bodyPoints(spec))
+    }
+
+    /// Cubic bezier point + tangent (the tail's one flowing compound curve).
+    nonisolated static func bezier(_ p0: CGPoint, _ p1: CGPoint, _ p2: CGPoint,
+                                   _ p3: CGPoint, _ t: CGFloat) -> CGPoint {
+        let u = 1 - t
+        let a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t
+        return CGPoint(x: a * p0.x + b * p1.x + c * p2.x + d * p3.x,
+                       y: a * p0.y + b * p1.y + c * p2.y + d * p3.y)
+    }
+
+    nonisolated static func bezierTangent(_ p0: CGPoint, _ p1: CGPoint, _ p2: CGPoint,
+                                          _ p3: CGPoint, _ t: CGFloat) -> CGPoint {
+        let u = 1 - t
+        let a = 3 * u * u, b = 6 * u * t, c = 3 * t * t
+        return CGPoint(x: a * (p1.x - p0.x) + b * (p2.x - p1.x) + c * (p3.x - p2.x),
+                       y: a * (p1.y - p0.y) + b * (p2.y - p1.y) + c * (p3.y - p2.y))
+    }
+
     nonisolated static func circle(_ cx: CGFloat, _ cy: CGFloat, _ r: CGFloat) -> CGPath {
         CGPath(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2), transform: nil)
     }
 
     nonisolated static func ellipse(_ cx: CGFloat, _ cy: CGFloat, _ w: CGFloat, _ h: CGFloat) -> CGPath {
         CGPath(ellipseIn: CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h), transform: nil)
-    }
-
-    /// The squashed bean body (continuous rounded rect at half-height poles).
-    nonisolated static func roundedBean(cx: CGFloat, cy: CGFloat, w: CGFloat, h: CGFloat) -> CGPath {
-        CGPath(roundedRect: CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h),
-               cornerWidth: min(w, h) / 4, cornerHeight: h / 2, transform: nil)
     }
 
     /// A four-point diamond sparkle.
