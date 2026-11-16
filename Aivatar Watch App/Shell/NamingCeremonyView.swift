@@ -11,18 +11,6 @@ import SwiftUI
 /// a 44 pt clear button, a full-width 44 pt commit, and a quiet 44 pt-hit
 /// cancel — all inside a ScrollView so large Dynamic Type never clips, with
 /// the bottom content above the safe area.
-/// PerkThrottle (E3): pure, tick-injectable throttle for the naming perk —
-/// one perk per >= 20-tick (3 s) window while the field is focused.
-nonisolated struct PerkThrottle: Sendable {
-    static let windowTicks = 20
-    private var lastPerkTick = -1_000_000
-    mutating func allow(tick: Int) -> Bool {
-        guard tick - lastPerkTick >= Self.windowTicks else { return false }
-        lastPerkTick = tick
-        return true
-    }
-}
-
 struct NamingCeremonyView: View {
     let archetype: Archetype
     @Binding var isPresented: Bool
@@ -30,10 +18,6 @@ struct NamingCeremonyView: View {
     @AppStorage("namingCompleted") private var namingCompleted = false
     @State private var draft = ""
     @FocusState private var focused: Bool
-    /// E3: live hero's director (held via callback) + the perk throttle.
-    @State private var previewDirector: SpriteDirector?
-    @State private var perkThrottle = PerkThrottle()
-    @State private var appearDate = Date()
 
     /// Called when a name is committed so the stage can celebrate.
     var onName: ((String) -> Void)?
@@ -60,17 +44,14 @@ struct NamingCeremonyView: View {
                 let compact = geometry.size.height < 260
                 ScrollView {
                     VStack(spacing: compact ? 8 : 10) {
-                    // E3 "it hears you": the hero is alive — while you type,
-                    // the companion perks (looks up at the name), throttled to
-                    // once per 20 ticks (3 s).
-                    LiveCompanionPreviewView(archetype: archetype, size: compact ? 44 : 56,
-                                             onDirectorChange: { previewDirector = $0 })
+                    // AMS v2 (v43): the naming hero is the HD PORTRAIT of
+                    // the companion being named — "a photo of your
+                    // companion", static by contract (the living companion
+                    // is the authored stage grid). The perk beat moved to
+                    // the commit celebration (sparkle + haptic + the stage's
+                    // happy act).
+                    SetupTheme.portraitDisc(for: archetype, size: compact ? 44 : 56)
                         .padding(.top, compact ? 2 : 6)
-                        .onChange(of: draft) { _ in
-                            guard focused else { return }
-                            let tick = Int(Date().timeIntervalSince(appearDate) / SpriteDirector.tickDuration)
-                            if perkThrottle.allow(tick: tick) { previewDirector?.playPerk() }
-                        }
                     Text(String(format: String(localized: "naming.title"), archetype.animalName))
                         .font(.title3.weight(.semibold))
                         .multilineTextAlignment(.center)
@@ -138,7 +119,6 @@ struct NamingCeremonyView: View {
             .onAppear {
                 // v30: rename path prefills the current name.
                 if draft.isEmpty { draft = companionName }
-                appearDate = Date()
                 focused = true
             }
         }

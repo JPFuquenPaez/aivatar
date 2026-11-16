@@ -16,10 +16,6 @@ final class SeasonOverlayTests: XCTestCase {
         // with authored art).
         for archetype in Archetype.allCases {
             let sprite = AuthoredSprites.sprite(for: archetype)
-            // v40: image-backed pets draw the HD art over rows 0...15 and the
-            // tile UNDER it (rows 15-17 may hold fallback feet cells); the
-            // empty-row rule binds authored grids (lumen) only.
-            if sprite.isImageBacked { continue }
             let row = SpriteStageMetadata.meta(for: archetype).shadowRow
             for dy in 0...2 {
                 let y = row + dy

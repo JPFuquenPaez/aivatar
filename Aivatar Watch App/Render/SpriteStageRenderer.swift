@@ -90,7 +90,6 @@ struct SpriteStageRenderer: View {
             if luminanceReduced && !farewellPending {
                 Canvas { ctx, size in
                     drawFrame(ctx: ctx, size: size, frameID: "sleepy",
-                              pose: PetMotion.act("sleepy", 99),
                               overlay: [], shadow: [], rest: true, mote: nil)
                 }
             } else {
@@ -147,15 +146,15 @@ struct SpriteStageRenderer: View {
         // frame plays (sprout / week grid / trinket); Aivatar 2.0 adds the
         // director's transient tells (blush / vapor / memento deposit) and
         // the E9.1 ground shadow — awake frames only: absent in the rest LOD
-        // and during the farewell wipe (G9 + craft: the rest frame's lit-pixel
-        // ratio is untouched).
+        // and during the farewell wipe (G9 + craft: the rest frame's
+        // lit-pixel ratio is untouched). AMS v2 adds the tail part overlay
+        // (the quantized wag pose as authored cell diffs — v43).
         var baseOverlay = sprite.interiorityDiffs(director.interiority)
-        // E5: while the memento deposit animates, the stepped-alpha copy in the
-        // transient channel replaces the full-alpha interiority cell.
         if director.mementoDepositAlpha != nil {
             baseOverlay.removeAll { $0.x == 9 && $0.y == 16 && $0.symbol == "A" }
         }
-        var overlay = baseOverlay + director.transientOverlayCells
+        let overlay = baseOverlay + director.transientOverlayCells
+            + director.tailOverlayCells
         let shadow = SpriteStageMetadata.shadowOverlayIfAwake(
             director.currentArchetype, frame: director.currentFrame, farewellPending: farewellPending)
         let fullOverlay = overlay + shadow
@@ -164,16 +163,10 @@ struct SpriteStageRenderer: View {
         // change 3->4 keeps count but changes symbols, and the week grid must
         // not stay stale until the next frame change.
         let overlayKey = fullOverlay.map { "\($0.x),\($0.y),\($0.symbol)" }.joined()
-        // v42: the pose joins the key QUANTIZED (sub-pixel moves don't force
-        // a redraw — OLED/battery), so continuous ambient motion redraws
-        // only when it crosses a pixel boundary.
-        let pose = PetMotion.pose(frameID: director.currentFrame, frameAge: director.frameAge,
-                                  tick: director.tick, seed: director.seed)
-        let poseKey = "\(Int(pose.rotation * 1000)),\(Int(pose.dx * 10)),\(Int(pose.dy * 10)),\(Int(pose.scaleY * 1000)),\(Int(pose.headTilt * 1000)),\(Int(pose.tailWag * 1000))"
-        let key = "\(director.currentFrame)|\(overlayKey)|\(director.moteCell?.x ?? -1),\(director.moteCell?.y ?? -1)|\(director.weatherHueShiftDeg)|\(rampBucket)|\(poseKey)"
+        let key = "\(director.currentFrame)|\(overlayKey)|\(director.moteCell?.x ?? -1),\(director.moteCell?.y ?? -1)|\(director.weatherHueShiftDeg)|\(rampBucket)"
         if key == lastDrawKey { return }
         lastDrawKey = key
-        drawFrame(ctx: ctx, size: size, frameID: director.currentFrame, pose: pose,
+        drawFrame(ctx: ctx, size: size, frameID: director.currentFrame,
                   overlay: overlay, shadow: shadow, rest: false, mote: director.moteCell)
         if farewellPending, let start = farewellStartedAt, farewellTotalSeconds > 0 {
             // v28: the dim ramps over the LAST ticks (peak-end), not the whole
@@ -185,33 +178,17 @@ struct SpriteStageRenderer: View {
     }
 
     private func drawFrame(ctx: GraphicsContext, size: CGSize, frameID: String,
-                           pose: PetMotion.Pose = .identity,
                            overlay: [CompanionSprite.CellDiff],
                            shadow: [CompanionSprite.CellDiff] = [],
                            rest: Bool,
                            mote: (x: Int, y: Int)?) {
         // Fill-width cell: the sprite spans the screen width exactly and
         // its content center sits slightly above the vertical middle (face
-        // in the upper-third glance zone, §9).
+        // in the upper-third glance zone, §9). AMS v2: the stage renders
+        // ONLY the authored grid — the HD portraits never animate here
+        // (kill list).
         let cell = size.width / CGFloat(CompanionSprite.gridWidth)
         let baseTop = size.height * 0.46 - cell * CGFloat(CompanionSprite.gridHeight) / 2
-        // v40: image-backed companions draw the HD pet image (aspect-fit
-        // into rows 0...15, tile underneath); the inhale lift rides the
-        // frame transform instead of shifting the grid origin.
-        if sprite.isImageBacked, PetImageRender.uiImage(sprite) != nil {
-            let fullBox = CGRect(x: 0, y: baseTop, width: size.width, height: size.height)
-            PetImageRender.drawOverlay(ctx: ctx, box: fullBox, cell: cell, sprite: sprite, cells: shadow)
-            let box = CGRect(x: 0, y: baseTop, width: size.width,
-                             height: CGFloat(PetImageRender.imageBoxRows) * cell)
-            PetImageRender.draw(ctx: ctx, box: box, sprite: sprite, pose: pose,
-                                rest: rest, overOverlay: overlay)
-            if let mote, !rest {
-                let rect = CGRect(x: CGFloat(mote.x) * cell, y: baseTop + CGFloat(mote.y) * cell,
-                                  width: cell, height: cell)
-                ctx.fill(Path(rect), with: .color(moteColor))
-            }
-            return
-        }
         let grid = sprite.symbols(frameID: frameID, overlay: overlay + shadow)
         let palette = palette(rest: rest)
         var top = baseTop

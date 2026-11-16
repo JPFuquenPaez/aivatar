@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// PhoneCompanionView (v36): the living companion on the iPhone shell. Renders
-/// the same authored 20x18 grid as the watch (AivatarShared.CompanionSprite)
-/// on the same 150 ms clock, with the same isometric ground tile
-/// (SpriteStageMetadata) and the same inhale lift, driven by
-/// PhoneCompanionAnimator. Reduce Motion freezes to the static idle frame.
+/// PhoneCompanionView (v36, AMS v2 v43): the iPhone companion shell. "The
+/// portrait and the companion" — the HD portrait (a photo of the companion)
+/// beside the living authored grid (the companion itself, animated by
+/// PhoneCompanionAnimator on the same 150 ms clock as the watch stage, with
+/// the same ground tile and the same quantized tail channel). The portrait
+/// is static by contract: no surface animates the HD art.
 struct PhoneCompanionView: View {
     let archetype: Archetype
     var presence: CompanionPresence
@@ -22,46 +23,60 @@ struct PhoneCompanionView: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.15)) { timeline in
-            Canvas { ctx, _ in
-                let frame: String
-                let pose: PetMotion.Pose
-                if reduceMotion {
-                    frame = presence == .asleep ? "sleepy" : "idle"
-                    pose = .identity
-                } else {
-                    let elapsed = timeline.date.timeIntervalSince(epoch)
-                    animator.advance(toTick: Int((elapsed / 0.15).rounded(.down)))
-                    frame = animator.currentFrame
-                    pose = PetMotion.pose(frameID: animator.currentFrame, frameAge: animator.frameAge,
-                                          tick: animator.tick, seed: animator.seed)
+        HStack(spacing: size * 0.08) {
+            portraitDisc
+            TimelineView(.animation(minimumInterval: 0.15)) { timeline in
+                Canvas { ctx, _ in
+                    let frame: String
+                    if reduceMotion {
+                        frame = presence == .asleep ? "sleepy" : "idle"
+                    } else {
+                        let elapsed = timeline.date.timeIntervalSince(epoch)
+                        animator.advance(toTick: Int((elapsed / 0.15).rounded(.down)))
+                        frame = animator.currentFrame
+                    }
+                    drawFrame(ctx: ctx, frameID: frame)
                 }
-                drawFrame(ctx: ctx, frameID: frame, pose: pose)
             }
+            .frame(width: liveSize, height: liveSize * 0.9)
         }
         .frame(width: size, height: size * 0.9)
     }
 
-    private func drawFrame(ctx: GraphicsContext, frameID: String, pose: PetMotion.Pose = .identity) {
+    /// The static HD portrait in a soft disc (never animated).
+    private var portraitDisc: some View {
+        let disc = size * 0.36
+        return Group {
+            if let portrait = PetImageRender.portraitImage(AuthoredSprites.sprite(for: archetype)) {
+                Image(uiImage: portrait)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .frame(width: disc, height: disc)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 1))
+            } else {
+                Circle()
+                    .fill(PetImageRender.color(AuthoredSprites.sprite(for: archetype).uiAccentHex).opacity(0.25))
+                    .frame(width: disc, height: disc)
+                    .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 1))
+            }
+        }
+        .shadow(color: .black.opacity(0.5), radius: 6, y: 3)
+    }
+
+    private var liveSize: CGFloat { size * 0.60 }
+
+    private func drawFrame(ctx: GraphicsContext, frameID: String) {
         let sprite = AuthoredSprites.sprite(for: archetype)
-        let cell = size / CGFloat(CompanionSprite.gridWidth)
-        let baseTop = size * 0.42 - cell * CGFloat(CompanionSprite.gridHeight) / 2
-        // Same isometric ground tile as the watch stage (awake frames only).
-        let tile = presence != .asleep
+        let cell = liveSize / CGFloat(CompanionSprite.gridWidth)
+        let baseTop = liveSize * 0.42 - cell * CGFloat(CompanionSprite.gridHeight) / 2
+        // Same isometric ground tile as the watch stage (awake frames only)
+        // + the tail part overlay (the living wag, same quantized channel).
+        var tile = presence != .asleep
             ? SpriteStageMetadata.shadowOverlayIfAwake(archetype, frame: frameID, farewellPending: false)
             : []
-        // v40: image-backed companions draw the HD pet — the SAME image the
-        // watch stage draws, animated by the same frame transform.
-        if sprite.isImageBacked, PetImageRender.uiImage(sprite) != nil {
-            PetImageRender.drawOverlay(ctx: ctx,
-                box: CGRect(x: 0, y: baseTop, width: size, height: size),
-                cell: cell, sprite: sprite, cells: tile)
-            PetImageRender.draw(ctx: ctx,
-                box: CGRect(x: 0, y: baseTop, width: size,
-                            height: CGFloat(PetImageRender.imageBoxRows) * cell),
-                sprite: sprite, pose: pose, rest: presence == .asleep)
-            return
-        }
+        if !reduceMotion { tile += animator.tailOverlayCells }
         var grid = sprite.symbols(frameID: frameID)
         for diff in tile where diff.y >= 0 && diff.y < CompanionSprite.gridHeight
             && diff.x >= 0 && diff.x < CompanionSprite.gridWidth {

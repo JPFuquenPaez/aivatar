@@ -1,31 +1,10 @@
 import XCTest
 @testable import Aivatar_Watch_App
 
-/// Aivatar 2.0 E3 + E4 — the naming perk throttle, the naming-day persistence
-/// rule, the anniversary beat (selector rung ordering, Feb 29 -> Mar 1,
-/// once-per-day gate), and the postcard stamp's determinism pins.
-final class NamingPerkTests: XCTestCase {
-
-    func testPerkThrottleWindow() {
-        var t = PerkThrottle()
-        XCTAssertTrue(t.allow(tick: 0), "first perk allowed")
-        XCTAssertFalse(t.allow(tick: 19), "inside the 20-tick window")
-        XCTAssertTrue(t.allow(tick: 20), "window boundary re-allows")
-        XCTAssertFalse(t.allow(tick: 21))
-        XCTAssertTrue(t.allow(tick: 40))
-    }
-
-    func testNamingDayPersistedShape() throws {
-        // The commit path writes namingDay; the pure rule is that a set
-        // namingDay drives the anniversary match and nil never does.
-        let now = Date(timeIntervalSince1970: 1_793_620_800)  // 2026-11-03 12:00 UTC
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        XCTAssertFalse(WakeBeatSelector.isAnniversary(namingDay: now.addingTimeInterval(-86_400), now: now, calendar: cal))
-        XCTAssertTrue(WakeBeatSelector.isAnniversary(namingDay: now.addingTimeInterval(-365 * 86_400), now: now, calendar: cal))
-    }
-}
-
+/** Aivatar 2.0 E4 — the naming-day persistence rule, the anniversary beat
+ (selector rung ordering, Feb 29 -> Mar 1, once-per-day gate), and the
+ postcard stamp's determinism pins. (E3's live naming perk retired with the
+ portrait hero in AMS v2 v43; the celebration lives on the commit path.) */
 final class NamingDayTests: XCTestCase {
 
     private var utc: Calendar {

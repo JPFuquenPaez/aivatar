@@ -27,50 +27,48 @@ nonisolated enum SpriteStageMetadata {
 
     static func meta(for archetype: Archetype) -> AnimalMeta {
         switch archetype {
-        // v40 HD pets: the pet image is drawn aspect-fit into rows 0...15
-        // (bottom-anchored), so the ground tile sits at rows 15-17 and the
-        // face band follows the head in the HD art (cell coords of the same
-        // 20x18 box — boop hit math is unchanged).
+        // v43 (AMS v2): all six companions are authored grids again — the
+        // meta re-authored for the P0 grids (feet at row 13, tile rows 14-16,
+        // grid-centered bodies so shadowCenterX is nil everywhere).
         case .ember:
-            // Fox: head left-of-center (ears x1-11, rows 2-13); tail drags
-            // the body center right.
+            // Fox: head rows 4-9 cols 4-15; ears rows 0-3; paws row 13.
             return AnimalMeta(
-                faceRect: (1, 2, 12, 12),
-                shadowRow: 15, shadowWidth: 12, shadowCenterX: 10,
-                blushL: (2, 9), blushR: (11, 9),
-                vapor: [(5, 0), (6, 0)]
+                faceRect: (4, 4, 12, 6),
+                shadowRow: 14, shadowWidth: 12,
+                blushL: (5, 7), blushR: (14, 7),
+                vapor: [(7, 2), (8, 2)]
             )
         case .willow:
-            // Shiba: head top-center, facing forward.
+            // Shiba: head rows 3-9 cols 4-15; curl at the right shoulder.
             return AnimalMeta(
-                faceRect: (6, 1, 10, 11),
-                shadowRow: 15, shadowWidth: 10, shadowCenterX: 9,
-                blushL: (7, 7), blushR: (15, 7),
-                vapor: [(10, 0), (11, 0)]
+                faceRect: (4, 4, 12, 6),
+                shadowRow: 14, shadowWidth: 10,
+                blushL: (4, 6), blushR: (15, 6),
+                vapor: [(7, 1), (8, 1)]
             )
         case .compass:
-            // Corgi: head top-center-right.
+            // Corgi: side-profile loaf; head rows 3-8 cols 1-6, nose at (0,5).
             return AnimalMeta(
-                faceRect: (6, 1, 11, 11),
-                shadowRow: 15, shadowWidth: 10, shadowCenterX: 9,
-                blushL: (7, 7), blushR: (16, 7),
-                vapor: [(10, 0), (11, 0)]
+                faceRect: (0, 3, 8, 6),
+                shadowRow: 14, shadowWidth: 14,
+                blushL: (2, 4), blushR: (3, 7),
+                vapor: [(0, 2), (1, 2)]
             )
         case .prism:
-            // Sphynx: small head top-center, big ears.
+            // Sphynx: narrow face rows 3-8 cols 4-11, giant ears rows 0-3.
             return AnimalMeta(
-                faceRect: (6, 1, 8, 9),
-                shadowRow: 15, shadowWidth: 8, shadowCenterX: 9,
-                blushL: (6, 5), blushR: (13, 5),
-                vapor: [(9, 0), (10, 0)]
+                faceRect: (4, 4, 8, 5),
+                shadowRow: 14, shadowWidth: 8,
+                blushL: (4, 7), blushR: (11, 7),
+                vapor: [(8, 1), (9, 1)]
             )
         case .nimbus:
-            // Mockingbird: head at the right end of its branch.
+            // Mockingbird: head rows 1-5 cols 3-7, beak at cols 0-2 row 3.
             return AnimalMeta(
-                faceRect: (10, 1, 9, 11),
-                shadowRow: 15, shadowWidth: 8, shadowCenterX: 13,
-                blushL: (10, 7), blushR: (18, 7),
-                vapor: [(13, 0), (14, 0)]
+                faceRect: (2, 2, 6, 4),
+                shadowRow: 14, shadowWidth: 8,
+                blushL: (3, 5), blushR: (7, 5),
+                vapor: [(4, 0), (5, 0)]
             )
         case .lumen:
             // Moth: eyes rows 2-3 cols 6-13 (antennae row 0); body bottom row 13.
@@ -81,6 +79,27 @@ nonisolated enum SpriteStageMetadata {
                 vapor: [(9, 0), (10, 0)]
             )
         }
+    }
+
+    /// The LPR tail part (AMS v2 §5.2): the authored pose diffs for the
+    /// TailChannel's quantized pose (-1 tailL, +1 tailR; 0 = the idle tail).
+    /// Only translation-grade cell diffs — no crops, no rotation. Lumen has
+    /// no tail part (nil = never wags).
+    static func tailPoses(_ archetype: Archetype) -> [Int: [CellDiff]]? {
+        switch archetype {
+        case .ember: return AuthoredSprites.foxTailPoses
+        case .willow: return AuthoredSprites.shibaTailPoses
+        case .compass: return AuthoredSprites.corgiTailPoses
+        case .prism: return AuthoredSprites.sphynxTailPoses
+        case .nimbus: return AuthoredSprites.birdTailPoses
+        case .lumen: return nil
+        }
+    }
+
+    /// The tail overlay for the current quantized pose (renderer/consumer).
+    static func tailOverlay(_ archetype: Archetype, pose: Int) -> [CellDiff] {
+        guard pose != 0, let poses = tailPoses(archetype) else { return [] }
+        return poses[pose] ?? []
     }
 
     /// True when the cell is inside the face rect (E7 hit routing).

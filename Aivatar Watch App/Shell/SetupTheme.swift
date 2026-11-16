@@ -88,6 +88,53 @@ nonisolated enum SetupTheme {
     static func iconDisc(for archetype: Archetype, selected: Bool = false, size: CGFloat = 64) -> some View {
         SetupIconDisc(archetype: archetype, selected: selected, size: size)
     }
+
+    /// AMS v2 (v43): the PORTRAIT disc — the HD pet cut in the glow-disc
+    /// chrome (soft accent halo, static by contract: no surface animates
+    /// the HD art). Falls back to the pixel icon disc when the portrait
+    /// asset does not resolve (lumen, older installs).
+    static func portraitDisc(for archetype: Archetype, selected: Bool = false, size: CGFloat = 64) -> some View {
+        SetupPortraitDisc(archetype: archetype, selected: selected, size: size)
+    }
+}
+
+/// The portrait-disc hero (AMS v2): the HD cut on the same glow-disc
+/// language as the pixel icon disc — identity chrome, never a stage.
+struct SetupPortraitDisc: View {
+    let archetype: Archetype
+    var selected: Bool
+    var size: CGFloat
+
+    var body: some View {
+        let accent = SetupTheme.accent(for: archetype)
+        ZStack {
+            Circle()
+                .fill(accent.opacity(0.12))
+                .frame(width: size, height: size)
+            if let portrait = PetImageRender.portraitImage(AuthoredSprites.sprite(for: archetype)) {
+                Image(uiImage: portrait)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .frame(width: size * 0.82, height: size * 0.82)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.white.opacity(0.10), lineWidth: 0.5))
+            } else {
+                SetupIconDisc(archetype: archetype, selected: false, size: size * 0.82)
+            }
+            if selected {
+                Circle()
+                    .stroke(accent, lineWidth: 2.5)
+                    .frame(width: size, height: size)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: size * 0.28))
+                    .foregroundStyle(accent)
+                    .background(Circle().fill(Color.black))
+                    .offset(x: size * 0.32, y: size * 0.32)
+            }
+        }
+        .frame(width: size, height: size)
+    }
 }
 
 /// The glow-disc hero as a real view so it can read Reduce Motion (v30).

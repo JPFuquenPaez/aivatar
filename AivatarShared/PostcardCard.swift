@@ -18,8 +18,13 @@ nonisolated enum PostcardCard {
     static let iconScale = 12
 
     /// Renders the card. `iconPNG` is the companion's icon PNG from the shared
-    /// container (nil = pawprint-less plain black card with just the caption).
-    static func render(iconPNG: Data?, title: String, subtitle: String) -> CGImage? {
+    /// container (nil = plain black card with just the iso tile + caption).
+    /// AMS v2 (v43): `portraitPNG` — the HD pet cut — is preferred on the
+    /// card front when the caller can supply it ("a photo of your companion");
+    /// the grid icon remains the pixel-honest fallback. The portrait never
+    /// animates anywhere (§5.6).
+    static func render(iconPNG: Data?, title: String, subtitle: String,
+                       portraitPNG: Data? = nil) -> CGImage? {
         let size = canvasSize
         let ctx = CGContext(
             data: nil, width: size, height: size, bitsPerComponent: 8,
@@ -34,7 +39,24 @@ nonisolated enum PostcardCard {
         // max 52% height), not a fixed factor, so any icon size composes.
         // (The context is y-up; rects are computed y-down then converted.)
         var iconBottomYDown: CGFloat = CGFloat(size) * 0.33 + CGFloat(size) * 0.26
-        if let iconPNG,
+        if let portraitPNG,
+           let source = CGImageSourceCreateWithData(portraitPNG as CFData, nil),
+           let portrait = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+            // The HD portrait, smooth-interpolated, fit into the hero slot.
+            let maxW = CGFloat(size) * 0.72, maxH = CGFloat(size) * 0.50
+            let scale = min(maxW / CGFloat(portrait.width), maxH / CGFloat(portrait.height))
+            let w = CGFloat(portrait.width) * scale, h = CGFloat(portrait.height) * scale
+            let centerYDown = CGFloat(size) * 0.33
+            let topYDown = centerYDown - h / 2
+            let rect = CGRect(x: (CGFloat(size) - w) / 2,
+                              y: CGFloat(size) - topYDown - h,
+                              width: w, height: h)
+            ctx.interpolationQuality = .high
+            ctx.draw(portrait, in: rect)
+            iconBottomYDown = topYDown + h
+            drawIsoTile(ctx: ctx, topYDown: iconBottomYDown + CGFloat(size) * 0.025,
+                        width: w * 0.92, size: size)
+        } else if let iconPNG,
            let source = CGImageSourceCreateWithData(iconPNG as CFData, nil),
            let icon = CGImageSourceCreateImageAtIndex(source, 0, nil) {
             let maxW = CGFloat(size) * 0.80, maxH = CGFloat(size) * 0.52
@@ -66,8 +88,10 @@ nonisolated enum PostcardCard {
     }
 
     /// PNG bytes of the card (ImageIO), ready for a share sheet.
-    static func pngData(iconPNG: Data?, title: String, subtitle: String) -> Data? {
-        guard let image = render(iconPNG: iconPNG, title: title, subtitle: subtitle) else { return nil }
+    static func pngData(iconPNG: Data?, title: String, subtitle: String,
+                        portraitPNG: Data? = nil) -> Data? {
+        guard let image = render(iconPNG: iconPNG, title: title, subtitle: subtitle,
+                                 portraitPNG: portraitPNG) else { return nil }
         let data = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else { return nil }
         CGImageDestinationAddImage(dest, image, nil)

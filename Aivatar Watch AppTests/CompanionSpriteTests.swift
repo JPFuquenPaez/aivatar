@@ -96,11 +96,14 @@ final class CompanionSpriteTests: XCTestCase {
             // pet grids (HD image-backed); lumen keeps its authored grid.
             // Re-pinned v41: cuts now include the legs/paws (platform removed
             // by color, not by row band).
-            .ember: 15_372_849_707_682_877_320,
-            .willow: 8_363_715_098_910_483_911,
-            .compass: 11_677_586_957_638_007_877,
-            .prism: 6_394_448_247_842_795_144,
-            .nimbus: 2_448_921_687_502_174_694,
+            // Re-pinned v43 (AMS v2): the five pets are HAND-AUTHORED grids
+            // again (patch grammar restored, lumen-style); the auto-
+            // downsampled v40 grids are retired.
+            .ember: 8_596_436_825_775_369_926,
+            .willow: 3_165_097_965_075_710_588,
+            .compass: 15_519_214_058_480_497_629,
+            .prism: 11_051_880_517_478_910_899,
+            .nimbus: 7_594_927_116_320_155_161,
             .lumen: 15_613_248_097_422_517_119,
         ]
         var actual: [Archetype: UInt64] = [:]
@@ -129,10 +132,6 @@ final class CompanionSpriteTests: XCTestCase {
         // SpriteFixTests.testImageBackedTransformsCoverEveryFrame.
         for archetype in Archetype.allCases {
             let sprite = AuthoredSprites.sprite(for: archetype)
-            if sprite.isImageBacked {
-                XCTAssertTrue(sprite.patches.isEmpty, "\(archetype.rawValue): image-backed sprite has no cell patches")
-                continue
-            }
             for (frameID, patch) in sprite.patches {
                 XCTAssertLessThan(patch.count, 13, "\(archetype.rawValue)/\(frameID): patch too big")
                 if frameID == "blink" {
@@ -169,12 +168,6 @@ final class CompanionSpriteTests: XCTestCase {
         // v40: image-backed pets have no catchlight cells; their blink is
         // the transform squash (scaleY 0.90), pinned in SpriteFixTests.
         for archetype in Archetype.allCases {
-            let sprite = AuthoredSprites.sprite(for: archetype)
-            if sprite.isImageBacked {
-                XCTAssertLessThan(PetMotion.act("blink", 1).scaleY, 1.0,
-                                  "\(archetype.rawValue): image-backed blink squashes (envelope)")
-                continue
-            }
             let idle = symbols(archetype, frameID: "idle")
             let blink = symbols(archetype, frameID: "blink")
             func count(_ grid: [[Character]], _ symbol: Character) -> Int {
@@ -192,12 +185,6 @@ final class CompanionSpriteTests: XCTestCase {
         // accent/ink change somewhere on the face), never just idle.
         // v40: image-backed pets express happy as a transform (lift + tilt).
         for archetype in Archetype.allCases {
-            let sprite = AuthoredSprites.sprite(for: archetype)
-            if sprite.isImageBacked {
-                XCTAssertNotEqual(PetMotion.act("happy", 2), .identity,
-                                  "\(archetype.rawValue): image-backed happy must move (envelope)")
-                continue
-            }
             let idle = symbols(archetype, frameID: "idle")
             let happy = symbols(archetype, frameID: "happy")
             var diff = 0
@@ -216,9 +203,6 @@ final class CompanionSpriteTests: XCTestCase {
         // the block. Assert: every idle grid has >= 1 'W' catchlight and
         // >= 2 ink cells adjacent to it.
         for archetype in Archetype.allCases {
-            // v40: image-backed pets carry the real face in the HD art; the
-            // grid eye-style rule applies to authored grids only.
-            if AuthoredSprites.sprite(for: archetype).isImageBacked { continue }
             let grid = symbols(archetype, frameID: "idle")
             var catchlights = 0
             for y in 0..<(CompanionSprite.gridHeight - 1) {

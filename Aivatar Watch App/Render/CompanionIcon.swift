@@ -29,13 +29,11 @@ nonisolated enum CompanionIcon {
     }
     private static let cache = Cache()
 
-    /// SwiftUI image for the picker. v40: HD pet icons interpolate smoothly
-    /// (they are no longer pixel art); authored grids stay nearest-neighbor.
+    /// SwiftUI image for the picker (grid render, nearest-neighbor always).
     static func image(for archetype: Archetype) -> Image? {
         guard let cg = cgImage(for: archetype) else { return nil }
-        let sprite = AuthoredSprites.sprite(for: archetype)
         return Image(decorative: cg, scale: 1)
-            .interpolation(sprite.isImageBacked ? .high : .none)
+            .interpolation(.none)
     }
 
     /// The rendered icon, built once per process and cached.
@@ -59,11 +57,6 @@ nonisolated enum CompanionIcon {
         let sprite = AuthoredSprites.sprite(for: archetype)
         let w = CompanionSprite.gridWidth * cellScale
         let h = CompanionSprite.gridHeight * cellScale
-        // v40: image-backed companions icon with the HD pet itself
-        // (downscaled into the 20x15 cell box above the tile rows).
-        if sprite.isImageBacked, let img = PetImageRender.uiImage(sprite) {
-            return imageBackedBytes(img, sprite: sprite, state: state, w: w, h: h)
-        }
         let grid = sprite.symbols(frameID: "idle")
         var pixels = [UInt8](repeating: 0, count: w * h * 4)
         for y in 0..<CompanionSprite.gridHeight {
@@ -149,20 +142,13 @@ nonisolated enum CompanionIcon {
         return data as Data
     }
 
-    /// One frame of a companion as a CGImage: the HD pet posed with
-    /// `pose` for image-backed sprites (animated postcard), else the symbol
-    /// grid (authored sprites). v40/v42.
+    /// One frame of a companion as a CGImage: the authored grid, posed by
+    /// its patch (postcard frames) with overlay cells composed on top.
+    /// AMS v2: the postcard moment is the authored grid — portraits never
+    /// animate (v43).
     static func cgImage(for archetype: Archetype, frameID: String = "idle",
-                        pose: PetMotion.Pose = .identity,
                         overlay: [CompanionSprite.CellDiff] = []) -> CGImage? {
         let sprite = AuthoredSprites.sprite(for: archetype)
-        if sprite.isImageBacked, let img = PetImageRender.uiImage(sprite) {
-            let w = CompanionSprite.gridWidth * cellScale
-            let h = CompanionSprite.gridHeight * cellScale
-            let bytes = imageBackedBytes(img, sprite: sprite, state: .awake, w: w, h: h,
-                                         pose: pose, overlay: overlay)
-            return cgImage(from: bytes, w: w, h: h)
-        }
         return cgImage(for: archetype, grid: sprite.symbols(frameID: frameID, overlay: overlay))
     }
 
@@ -178,99 +164,6 @@ nonisolated enum CompanionIcon {
             provider: provider, decode: nil,
             shouldInterpolate: false, intent: .defaultIntent
         )
-    }
-
-    /// v40/v42: renders the pet image into the 60x54 icon buffer, posed with
-    /// `pose` (the postcard plays the same continuous motion as the stage).
-    /// Awake =
-    /// full color on transparency; asleep = the rest-LOD dim (matches the
-    /// stage: black 0.78 over the art); event = the empty cells flash in
-    /// the companion's accent (legible on every family, same contract as
-    /// the grid path's uniform flash). The frame transform animates the pet
-    /// around the bottom-center anchor of the 20x15 cell box (CG is y-up:
-    /// the box occupies the TOP of the buffer, anchor at its bottom edge).
-    private static func imageBackedBytes(_ img: UIImage, sprite: CompanionSprite,
-                                         state: IconState, w: Int, h: Int,
-                                         pose: PetMotion.Pose = .identity,
-                                         overlay: [CompanionSprite.CellDiff] = []) -> [UInt8] {
-        var pixels = [UInt8](repeating: 0, count: w * h * 4)
-        guard let ctx = CGContext(data: &pixels, width: w, height: h, bitsPerComponent: 8,
-                                  bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
-              let cg = img.cgImage else { return pixels }
-        if state == .event {
-            let rgb = CompanionSprite.hexToRGB(sprite.uiAccentHex)
-            ctx.setFillColor(CGColor(red: CGFloat(rgb.r) / 255, green: CGFloat(rgb.g) / 255,
-                                     blue: CGFloat(rgb.b) / 255, alpha: 1))
-            ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
-        }
-        let cell = CGFloat(w) / CGFloat(CompanionSprite.gridWidth)
-        let boxH = CGFloat(PetImageRender.imageBoxRows) * cell
-        let scale = min(CGFloat(w) / CGFloat(cg.width), boxH / CGFloat(cg.height))
-        let dw = CGFloat(cg.width) * scale, dh = CGFloat(cg.height) * scale
-        // y-up anchor: bottom-center of the 20x15 box = (w/2, h - boxH).
-        // The rect's bottom-center is (dw/2, 0) in y-up coords.
-        let anchorX = CGFloat(w) / 2, anchorY = CGFloat(h) - boxH
-        var tr = CGAffineTransform.identity
-            .translatedBy(x: anchorX + CGFloat(pose.dx) * cell, y: anchorY + CGFloat(pose.dy) * cell)
-            .rotated(by: CGFloat(pose.rotation))
-            .scaledBy(x: CGFloat(pose.scaleX), y: CGFloat(pose.scaleY))
-            .translatedBy(x: -dw / 2, y: 0)
-        let rect = CGRect(origin: .zero, size: CGSize(width: dw, height: dh)).applying(tr)
-        ctx.interpolationQuality = .high
-        ctx.draw(cg, in: rect)
-        // Puppet regions (head/tail) redrawn on top, like the live stage.
-        if let tail = sprite.puppetTail {
-            drawRegionCG(ctx: ctx, cg: cg, sprite: sprite, region: tail,
-                         base: rect, anchorBase: CGPoint(x: anchorX, y: anchorY),
-                         rotation: pose.tailWag, bobCells: 0, cell: cell)
-        }
-        if let head = sprite.puppetHead {
-            drawRegionCG(ctx: ctx, cg: cg, sprite: sprite, region: head,
-                         base: rect, anchorBase: CGPoint(x: anchorX, y: anchorY),
-                         rotation: pose.headTilt, bobCells: pose.headBob, cell: cell)
-        }
-        if state == .asleep {
-            ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 0.78))
-            ctx.fill(rect)
-        }
-        // Overlay cells (blush/stamp/week grid) at their grid rects, y-up.
-        for d in overlay {
-            guard d.x >= 0, d.x < CompanionSprite.gridWidth,
-                  d.y >= 0, d.y < CompanionSprite.gridHeight,
-                  let hex = sprite.paletteHex[d.symbol] else { continue }
-            let rgb = CompanionSprite.hexToRGB(hex)
-            ctx.setFillColor(CGColor(red: CGFloat(rgb.r) / 255, green: CGFloat(rgb.g) / 255,
-                                     blue: CGFloat(rgb.b) / 255, alpha: CGFloat(d.alpha)))
-            ctx.fill(CGRect(x: CGFloat(d.x) * cell, y: CGFloat(h) - CGFloat(d.y + 1) * cell,
-                            width: cell, height: cell))
-        }
-        return pixels
-    }
-
-    /// v42: draws one puppeteered region (cropped from the pet CGImage) at
-    /// its rect inside the posed image `base`, rotated around its anchor.
-    /// CG is y-up; region rects are normalized y-down, so flip the crop.
-    private static func drawRegionCG(ctx: CGContext, cg: CGImage, sprite: CompanionSprite,
-                                     region: CompanionSprite.PuppetRegion,
-                                     base: CGRect, anchorBase: CGPoint,
-                                     rotation: Double, bobCells: Double, cell: CGFloat) {
-        let iw = CGFloat(cg.width), ih = CGFloat(cg.height)
-        let src = CGRect(x: region.rect.minX * iw, y: (1 - region.rect.maxY) * ih,
-                         width: region.rect.width * iw, height: region.rect.height * ih)
-        guard let cropped = cg.cropping(to: src) else { return }
-        let cellH = base.height / CGFloat(PetImageRender.imageBoxRows)
-        let destBase = CGRect(x: base.minX + region.rect.minX * base.width,
-                              y: base.minY + (1 - region.rect.maxY) * base.height + CGFloat(bobCells) * cellH,
-                              width: region.rect.width * base.width,
-                              height: region.rect.height * base.height)
-        let anchor = CGPoint(x: base.minX + region.anchor.x * base.width,
-                             y: base.minY + (1 - region.anchor.y) * base.height)
-        var tr = CGAffineTransform(translationX: anchor.x, y: anchor.y)
-            .rotated(by: CGFloat(rotation))
-            .translatedBy(x: -anchor.x, y: -anchor.y)
-        ctx.interpolationQuality = .high
-        ctx.draw(cropped, in: destBase.applying(tr))
     }
 
     private static func render(_ archetype: Archetype, state: IconState = .awake) -> CGImage? {

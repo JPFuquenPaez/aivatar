@@ -98,15 +98,16 @@ struct CompanionPickerView: View {
                 : min(geometry.size.height * (compact ? 0.26 : 0.34), compact ? 64 : 96)
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
-                // E2 "Meet them": the hero is the LIVING animal (preview
-                // director on a distinct seed stream). Accessibility type
-                // sizes keep the static clamped disc so type never competes
-                // with motion.
+                // AMS v2 (v43) "Meet them": the hero is the HD PORTRAIT in
+                // the glow-disc chrome — identity art while choosing ("a
+                // photo of your companion"); the living companion is the
+                // authored grid on the stage you get after choosing. AX
+                // type sizes clamp it to the small disc.
                 Group {
                     if dynamicTypeSize.isAccessibilitySize {
                         SetupTheme.iconDisc(for: archetype, selected: isSelected, size: hero)
                     } else {
-                        LiveCompanionPreviewView(archetype: archetype, size: hero, selected: isSelected, page: page)
+                        SetupTheme.portraitDisc(for: archetype, selected: isSelected, size: hero)
                     }
                 }
                 .padding(.bottom, compact ? 8 : 14)

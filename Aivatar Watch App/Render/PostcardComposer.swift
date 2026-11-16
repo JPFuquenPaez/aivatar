@@ -120,15 +120,14 @@ nonisolated enum PostcardComposer {
         return frameSpecs(inputs).map { sprite.symbols(frameID: $0.frameID, overlay: $0.overlay) }
     }
 
-    /// v40/v42: the card's frames as rendered images — image-backed
-    /// companions play the HD pet with the SAME continuous PetMotion pose
-    /// as the live stage (the postcard is alive, bit-exact per inputs).
+    /// v43 (AMS v2): the card's animated moment is the AUTHORED GRID — the
+    /// same patches the stage plays, rendered through the icon grid path.
+    /// The HD portrait may sit on the card front (PostcardCard), but never
+    /// animates: identical inputs -> identical images, bit-exact.
     static func frameImages(_ inputs: PostcardInputs) -> [CGImage] {
         let archetype = Archetype(rawValue: inputs.archetypeRaw) ?? .ember
         return frameSpecs(inputs).compactMap { spec in
-            let pose = PetMotion.pose(frameID: spec.frameID, frameAge: spec.frameAge,
-                                      tick: spec.tick, seed: inputs.seed)
-            return CompanionIcon.cgImage(for: archetype, frameID: spec.frameID, pose: pose, overlay: spec.overlay)
+            CompanionIcon.cgImage(for: archetype, frameID: spec.frameID, overlay: spec.overlay)
         }
     }
 

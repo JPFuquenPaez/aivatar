@@ -135,33 +135,22 @@ nonisolated final class SpriteDirector {
         return Float(Self.mementoDepositTicks - mementoDepositTicksLeft + 1) / Float(Self.mementoDepositTicks)
     }
 
-    // MARK: - Preview mode (Aivatar 2.0, E2 "Meet them" live picker)
+    // MARK: - AMS v2 tail part (LPR)
 
-    /// Preview configuration (the picker): the animal is *meeting you*, not
-    /// performing — blink λ x 0.7, glance rate x 0.5, motes/yawn/lonely-poke
-    /// off, mood pinned calm, life floor on. Dwell >= 8 ticks (1.2 s) of
-    /// continuous presence schedules exactly ONE owner quirk per page visit.
-    var previewMode = false
-    private var previewDwellTicks = 0
-    private var previewQuirkDone = false
-    /// Preview dwell threshold in ticks (8 ticks = 1.2 s).
-    static let previewQuirkDwellTicks = 8
-
-    /// Page change in the picker: the dwell counter resets and the quirk
-    /// re-arms (at most one quirk per page visit).
-    func resetPreviewDwell() {
-        previewDwellTicks = 0
-        previewQuirkDone = false
-    }
-
-    private func stepPreview() {
-        guard queue.isEmpty else { return }
-        previewDwellTicks += 1
-        if previewDwellTicks >= Self.previewQuirkDwellTicks,
-           !previewQuirkDone, mode == .full {
-            previewQuirkDone = true
-            play(.quirk)  // the owner's signature move, once per page visit
-        }
+    /// The ambient tail channel: PetMotion proposes, CellQuantizer steps
+    /// (>= 2-tick holds), and the selected authored pose renders as overlay
+    /// diffs (SpriteStageMetadata.tailOverlay). A dedicated SplitMix64
+    /// stream keeps the act-schedule goldens unchanged. One focal story:
+    /// no wags while a quirk owns the tail, during a breath session, under
+    /// Reduce Motion L2, or during a vapor puff.
+    private var tailChannel: TailChannel
+    private let tailWagTicksPerMinute: Float = 60.0 / 0.15
+    private let tailTempoScale: Float
+    /// The current quantized tail pose (-1 tailL, 0 neutral, +1 tailR).
+    var tailPose: Int { tailChannel.pose }
+    /// The tail overlay diffs for the current pose (empty when neutral / lumen).
+    var tailOverlayCells: [CompanionSprite.CellDiff] {
+        SpriteStageMetadata.tailOverlay(archetype, pose: tailChannel.pose)
     }
 
     private var rng: SeededRandom
@@ -278,6 +267,8 @@ nonisolated final class SpriteDirector {
         nextMoteTick = 140 + rng.nextInt(160)
         vaporRng = SeededRandom(seed ^ 0xFAE2_B04D)
         vaporNextTick = 80 + vaporRng.nextInt(120)
+        tailChannel = TailChannel(seed: seed)
+        tailTempoScale = profile.motionProfile.tempoScale
     }
 
     // MARK: - Reading state
@@ -308,11 +299,19 @@ nonisolated final class SpriteDirector {
         if resting { return }
         if vaporOnTicksLeft > 0 { vaporOnTicksLeft -= 1 }  // E9.2 puff lifetime
         if blushTicksLeft > 0 { blushTicksLeft -= 1 }      // E7 flush lifetime
+        // AMS v2 tail part (LPR): the ambient wag steps every tick from its
+        // dedicated stream; suppressed while a quirk owns the tail, during a
+        // breath session, a vapor puff, or under Reduce Motion L2 (one focal
+        // story, G2). The quantizer guarantees >= 2-tick holds and
+        // re-convergence to neutral.
+        let tailOwnedByAct = queue.contains { $0.frame == "quirk" }
+        _ = tailChannel.step(
+            modeAllows: mode == .full && !sessionMode && !vaporActive && !tailOwnedByAct,
+            ticksPerMinute: tailWagTicksPerMinute,
+            tempoScale: tailTempoScale)
         // E8 session grammar runs instead of the idle schedule entirely.
         if sessionMode { stepSession(); return }
-        // E2 preview: mood pinned calm, no motes/yawn/lonely; the dwell quirk
-        // replaces the random quirk draw.
-        if previewMode { stepPreview() } else { updateMoodAndAutonomy() }
+        updateMoodAndAutonomy()
         if !queue.isEmpty {
             queue[0].ticks -= 1
             if queue[0].ticks <= 0 { queue.removeFirst() }
@@ -327,10 +326,10 @@ nonisolated final class SpriteDirector {
             play(ceremony.act)
             return
         }
-        // E9.2 vapor scheduling: cold class only, awake + full mode, no
-        // session/preview, queue free. On 3 ticks, then hidden
-        // >= 33 ticks (gap drawn from the dedicated vapor stream).
-        if mode == .full, !sessionMode, !previewMode,
+        // E9.2 vapor scheduling: cold class only, awake + full mode, queue
+        // free. On 3 ticks, then hidden >= 33 ticks (gap drawn from the
+        // dedicated vapor stream).
+        if mode == .full, !sessionMode,
            condition == .cold, queue.isEmpty,
            vaporOnTicksLeft == 0, tick >= vaporNextTick {
             vaporOnTicksLeft = Self.vaporOnTicks
@@ -339,9 +338,8 @@ nonisolated final class SpriteDirector {
         // Idle schedule (draw order fixed: blink, glance, quirk, flick). A
         // firing act preempts the floor frame; draws only run on idle ticks.
         scheduledIdle = scheduledIdleFrame()
-        // E2 preview: blink λ x 0.7, glance rate x 0.5.
-        let effBlinkP = previewMode ? blinkP * 0.7 : blinkP
-        let effGlanceP = previewMode ? glanceP * 0.5 : glanceP
+        let effBlinkP = blinkP
+        let effGlanceP = glanceP
         // v16 F1: bond biases the idle schedule — higher bond, more signature
         // quirks, fewer glances away (the companion looks at you more).
         let glanceMul: Float = (mood == .bored ? 2 : (mood == .lonely ? 0.3 : 1))
@@ -371,7 +369,7 @@ nonisolated final class SpriteDirector {
                 play(.look, direction: direction)
             }
             actCount += 1
-        } else if mode == .full, !previewMode, !vaporActive,
+        } else if mode == .full, !vaporActive,
                   rng.nextFloat() < eventP * eventMul {
             play(.quirk)
             actCount += 1

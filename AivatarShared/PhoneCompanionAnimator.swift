@@ -20,6 +20,15 @@ nonisolated final class PhoneCompanionAnimator: @unchecked Sendable {
     private(set) var currentFrame = "idle"
     /// Ticks the current frame has been showing (act envelopes key on this).
     private(set) var frameAge = 0
+    /// AMS v2 (v43): the ambient tail channel — the same PetMotion envelope
+    /// -> CellQuantizer -> authored pose path as the watch stage, on its own
+    /// stream, so the phone's companion wags the same way (deterministic per
+    /// archetype seed).
+    private var tailChannel: TailChannel
+    var tailPose: Int { tailChannel.pose }
+    var tailOverlayCells: [CompanionSprite.CellDiff] {
+        SpriteStageMetadata.tailOverlay(archetype, pose: tailChannel.pose)
+    }
     /// The animator's dedicated stream seed (PetMotion pose phases derive from it).
     var seed: UInt64 { Self.phoneSeed(archetype) }
 
@@ -34,6 +43,7 @@ nonisolated final class PhoneCompanionAnimator: @unchecked Sendable {
         self.archetype = archetype
         self.presence = presence
         self.rng = SeededRandom(Self.phoneSeed(archetype))
+        self.tailChannel = TailChannel(seed: Self.phoneSeed(archetype))
     }
 
     /// Advances the clock to `target` ticks (idempotent).
@@ -49,6 +59,10 @@ nonisolated final class PhoneCompanionAnimator: @unchecked Sendable {
     }
 
     private func stepBody() {
+        // AMS v2: the tail part steps every tick — awake + alive only
+        // (asleep and events stay calm; Random Motion freezes upstream).
+        _ = tailChannel.step(modeAllows: presence == .awake,
+                             ticksPerMinute: 400, tempoScale: 1)
         // Asleep: the rest face with a slow blink only.
         if presence == .asleep {
             if queue.isEmpty {

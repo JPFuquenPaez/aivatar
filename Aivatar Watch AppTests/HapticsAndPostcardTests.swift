@@ -63,37 +63,8 @@ final class HapticsAndPostcardTests: XCTestCase {
                        bondLevel: 3, dayCount: 23, streakDays: 5, weatherClassRaw: "rain")
     }
 
-    /// v40: FNV-1a over the rendered frame images (image-backed pets animate
-    /// via transforms, so the pixel hashes are the meaningful pins for them).
-    private func imageHashes(_ inputs: PostcardInputs) -> [UInt64] {
-        PostcardComposer.frameImages(inputs).map { img in
-            var h: UInt64 = 0xcbf29ce484222325
-            if let data = img.dataProvider?.data, let ptr = CFDataGetBytePtr(data) {
-                let n = CFDataGetLength(data)
-                for i in 0..<n {
-                    h ^= UInt64(ptr[i])
-                    h = h &* 0x100000001b3
-                }
-            }
-            return h
-        }
-    }
-
     func testPostcardFramesAreDeterministicPerSeed() {
         for archetype in Archetype.allCases {
-            if AuthoredSprites.sprite(for: archetype).isImageBacked {
-                // v40: HD pets — the rendered image frames carry the motion.
-                let a = imageHashes(inputs(archetype))
-                let b = imageHashes(inputs(archetype))
-                XCTAssertEqual(a, b, "\(archetype.rawValue): same inputs -> same image frames")
-                XCTAssertEqual(a.count, PostcardComposer.frameCount)
-                let c = imageHashes(inputs(archetype, seed: 999))
-                XCTAssertNotEqual(a, c, "\(archetype.rawValue): different seed, different card")
-                // The grid fallback stays deterministic as well.
-                XCTAssertEqual(PostcardComposer.frameHashes(inputs(archetype)),
-                               PostcardComposer.frameHashes(inputs(archetype)))
-                continue
-            }
             let a = PostcardComposer.frameHashes(inputs(archetype))
             let b = PostcardComposer.frameHashes(inputs(archetype))
             XCTAssertEqual(a, b, "\(archetype.rawValue): same inputs -> same hashes")
@@ -114,11 +85,12 @@ final class HapticsAndPostcardTests: XCTestCase {
             // first frames are unchanged.
             // Re-pinned v40: pet downsample grids (image-backed companions).
             // Re-pinned v41: complete pet cuts (legs included).
-            .ember: 15_372_849_707_682_877_320,
-            .willow: 13_042_637_692_457_985_637,
-            .compass: 6_493_603_783_392_441_931,
-            .prism: 6_394_448_247_842_795_144,
-            .nimbus: 2_448_921_687_502_174_694,
+            // Re-pinned v43 (AMS v2): hand-authored grids + restored patches.
+            .ember: 6_869_640_515_071_700_998,
+            .willow: 2_738_666_425_771_914_526,
+            .compass: 652_045_976_902_692_158,
+            .prism: 5_934_566_669_287_846_895,
+            .nimbus: 12_457_843_435_727_514_617,
             .lumen: 1_557_286_761_931_598_275,
         ]
         var recorded: [String] = []

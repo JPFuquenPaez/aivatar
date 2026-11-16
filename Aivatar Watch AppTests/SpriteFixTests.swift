@@ -12,90 +12,154 @@ final class SpriteFixTests: XCTestCase {
         AuthoredSprites.sprite(for: archetype).symbols(frameID: frameID)
     }
 
-    // MARK: - v40 HD pets
+    // MARK: - AMS v2 (v43)
 
-    /// The five companions are image-backed (avatars/ sheet cuts): they own
-    /// an asset name, a vivid UI accent override, no cell patches, and a
-    /// non-identity transform for every non-idle frame (motion is a pure
-    /// function of the frameID — the director clock stays the only input).
-    func testImageBackedSpritesAreWired() {
-        let expectedAssets: [Archetype: String] = [
+    /// Two skins, one animal (§5.6): the five pets carry their HD PORTRAIT
+    /// asset + the family accent; lumen (grid-only) carries neither. No
+    /// surface animates the portrait — the stage renders the authored grid.
+    func testPortraitAssetsAreWired() {
+        let expected: [Archetype: String] = [
             .ember: "pet-fox", .willow: "pet-shiba", .compass: "pet-corgi",
             .prism: "pet-sphynx", .nimbus: "pet-mockingbird",
         ]
-        for (archetype, asset) in expectedAssets {
+        for (archetype, asset) in expected {
             let sprite = AuthoredSprites.sprite(for: archetype)
-            XCTAssertTrue(sprite.isImageBacked, "\(archetype.rawValue): image-backed")
-            XCTAssertEqual(sprite.imageAssetName, asset)
+            XCTAssertTrue(sprite.hasPortrait, "\(archetype.rawValue): portrait wired")
+            XCTAssertEqual(sprite.portraitAssetName, asset)
             XCTAssertNotNil(sprite.accentHexOverride, "\(archetype.rawValue): vivid accent override")
             XCTAssertEqual(sprite.uiAccentHex, sprite.accentHexOverride)
-            XCTAssertTrue(sprite.patches.isEmpty, "\(archetype.rawValue): no cell patches on HD art")
+            XCTAssertFalse(sprite.patches.isEmpty, "\(archetype.rawValue): authored patch grammar restored")
         }
-        XCTAssertFalse(AuthoredSprites.sprite(for: .lumen).isImageBacked, "lumen stays an authored grid")
+        XCTAssertFalse(AuthoredSprites.sprite(for: .lumen).hasPortrait, "lumen stays a grid-only sprite")
+        XCTAssertNil(AuthoredSprites.sprite(for: .lumen).portraitAssetName)
     }
 
-    /// v42: every non-idle act is a real ENVELOPE (non-identity at some age
-    /// 1...6), and the ambient layer is non-static but bounded — continuous
-    /// life, never a snap or a runaway.
-    func testImageBackedActEnvelopesCoverEveryFrame() {
-        let frameIDs = ["blink", "sleepy", "happy", "glanceL", "glanceR",
-                        "quirk", "perk", "breathe", "idleA", "idleB", "yawn"]
-        for id in frameIDs {
-            let moving = (1...6).contains { age in PetMotion.act(id, age) != .identity }
-            XCTAssertTrue(moving, "\(id): act envelope must move at some age")
-        }
-        // Ambient: bounded amplitude, non-zero (the animal is never a still).
-        for seed: UInt64 in [1, 20261010, 999] {
-            var maxRot = 0.0, maxDx = 0.0, maxWag = 0.0
-            var anyMotion = false
-            for tick in 0..<500 {
-                let p = PetMotion.ambient(tick, seed: seed)
-                maxRot = max(maxRot, abs(p.rotation))
-                maxDx = max(maxDx, abs(p.dx))
-                maxWag = max(maxWag, abs(p.tailWag))
-                if p != .identity { anyMotion = true }
-            }
-            XCTAssertTrue(anyMotion, "ambient must move")
-            XCTAssertLessThan(maxRot, 0.05, "sway stays subtle")
-            XCTAssertLessThan(maxDx, 0.5, "drift stays on the tile")
-            XCTAssertLessThan(maxWag, 0.25, "wag stays subtle")
-        }
-        // Determinism: same (frameID, age, tick, seed) -> same pose.
-        XCTAssertEqual(PetMotion.pose(frameID: "quirk", frameAge: 3, tick: 120, seed: 42),
-                       PetMotion.pose(frameID: "quirk", frameAge: 3, tick: 120, seed: 42))
-        // Non-repeating: the FULL ambient pose takes many distinct values over
-        // an hour of ticks. (Each layer has an integer period, but the periods
-        // are coprime, so the combined pose's period is ~1.2e9 ticks — no
-        // visible loop.)
-        func hash(_ p: PetMotion.Pose) -> Int {
-            var h = 0
-            for v in [p.dx, p.dy, p.scaleX, p.scaleY, p.rotation, p.headTilt, p.headBob, p.tailWag] {
-                h = h &* 31 &+ Int(v * 1_000_000)
-            }
-            return h
-        }
-        let poses = Set((0..<24000).map { hash(PetMotion.ambient($0, seed: 7)) })
-        XCTAssertGreaterThan(poses.count, 1000, "ambient motion must not loop visibly")
-    }
-
-    /// v42: the five HD pets carry puppet regions (head + tail) inside the
-    /// image bounds; the grid-authored lumen has none.
-    func testPuppetRegionsAreWiredPerPet() throws {
+    /// The face is the avatar (§5.4): every one of the six companions owns
+    /// the uniform eye style in its IDLE grid — a W catchlight with ink to
+    /// its right and below-right.
+    func testFaceStyleHoldsAcrossAllSix() {
         for archetype in Archetype.allCases {
-            let sprite = AuthoredSprites.sprite(for: archetype)
-            if sprite.isImageBacked {
-                for region in [sprite.puppetHead, sprite.puppetTail] {
-                    let r = try XCTUnwrap(region, "\(archetype.rawValue): puppet region missing")
-                    XCTAssertTrue(r.rect.minX >= 0 && r.rect.maxX <= 1 && r.rect.minY >= 0 && r.rect.maxY <= 1,
-                                  "\(archetype.rawValue): region rect inside the image")
-                    XCTAssertTrue(r.anchor.x >= 0 && r.anchor.x <= 1 && r.anchor.y >= 0 && r.anchor.y <= 1,
-                                  "\(archetype.rawValue): anchor inside the image")
+            let grid = AuthoredSprites.sprite(for: archetype).symbols(frameID: "idle")
+            var catchlights = 0
+            for y in 0..<(CompanionSprite.gridHeight - 1) {
+                for x in 0..<(CompanionSprite.gridWidth - 1) {
+                    if grid[y][x] == "W" && grid[y][x + 1] == "K" && grid[y + 1][x + 1] == "K" {
+                        catchlights += 1
+                    }
                 }
-            } else {
-                XCTAssertNil(sprite.puppetHead)
-                XCTAssertNil(sprite.puppetTail)
+            }
+            XCTAssertGreaterThanOrEqual(catchlights, 1,
+                "\(archetype.rawValue): the shared eye style (W catchlight + K pupil)")
+        }
+    }
+
+    /// CellQuantizer (§5.3): the pixel-honesty gate — floor, hold, step
+    /// economy, determinism.
+    func testCellQuantizerRules() {
+        // Rule 1 — cell floor: sub-cell proposals are deleted, not rounded.
+        XCTAssertEqual(CellQuantizer.quantizedTarget(0.0), 0)
+        XCTAssertEqual(CellQuantizer.quantizedTarget(0.9), 0)
+        XCTAssertEqual(CellQuantizer.quantizedTarget(-0.99), 0)
+        XCTAssertEqual(CellQuantizer.quantizedTarget(1.0), 1)
+        XCTAssertEqual(CellQuantizer.quantizedTarget(-1.4), -1)
+        // Rule 2 — hold: a new state is kept for >= 2 ticks (ambient default).
+        var q = CellQuantizer()
+        XCTAssertEqual(q.output, 0)
+        _ = q.step(proposal: 1.4)   // first move allowed (long held)
+        XCTAssertEqual(q.output, 1)
+        _ = q.step(proposal: 1.4)   // still held
+        XCTAssertEqual(q.output, 1)
+        _ = q.step(proposal: 0)     // target 0 after only 1 hold tick -> held
+        XCTAssertEqual(q.output, 1, "ambient holds >= 2 ticks")
+        _ = q.step(proposal: 0)
+        XCTAssertEqual(q.output, 0, "then converges to neutral")
+        // Rule 3 — step economy: a reversal passes through neutral (never
+        // directly +1 -> -1), gated by the same hold rule.
+        var r = CellQuantizer()
+        _ = r.step(proposal: 1.4)
+        XCTAssertEqual(r.output, 1)
+        _ = r.step(proposal: -1.4)  // economy clamps the target to 0, held
+        XCTAssertEqual(r.output, 1, "hold rule still applies to reversals")
+        _ = r.step(proposal: -1.4)  // held again (1 tick since the last change)
+        XCTAssertEqual(r.output, 1)
+        _ = r.step(proposal: -1.4)  // held expired -> settles through NEUTRAL
+        XCTAssertEqual(r.output, 0, "reversal must pass through neutral")
+        _ = r.step(proposal: -1.4)
+        XCTAssertEqual(r.output, 0)
+        _ = r.step(proposal: -1.4)
+        XCTAssertEqual(r.output, 0)
+        _ = r.step(proposal: -1.4)
+        XCTAssertEqual(r.output, -1, "then the other pose")
+        // Determinism: the same trace folds bit-identically.
+        func run() -> [Int] {
+            var c = CellQuantizer()
+            return (0..<500).map { i in c.step(proposal: 1.4 * sin(Double(i) / 7.0)) }
+        }
+        XCTAssertEqual(run(), run())
+    }
+
+    /// The LPR tail part (§5.2): authored pose diffs for every pet, lumen
+    /// none — sized like a cat-class patch, never a crop or a rotation.
+    func testTailPosesAreAuthoredAndBounded() {
+        for archetype in Archetype.allCases {
+            guard let poses = SpriteStageMetadata.tailPoses(archetype) else {
+                XCTAssertEqual(archetype, .lumen, "only lumen has no tail part")
+                continue
+            }
+            for (pose, cells) in poses {
+                XCTAssertFalse(cells.isEmpty, "\(archetype.rawValue): pose \(pose) authored")
+                XCTAssertLessThanOrEqual(cells.count, 6,
+                    "\(archetype.rawValue): pose \(pose) is cat-class small")
+                for d in cells {
+                    XCTAssertTrue(d.x >= 0 && d.x < CompanionSprite.gridWidth
+                        && d.y >= 0 && d.y < CompanionSprite.gridHeight,
+                        "\(archetype.rawValue): pose \(pose) cell in-grid")
+                    XCTAssertNotEqual(d.symbol, ".", "\(archetype.rawValue): poses paint, not clear")
+                }
             }
         }
+    }
+
+    /// The ambient tail channel (§5.5): wags happen, hold >= 2 ticks, and
+    /// re-converge to neutral between bursts — deterministic per seed.
+    func testTailChannelWagsHoldsAndReconverges() {
+        var channel = TailChannel(seed: 20261103)
+        var poses: [Int] = []
+        var nonNeutralTicks = 0
+        for _ in 0..<4000 {
+            let pose = channel.step(modeAllows: true, ticksPerMinute: 400, tempoScale: 1)
+            poses.append(pose)
+            if pose != 0 { nonNeutralTicks += 1 }
+        }
+        XCTAssertGreaterThan(nonNeutralTicks, 0, "the tail wags at ambient rate")
+        XCTAssertLessThan(nonNeutralTicks, 2000 * 3, "the tail is not perpetually up")
+        // Holds: a non-zero pose lasts at least 2 consecutive ticks (ignoring
+        // the boundary pass through neutral).
+        var violations = 0
+        var i = 0
+        while i < poses.count {
+            if poses[i] != 0 {
+                var len = 0
+                while i + len < poses.count, poses[i + len] == poses[i] { len += 1 }
+                if len < 2 { violations += 1 }
+                i += len
+            } else { i += 1 }
+        }
+        XCTAssertEqual(violations, 0, "quantized poses hold >= 2 ticks")
+        // Re-convergence: the run ENDS settled (long stretches of neutral).
+        XCTAssertLessThan(poses.suffix(600).filter { $0 != 0 }.count, 100,
+            "the tail returns to neutral between bursts")
+        // Determinism per seed.
+        func run(_ seed: UInt64) -> [Int] {
+            var c = TailChannel(seed: seed)
+            return (0..<1000).map { _ in c.step(modeAllows: true, ticksPerMinute: 400, tempoScale: 1) }
+        }
+        XCTAssertEqual(run(7), run(7))
+        XCTAssertNotEqual(run(7), run(8))
+        // Suppression settles to neutral immediately.
+        var halted = TailChannel(seed: 20261103)
+        _ = halted.step(modeAllows: false, ticksPerMinute: 400, tempoScale: 1)
+        XCTAssertEqual(halted.pose, 0, "mode gates freeze the tail neutral")
     }
 
     /// v31 rule carried to v40: a frame that renders as plain idle is an
@@ -108,11 +172,6 @@ final class SpriteFixTests: XCTestCase {
             let sprite = AuthoredSprites.sprite(for: archetype)
             let base = sprite.symbols(frameID: "idle")
             for id in frameIDs {
-                if sprite.isImageBacked {
-                    let moving = (1...6).contains { age in PetMotion.act(id, age) != .identity }
-                    XCTAssertTrue(moving, "\(archetype.rawValue) \(id): no-op act envelope")
-                    continue
-                }
                 let frame = sprite.symbols(frameID: id)
                 var diffs = 0
                 for y in 0..<CompanionSprite.gridHeight {

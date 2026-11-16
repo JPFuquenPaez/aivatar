@@ -1,7 +1,4 @@
 import Foundation
-#if canImport(CoreGraphics)
-import CoreGraphics
-#endif
 
 /// v13 — AUTHORED PIXEL SPRITES (the source of truth for the companion's
 /// look, Tools/PIXEL_DESIGN.md v5).
@@ -70,45 +67,30 @@ nonisolated struct CompanionSprite: Sendable, Equatable {
     /// Ramp token -> hex string. Exactly 5 tokens per species.
     let paletteHex: [Character: String]
 
-    /// v40 HD pet pass: when set, renderers draw this asset image
-    /// (aspect-fit into the 20x15 cell box above the ground tile) and
-    /// animate it with PetMotion poses + puppet regions — the
-    /// HD art has no cell-level poses. `base` remains as the deterministic
-    /// auto-downsampled fallback (postcard, complication icon, tests).
-    let imageAssetName: String?
-    /// UI accent for image-backed sprites (selection ring, disc): the
-    /// downsampled palette's body tone is muddy, so the vivid accent is
-    /// authored separately.
+    /// AMS v2: the HD pet PORTRAIT asset (avatars/ sheet cuts), used ONLY by
+    /// static portrait surfaces (picker disc, naming hero, iPhone card,
+    /// postcard front). No surface animates it — the live stage, phone grid
+    /// and postcard moment render the authored grid + patches (§5.6
+    /// "two skins, one animal": the portrait is a photo OF the companion,
+    /// the grid IS the companion).
+    let portraitAssetName: String?
+    /// UI accent for portrait surfaces (selection ring, disc): authored
+    /// separately from the ramp (the family accent, not the body tone).
     let accentHexOverride: String?
 
     init(archetype: Archetype, base: [String], patches: [String: [CellDiff]],
-         paletteHex: [Character: String], imageAssetName: String? = nil,
-         accentHexOverride: String? = nil,
-         puppetHead: PuppetRegion? = nil, puppetTail: PuppetRegion? = nil) {
+         paletteHex: [Character: String], portraitAssetName: String? = nil,
+         accentHexOverride: String? = nil) {
         self.archetype = archetype
         self.base = base
         self.patches = patches
         self.paletteHex = paletteHex
-        self.imageAssetName = imageAssetName
+        self.portraitAssetName = portraitAssetName
         self.accentHexOverride = accentHexOverride
-        self.puppetHead = puppetHead
-        self.puppetTail = puppetTail
     }
 
-    nonisolated var isImageBacked: Bool { imageAssetName != nil }
+    nonisolated var hasPortrait: Bool { portraitAssetName != nil }
     nonisolated var uiAccentHex: String { accentHexOverride ?? paletteHex["B"] ?? "FF9E4A" }
-
-    /// v42: a puppeteered region of the HD image (head / tail), normalized
-    /// 0...1 in image space (y-down). The renderer redraws the region on top
-    /// of the body with its own small rotation/bob (see PetMotion.Pose), so
-    /// the animal reads as a creature, not a sticker. Nil for grid sprites.
-    nonisolated struct PuppetRegion: Sendable, Equatable {
-        var rect: CGRect      // normalized, y-down
-        var anchor: CGPoint   // normalized pivot, y-down
-    }
-
-    let puppetHead: PuppetRegion?
-    let puppetTail: PuppetRegion?
 
     // MARK: - Resolution
 
@@ -230,218 +212,479 @@ nonisolated enum AuthoredSprites {
         }
     }
 
-    // MARK: v40 HD PETS — the five companions are cut from the authored
-    // HD pet sheet (avatars/, cut into avatars/cut/pet-*.png and shipped as
-    // imagesets `pet-<name>` in both app catalogs). The 20x18 grids below
-    // are deterministic auto-downsamples of the same art: they keep every
-    // grid consumer working (postcard, complication icon, tests) as a
-    // pixel-honest fallback; the live stage/picker/phone draw the HD image.
+    // MARK: AMS v2 AUTHORED GRIDS (the five pets, P0)
+    //
+    // v43 (AMS v2): the stage is pixel art again. Each pet is HAND-AUTHORED
+    // on the 20x18 cell grid with the full patch grammar (lumen was the
+    // literal template) — silhouette-first, uniform eye style (a 2x2 `W K /
+    // K K` block, catchlight upper-left, 3-cell glance window), 1-2 mouth
+    // cells, family-locked 5-token ramps, and per-animal signature patches
+    // (fox: ear flick + tail ride; shiba: head cock + the smile; corgi: stub
+    // nub pop + far-ear flick; sphynx: ear twitch + kneading press; bird:
+    // wing flick + crest spread). The auto-downsampled v40 grids (HD art in
+    // a pixel costume — the second "costume mistake" after v5-v12) are
+    // retired; the HD cuts live on as PORTRAITS only (portraitAssetName):
+    // picker disc, naming hero, iPhone card, postcard front.
 
     static let petFoxGrid: [String] = [
-    "WK......KWW.........",
-    "BA.....ABBW.........",
-    "BBDK..DAWBW.........",
-    "WBADDDDWDBW.........",
-    "DBWADDAWBW..........",
-    ".WAAAAAWW...........",
-    "..AAAKAAK...........",
-    "..WWWWWW............",
-    "...WBBAKKDDD........",
-    "...BBWKKKDDDAA......",
-    "...KKKAAAKDDAAA.KDD.",
-    "....WWWAAKDADAAADDK.",
-    "....BBWAKBAADDAAAKKK",
-    ".....DDADDWAADDAAAKK",
-    ".....BBADDDWADDDDDKK",
-    ".....BBW.D..WB.DDDK.",
-    ".....BWW.D..WA......",
-    ".....WWW....WK......",
-]
-    static let petFoxPalette: [Character: String] = [
-    "K": "4E3023",
-    "D": "AB724E",
-    "B": "C59D8A",
-    "W": "F2E1C5",
-    "A": "E9B575",
-]
-
-    static let petMockingbirdGrid: [String] = [
-    ".WW.................",
-    "KWKWD...............",
-    "KKKKW...............",
-    "KKKKKW.......AAAA...",
-    "WKKKKKK.....AAWAAKK.",
-    "WWKKKKK....KAAAABK..",
-    ".WWKKKK....AAAWBB...",
-    ".WWDKKKK.DDADABBB...",
-    "..WWAKDDDDDDDDBBB...",
-    "....WDDDKKKKKWBBB...",
-    ".....DDDWKKKKWWWW...",
-    ".....DDDKWWAWWWWW...",
-    ".....KKKKAAWWWWA..D.",
-    "....KKKKAAAAAA...DD.",
-    "....KKKK.KKDKKK.DDKD",
-    "..........KK.KKKDKKD",
-    "..........KKDKKK....",
-    "..........KKKKKKK...",
-]
-    static let petMockingbirdPalette: [Character: String] = [
-    "K": "373B44",
-    "D": "77757B",
-    "B": "C3C1BF",
-    "W": "E4E9ED",
-    "A": "959CA8",
-]
+        "....A..........A....",
+        "....BA........AB....",
+        "....BB........BB....",
+        "....BBB......BBB....",
+        "....BBBBBBBBBBBB....",
+        "....BWKBBBBBWKBB....",
+        "....BKKBBBBBKKBB....",
+        "....BBBBBBBBBBBB....",
+        "....BWWWWWWWWWWB....",
+        "....BWWWWKKWWWWB....",
+        ".....BWWWWWWWWB.....",
+        "....BBBBWWWWBBBB....",
+        "....BBBBWWWWBBBBDD..",
+        "....BBBWWBBBWWBBBDW.",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+    ]
 
     static let petShibaGrid: [String] = [
-    ".........KAK....AWA.",
-    ".........AWAAAAAAAW.",
-    ".........AAAAAAAAAA.",
-    ".........AAAAKAAAAAA",
-    ".........AAWWWWWKKWW",
-    ".KWWWWWW.AWWWWWWBWWB",
-    ".WAAAAAW.AAAWWWBBBA.",
-    ".WAAAAAAKAKKKWWWBKA.",
-    ".WAAADDKDAAAKKKKKWAB",
-    ".KAAADKDDDDDAWWBBAAA",
-    ".AAAAAKDDDDDDDWWWDB.",
-    ".AAAAWKKDDDDDDDWKDD.",
-    ".AAAWBBBBDDDDKBDDD..",
-    ".AAWB.BBBDDDD.AAAD..",
-    "AWWK..BBBKAAA.BBA...",
-    "WWW...BBB.AAA.BWA...",
-    "WW.....BB.WWA..WW...",
-    "WW.........WW..WW...",
-]
-    static let petShibaPalette: [Character: String] = [
-    "K": "483327",
-    "D": "31546E",
-    "B": "B49A81",
-    "W": "F0E1C7",
-    "A": "CA8746",
-]
+        ".....A........A.....",
+        ".....BB......BB.....",
+        ".....BBB....BBB.....",
+        "....BBBBBBBBBBBB....",
+        "....BBBBBBBBBBBB....",
+        "....BWKBBBBBWKBB....",
+        "....BKKBBBBBKKBB....",
+        "...BBBBBBBBBBBBBB...",
+        "...BBWWWWWWWWWWD....",
+        "....BWWKWKKWKWWDW...",
+        ".....DDDDDDDDDDD....",
+        ".....BBBWWWWBBB.....",
+        ".....BBBWWWWBBB.....",
+        ".....BBWWBBBWWB.....",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+    ]
 
     static let petCorgiGrid: [String] = [
-    ".......AAK......AAA.",
-    ".......BBAA....AABB.",
-    ".......BBBAAAWAAABB.",
-    ".......ABBAAAWAAABA.",
-    ".......KAAAAAAWAAAA.",
-    ".....DDDDAAAAWWWAAA.",
-    "..WW.DDDAWWWWWKWWWA.",
-    ".WWA.DDKAAWWWWAKWWA.",
-    ".AAAADDKAAAWWBBBWABB",
-    ".AAADDDDAAKWWWWWWADB",
-    "AAAADDDKAAWWDDDWWAWW",
-    "AAAAADDAAAWWWWBBWADD",
-    "AAAAAADAAAWWWWWWBK..",
-    "AAAABAKAAAABBWWBB...",
-    "KAWWBBBBAAABBBBA....",
-    ".WWW.BBBWWWWBBWW....",
-    ".WWW..BBWWWW.BWW....",
-    ".........WWW..WW....",
-]
-    static let petCorgiPalette: [Character: String] = [
-    "K": "392718",
-    "D": "766E45",
-    "B": "C9A48E",
-    "W": "F1E5CC",
-    "A": "DF924B",
-]
+        "..A..A..............",
+        "..B.BBB.............",
+        "..B.BBB.............",
+        ".BBWBBB.............",
+        ".BBBWKB.............",
+        "KWWWKKB.............",
+        ".WWBBBB.............",
+        ".KBBBBBBBBBBBBBBW...",
+        ".WWWBBBBBBBBBBBBBW..",
+        ".WWBBBBBBBBBBBBBB...",
+        "..BBBBBBBBBBBBBBB...",
+        "..BWWWWWWWWWWWWWB...",
+        "..BWWWWWWWWWWWWWB...",
+        "..BBWWBBBWWBBBWBB...",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+    ]
 
     static let petSphynxGrid: [String] = [
-    ".......DWD.......DDD",
-    ".......WWDDD...DDDWW",
-    ".......DWWDDBBBBDWWD",
-    ".......KDDDBBBBBBDW.",
-    "........DDBABBBAABD.",
-    ".........KDBBBBBBD..",
-    "..........WDDDDDD...",
-    ".........WWWWWDWD...",
-    ".......BBBWWWWWWW...",
-    ".....BBBBBBBWWAWW...",
-    "...BBBBBBBBBBBBBB...",
-    "..BBBBBBBBBBBBBBB...",
-    ".BBBBBBBBBBBDDDBK...",
-    ".BBBBBBDBBBDDDDB....",
-    "BBBBBBBDDBBDDDBD....",
-    "BBBBBBBDDBBDDDB.....",
-    "BBBBBBBBDDBDDDB.....",
-    "BBBBBBDBDDBBDBB.....",
-]
-    static let petSphynxPalette: [Character: String] = [
-    "K": "2F2624",
-    "D": "614F53",
-    "B": "87797E",
-    "W": "BC966A",
-    "A": "53B1A0",
-]
+        "..A..............A..",
+        "..BB............BB..",
+        "..BBB..........BBB..",
+        "..BBBBBBBBBB...BBB..",
+        "....DBBBBBBD........",
+        "....BWKBBWKB........",
+        "....BKKBBKKB........",
+        "....BDDBBBDD........",
+        "....BBBKKBBB........",
+        ".....BBWWWWBB.......",
+        ".....BBWWWWBBD......",
+        ".....BBBBBBBB.D.....",
+        ".....BBBBBBBB.D.....",
+        ".....BWWBBWWB.......",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+    ]
 
-    // MARK: The five companions (image-backed)
+    static let petMockingbirdGrid: [String] = [
+        ".......B............",
+        "...BBBBB............",
+        "...BBBBB............",
+        "DDDBBWKB............",
+        ".D.BBKKB............",
+        "...BBBBB............",
+        "....BBBBDDDBBB......",
+        "....BBBBBDDDBBBB....",
+        "....BBBBBBDDDBBBBB..",
+        "....BBBBBBBDDDBBB...",
+        "....BWWWWWBBBB......",
+        "....BWWWWWBBBB......",
+        ".......K..K.........",
+        ".......K..K.........",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+    ]
+
+    // Family-locked 5-token ramps (value-ordered: ink < shade < body < paper;
+    // accent = the family accent, not a body re-tint). The fox keeps the
+    // hash-pinned icon ramp (one hue family across stage + icon + app icon).
+
+    static let petFoxPalette: [Character: String] = [
+        "K": "2A1612", "D": "C4621B", "B": "FF9E4A",
+        "W": "F5F4EF", "A": "FFC800",
+    ]
+
+    static let petShibaPalette: [Character: String] = [
+        "K": "2F2118", "D": "C0854B", "B": "F0DFC0",
+        "W": "FDF8EC", "A": "6FA0FF",
+    ]
+
+    static let petCorgiPalette: [Character: String] = [
+        "K": "2E1E12", "D": "9C6B3E", "B": "E19547",
+        "W": "F2E9D8", "A": "5FAE4A",
+    ]
+
+    static let petSphynxPalette: [Character: String] = [
+        "K": "2F2624", "D": "6E4F43", "B": "C9A489",
+        "W": "E9DCC9", "A": "2ED3C6",
+    ]
+
+    static let petMockingbirdPalette: [Character: String] = [
+        "K": "373B44", "D": "6B7280", "B": "B9C0CC",
+        "W": "E4E9ED", "A": "FFE066",
+    ]
+
+    static let foxPatches: [String: [CellDiff]] = [
+        "blink": [
+            CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(12, 5, "D"),
+            CellDiff(13, 5, "D")
+        ],
+        "sleepy": [
+            CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(12, 5, "D"),
+            CellDiff(13, 5, "D"), CellDiff(5, 6, "D"), CellDiff(6, 6, "D"),
+            CellDiff(12, 6, "D"), CellDiff(13, 6, "D"), CellDiff(5, 1, "B"),
+            CellDiff(14, 1, "B")
+        ],
+        "happy": [
+            CellDiff(5, 5, "B"), CellDiff(6, 5, "B"), CellDiff(12, 5, "B"),
+            CellDiff(13, 5, "B"), CellDiff(7, 9, "K"), CellDiff(12, 9, "K")
+        ],
+        "glanceL": [
+            CellDiff(4, 5, "W"), CellDiff(5, 5, "K"), CellDiff(6, 5, "B"),
+            CellDiff(4, 6, "K"), CellDiff(6, 6, "B"), CellDiff(11, 5, "W"),
+            CellDiff(12, 5, "K"), CellDiff(13, 5, "B"), CellDiff(11, 6, "K"),
+            CellDiff(13, 6, "B")
+        ],
+        "glanceR": [
+            CellDiff(5, 5, "B"), CellDiff(6, 5, "W"), CellDiff(7, 5, "K"),
+            CellDiff(5, 6, "B"), CellDiff(7, 6, "K"), CellDiff(12, 5, "B"),
+            CellDiff(13, 5, "W"), CellDiff(14, 5, "K"), CellDiff(12, 6, "B"),
+            CellDiff(14, 6, "K")
+        ],
+        "quirk": [
+            CellDiff(4, 1, "A"), CellDiff(15, 1, "A"), CellDiff(19, 13, "W"),
+            CellDiff(18, 13, "D")
+        ],
+        "perk": [
+            CellDiff(5, 4, "D"), CellDiff(6, 4, "D"), CellDiff(12, 4, "D"),
+            CellDiff(13, 4, "D")
+        ],
+        "breathe": [
+            CellDiff(7, 11, "W"), CellDiff(12, 11, "W")
+        ],
+        "idleA": [
+            CellDiff(18, 13, "D"), CellDiff(17, 13, "W")
+        ],
+        "idleB": [
+            CellDiff(19, 13, "W"), CellDiff(18, 13, "D")
+        ],
+        "yawn": [
+            CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(12, 5, "D"),
+            CellDiff(13, 5, "D"), CellDiff(5, 6, "D"), CellDiff(6, 6, "D"),
+            CellDiff(12, 6, "D"), CellDiff(13, 6, "D"), CellDiff(9, 10, "K"),
+            CellDiff(10, 10, "K")
+        ],
+    ]
+
+    static let shibaPatches: [String: [CellDiff]] = [
+        "blink": [
+            CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(12, 5, "D"),
+            CellDiff(13, 5, "D")
+        ],
+        "sleepy": [
+            CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(12, 5, "D"),
+            CellDiff(13, 5, "D"), CellDiff(5, 6, "D"), CellDiff(6, 6, "D"),
+            CellDiff(12, 6, "D"), CellDiff(13, 6, "D")
+        ],
+        "happy": [
+            CellDiff(5, 5, "B"), CellDiff(6, 5, "B"), CellDiff(12, 5, "B"),
+            CellDiff(13, 5, "B"), CellDiff(6, 9, "K"), CellDiff(11, 9, "K")
+        ],
+        "glanceL": [
+            CellDiff(4, 5, "W"), CellDiff(5, 5, "K"), CellDiff(6, 5, "B"),
+            CellDiff(4, 6, "K"), CellDiff(6, 6, "B"), CellDiff(11, 5, "W"),
+            CellDiff(12, 5, "K"), CellDiff(13, 5, "B"), CellDiff(11, 6, "K"),
+            CellDiff(13, 6, "B")
+        ],
+        "glanceR": [
+            CellDiff(5, 5, "B"), CellDiff(6, 5, "W"), CellDiff(7, 5, "K"),
+            CellDiff(5, 6, "B"), CellDiff(7, 6, "K"), CellDiff(12, 5, "B"),
+            CellDiff(13, 5, "W"), CellDiff(14, 5, "K"), CellDiff(12, 6, "B"),
+            CellDiff(14, 6, "K")
+        ],
+        "quirk": [
+            CellDiff(14, 0, "B"), CellDiff(13, 0, "A"), CellDiff(8, 9, "K"),
+            CellDiff(11, 9, "K")
+        ],
+        "perk": [
+            CellDiff(5, 0, "W"), CellDiff(14, 0, "W"), CellDiff(6, 9, "K"),
+            CellDiff(11, 9, "K")
+        ],
+        "breathe": [
+            CellDiff(7, 11, "W"), CellDiff(12, 11, "W")
+        ],
+        "idleA": [
+            CellDiff(7, 13, "B"), CellDiff(8, 13, "W")
+        ],
+        "idleB": [
+            CellDiff(12, 13, "B"), CellDiff(13, 13, "W")
+        ],
+        "yawn": [
+            CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(12, 5, "D"),
+            CellDiff(13, 5, "D"), CellDiff(5, 6, "D"), CellDiff(6, 6, "D"),
+            CellDiff(12, 6, "D"), CellDiff(13, 6, "D"), CellDiff(8, 9, "K"),
+            CellDiff(11, 9, "K")
+        ],
+    ]
+
+    static let corgiPatches: [String: [CellDiff]] = [
+        "blink": [
+            CellDiff(4, 4, "D"), CellDiff(5, 4, "D")
+        ],
+        "sleepy": [
+            CellDiff(4, 4, "D"), CellDiff(5, 4, "D"), CellDiff(4, 5, "D"),
+            CellDiff(5, 5, "D")
+        ],
+        "happy": [
+            CellDiff(4, 4, "B"), CellDiff(5, 4, "B"), CellDiff(2, 7, "K"),
+            CellDiff(3, 7, "K")
+        ],
+        "glanceL": [
+            CellDiff(3, 4, "W"), CellDiff(4, 4, "K"), CellDiff(5, 4, "B"),
+            CellDiff(3, 5, "K"), CellDiff(5, 5, "B")
+        ],
+        "glanceR": [
+            CellDiff(4, 4, "B"), CellDiff(5, 4, "W"), CellDiff(6, 4, "K"),
+            CellDiff(4, 5, "B"), CellDiff(6, 5, "K")
+        ],
+        "quirk": [
+            CellDiff(17, 7, "W"), CellDiff(16, 7, "B"), CellDiff(2, 1, "A")
+        ],
+        "perk": [
+            CellDiff(2, 0, "W"), CellDiff(5, 0, "W")
+        ],
+        "breathe": [
+            CellDiff(2, 11, "W"), CellDiff(16, 11, "W")
+        ],
+        "idleA": [
+            CellDiff(4, 13, "B"), CellDiff(3, 13, "W")
+        ],
+        "idleB": [
+            CellDiff(9, 13, "B"), CellDiff(8, 13, "W")
+        ],
+        "yawn": [
+            CellDiff(4, 4, "D"), CellDiff(5, 4, "D"), CellDiff(4, 5, "D"),
+            CellDiff(5, 5, "D"), CellDiff(1, 6, "K"), CellDiff(2, 6, "K")
+        ],
+    ]
+
+    static let sphynxPatches: [String: [CellDiff]] = [
+        "blink": [
+            CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(9, 5, "D"),
+            CellDiff(10, 5, "D")
+        ],
+        "sleepy": [
+            CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(9, 5, "D"),
+            CellDiff(10, 5, "D"), CellDiff(5, 6, "D"), CellDiff(6, 6, "D"),
+            CellDiff(9, 6, "D"), CellDiff(10, 6, "D")
+        ],
+        "happy": [
+            CellDiff(5, 5, "B"), CellDiff(6, 5, "B"), CellDiff(9, 5, "B"),
+            CellDiff(10, 5, "B"), CellDiff(6, 8, "K"), CellDiff(9, 8, "K")
+        ],
+        "glanceL": [
+            CellDiff(4, 5, "W"), CellDiff(5, 5, "K"), CellDiff(6, 5, "B"),
+            CellDiff(4, 6, "K"), CellDiff(6, 6, "B"), CellDiff(8, 5, "W"),
+            CellDiff(9, 5, "K"), CellDiff(10, 5, "B"), CellDiff(8, 6, "K"),
+            CellDiff(10, 6, "B")
+        ],
+        "glanceR": [
+            CellDiff(5, 5, "B"), CellDiff(6, 5, "W"), CellDiff(7, 5, "K"),
+            CellDiff(5, 6, "B"), CellDiff(7, 6, "K"), CellDiff(9, 5, "B"),
+            CellDiff(10, 5, "W"), CellDiff(11, 5, "K"), CellDiff(9, 6, "B"),
+            CellDiff(11, 6, "K")
+        ],
+        "quirk": [
+            CellDiff(15, 2, "D"), CellDiff(8, 13, "W"), CellDiff(9, 13, "W")
+        ],
+        "perk": [
+            CellDiff(2, 0, "W"), CellDiff(17, 0, "W")
+        ],
+        "breathe": [
+            CellDiff(5, 10, "W"), CellDiff(12, 10, "W")
+        ],
+        "idleA": [
+            CellDiff(14, 12, "W"), CellDiff(14, 13, "D")
+        ],
+        "idleB": [
+            CellDiff(6, 13, "B"), CellDiff(7, 13, "W")
+        ],
+        "yawn": [
+            CellDiff(5, 5, "D"), CellDiff(6, 5, "D"), CellDiff(9, 5, "D"),
+            CellDiff(10, 5, "D"), CellDiff(5, 6, "D"), CellDiff(6, 6, "D"),
+            CellDiff(9, 6, "D"), CellDiff(10, 6, "D"), CellDiff(6, 8, "K"),
+            CellDiff(9, 7, "K")
+        ],
+    ]
+
+    static let birdPatches: [String: [CellDiff]] = [
+        "blink": [
+            CellDiff(5, 3, "D"), CellDiff(6, 3, "D")
+        ],
+        "sleepy": [
+            CellDiff(5, 3, "D"), CellDiff(6, 3, "D"), CellDiff(5, 4, "D"),
+            CellDiff(6, 4, "D")
+        ],
+        "happy": [
+            CellDiff(5, 3, "B"), CellDiff(6, 3, "B"), CellDiff(2, 4, "D"),
+            CellDiff(1, 4, "B")
+        ],
+        "glanceL": [
+            CellDiff(4, 3, "W"), CellDiff(5, 3, "K"), CellDiff(6, 3, "B"),
+            CellDiff(4, 4, "K"), CellDiff(6, 4, "B")
+        ],
+        "glanceR": [
+            CellDiff(5, 3, "B"), CellDiff(6, 3, "W"), CellDiff(7, 3, "K"),
+            CellDiff(5, 4, "B"), CellDiff(7, 4, "K")
+        ],
+        "quirk": [
+            CellDiff(7, 6, "D"), CellDiff(8, 5, "D"), CellDiff(8, 6, "B")
+        ],
+        "perk": [
+            CellDiff(6, 0, "B"), CellDiff(8, 0, "B")
+        ],
+        "breathe": [
+            CellDiff(4, 10, "W"), CellDiff(4, 11, "W")
+        ],
+        "idleA": [
+            CellDiff(17, 9, "B"), CellDiff(16, 9, "B")
+        ],
+        "idleB": [
+            CellDiff(7, 6, "D"), CellDiff(8, 6, "B")
+        ],
+        "yawn": [
+            CellDiff(5, 3, "D"), CellDiff(6, 3, "D"), CellDiff(2, 4, "D"),
+            CellDiff(1, 4, "B")
+        ],
+    ]
+
+    static let foxTailPoses: [Int: [CellDiff]] = [
+        -1: [
+            CellDiff(18, 13, "D"), CellDiff(17, 13, "W")
+        ],
+        1: [
+            CellDiff(19, 13, "W"), CellDiff(18, 13, "B")
+        ],
+    ]
+
+    static let shibaTailPoses: [Int: [CellDiff]] = [
+        -1: [
+            CellDiff(16, 9, "D"), CellDiff(17, 9, "W")
+        ],
+        1: [
+            CellDiff(15, 8, "W"), CellDiff(16, 9, "D")
+        ],
+    ]
+
+    static let corgiTailPoses: [Int: [CellDiff]] = [
+        -1: [
+            CellDiff(17, 7, "W"), CellDiff(16, 7, "B")
+        ],
+        1: [
+            CellDiff(18, 8, "W"), CellDiff(17, 8, "B")
+        ],
+    ]
+
+    static let sphynxTailPoses: [Int: [CellDiff]] = [
+        -1: [
+            CellDiff(14, 11, "D"), CellDiff(13, 10, "D"), CellDiff(15, 13, "K")
+        ],
+        1: [
+            CellDiff(15, 12, "D"), CellDiff(16, 13, "D")
+        ],
+    ]
+
+    static let birdTailPoses: [Int: [CellDiff]] = [
+        -1: [
+            CellDiff(14, 6, "B"), CellDiff(13, 6, "B")
+        ],
+        1: [
+            CellDiff(17, 7, "B"), CellDiff(16, 7, "D")
+        ],
+    ]
+
+
+    // MARK: The five companions (authored grids + HD portraits)
 
     static let ember = CompanionSprite(
         archetype: .ember,
         base: petFoxGrid,
-        // v40/v42: the HD image animates via PetMotion (ambient + act
-        // envelopes + head/tail puppet regions); the grid is the static fallback.
-        patches: [:],
+        patches: foxPatches,
         paletteHex: petFoxPalette,
-        imageAssetName: "pet-fox",
-        accentHexOverride: "FFC800",
-        puppetHead: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.00, y: 0.00, width: 0.58, height: 0.62), anchor: CGPoint(x: 0.52, y: 0.58)),
-        puppetTail: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.55, y: 0.42, width: 0.45, height: 0.35), anchor: CGPoint(x: 0.60, y: 0.62))
+        portraitAssetName: "pet-fox",
+        accentHexOverride: "FFC800"
     )
 
     static let willow = CompanionSprite(
         archetype: .willow,
         base: petShibaGrid,
-        // v40/v42: the HD image animates via PetMotion (ambient + act
-        // envelopes + head/tail puppet regions); the grid is the static fallback.
-        patches: [:],
+        patches: shibaPatches,
         paletteHex: petShibaPalette,
-        imageAssetName: "pet-shiba",
-        accentHexOverride: "6FA0FF",
-        puppetHead: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.22, y: 0.00, width: 0.62, height: 0.52), anchor: CGPoint(x: 0.52, y: 0.50)),
-        puppetTail: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.00, y: 0.32, width: 0.35, height: 0.30), anchor: CGPoint(x: 0.32, y: 0.55))
+        portraitAssetName: "pet-shiba",
+        accentHexOverride: "6FA0FF"
     )
 
     static let compass = CompanionSprite(
         archetype: .compass,
         base: petCorgiGrid,
-        // v40/v42: the HD image animates via PetMotion (ambient + act
-        // envelopes + head/tail puppet regions); the grid is the static fallback.
-        patches: [:],
+        patches: corgiPatches,
         paletteHex: petCorgiPalette,
-        imageAssetName: "pet-corgi",
-        accentHexOverride: "5FAE4A",
-        puppetHead: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.28, y: 0.00, width: 0.62, height: 0.55), anchor: CGPoint(x: 0.58, y: 0.52)),
-        puppetTail: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.00, y: 0.30, width: 0.28, height: 0.25), anchor: CGPoint(x: 0.26, y: 0.50))
+        portraitAssetName: "pet-corgi",
+        accentHexOverride: "5FAE4A"
     )
 
     static let prism = CompanionSprite(
         archetype: .prism,
         base: petSphynxGrid,
-        // v40/v42: the HD image animates via PetMotion (ambient + act
-        // envelopes + head/tail puppet regions); the grid is the static fallback.
-        patches: [:],
+        patches: sphynxPatches,
         paletteHex: petSphynxPalette,
-        imageAssetName: "pet-sphynx",
-        accentHexOverride: "2ED3C6",
-        puppetHead: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.15, y: 0.00, width: 0.72, height: 0.45), anchor: CGPoint(x: 0.50, y: 0.42)),
-        puppetTail: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.62, y: 0.72, width: 0.38, height: 0.28), anchor: CGPoint(x: 0.68, y: 0.75))
+        portraitAssetName: "pet-sphynx",
+        accentHexOverride: "2ED3C6"
     )
 
     static let nimbus = CompanionSprite(
         archetype: .nimbus,
         base: petMockingbirdGrid,
-        // v40/v42: the HD image animates via PetMotion (ambient + act
-        // envelopes + head/tail puppet regions); the grid is the static fallback.
-        patches: [:],
+        patches: birdPatches,
         paletteHex: petMockingbirdPalette,
-        imageAssetName: "pet-mockingbird",
-        accentHexOverride: "FFE066",
-        puppetHead: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.52, y: 0.05, width: 0.48, height: 0.55), anchor: CGPoint(x: 0.60, y: 0.55)),
-        puppetTail: CompanionSprite.PuppetRegion(rect: CGRect(x: 0.00, y: 0.00, width: 0.55, height: 0.65), anchor: CGPoint(x: 0.52, y: 0.60))
+        portraitAssetName: "pet-mockingbird",
+        accentHexOverride: "FFE066"
     )
 
     // MARK: LUMEN — moth (Aivatar 2.0, E10; night element, luminous)
