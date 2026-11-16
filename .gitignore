@@ -11,8 +11,5 @@ Tools/launch-*.png
 Tools/probe-*.png
 Tools/final-*.png
 
-# Generated icon layers (Tools/icon_export.swift output; AppIcon.png in the appiconset is the committed composed icon)
-build/icon/
-
-# Xcode build database churn
-build/XCBuildData/
+# All local Xcode build output (generated icon layers, build database, object files)
+build/
